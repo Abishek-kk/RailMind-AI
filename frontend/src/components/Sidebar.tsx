@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Video, LayoutDashboard, Bell, Train } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const navItems = [
   { to: "/live", label: "Live Monitoring", icon: Video },
@@ -7,7 +8,32 @@ const navItems = [
   { to: "/alerts", label: "Alerts", icon: Bell },
 ] as const;
 
+const backendBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+
+/** BUG 11 FIX: poll backend health endpoint every 30 seconds */
+async function checkBackendHealth(): Promise<boolean> {
+  const response = await fetch(`${backendBaseUrl}/health`);
+  if (!response.ok) throw new Error("Backend unreachable");
+  return true;
+}
+
 export function Sidebar() {
+  const { isError, isPending } = useQuery({
+    queryKey: ["backendHealth"],
+    queryFn: checkBackendHealth,
+    refetchInterval: 30_000,
+    staleTime: 0,
+    retry: 1,
+  });
+
+  const isHealthy = !isError;
+  const statusLabel = isError
+    ? "Backend Unreachable"
+    : isPending
+    ? "Checking..."
+    : "All Systems Operational";
+  const statusColor = isError ? "#ef4444" : isPending ? "#f97316" : "#22c55e";
+
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-3 border-b border-border px-5 py-5">
@@ -40,10 +66,18 @@ export function Sidebar() {
         <div className="text-xs font-semibold text-muted-foreground">System Status</div>
         <div className="mt-2 flex items-center gap-2 text-sm">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#22c55e]" />
+            {isHealthy && (
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
+                style={{ backgroundColor: statusColor }}
+              />
+            )}
+            <span
+              className="relative inline-flex h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: statusColor }}
+            />
           </span>
-          <span className="text-[#22c55e]">All Systems Operational</span>
+          <span style={{ color: statusColor }}>{statusLabel}</span>
         </div>
       </div>
     </aside>

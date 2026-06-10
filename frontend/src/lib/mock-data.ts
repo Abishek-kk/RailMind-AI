@@ -34,6 +34,8 @@ export interface Alert {
   status: AlertStatus;
   description: string;
   image: string;
+  /** Optional operator assigned to this alert, as returned by the backend */
+  operator_assigned?: string | null;
 }
 
 import p1 from "@/assets/cctv-platform.jpg";
@@ -51,11 +53,6 @@ export const CCTV_OPTIONS = [
   { id: "CCTV-4", label: "CCTV-4 (Platform 4)" },
   { id: "CCTV-5", label: "CCTV-5 (Platform 5)" },
 ];
-
-function rand(seed: number) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
 
 export function getLiveFeeds(): CCTVFeed[] {
   return [
@@ -124,138 +121,6 @@ export function getLiveFeeds(): CCTVFeed[] {
         { id: 45, x: 62, y: 42, w: 9, h: 28, level: "low" },
       ],
     },
-  ];
-}
-
-const TYPES = [
-  "Suicide Risk Detected",
-  "Pickpocketing Risk",
-  "Loitering Detected",
-  "Normal Activity",
-  "Security Threat",
-] as const;
-
-function typeToLevel(t: string): RiskLevel {
-  if (t.includes("Suicide") || t.includes("Security")) return "high";
-  if (t.includes("Pickpocketing")) return "suspicious";
-  if (t.includes("Loitering")) return "medium";
-  return "low";
-}
-
-export function generateAlerts(count = 28): Alert[] {
-  const alerts: Alert[] = [];
-  for (let i = 0; i < count; i++) {
-    const type = TYPES[i % TYPES.length];
-    const cctvNum = (i % 5) + 1;
-    const level = typeToLevel(type);
-    const baseScore =
-      level === "high" ? 85 + (i % 10) :
-      level === "suspicious" ? 70 + (i % 15) :
-      level === "medium" ? 55 + (i % 15) :
-      10 + (i % 15);
-    const minute = 45 - i;
-    const status: AlertStatus = type === "Normal Activity" ? "resolved" : "active";
-    alerts.push({
-      id: `ALT-2025-0526-${String(i + 1).padStart(3, "0")}`,
-      cctv: `CCTV-${cctvNum}`,
-      platform: `Platform ${cctvNum}`,
-      type,
-      riskScore: baseScore,
-      riskLevel: level,
-      time: `10:${String(Math.max(0, minute)).padStart(2, "0")}:${String(28 - (i % 30)).padStart(2, "0")} AM`,
-      date: "18 May 2025",
-      status,
-      description:
-        level === "high"
-          ? "Person standing near platform edge for extended time with risky behavior."
-          : level === "suspicious"
-          ? "Suspicious hand movement detected in crowded area near other passengers."
-          : level === "medium"
-          ? "Individual loitering in restricted zone beyond expected dwell time."
-          : "Normal passenger movement detected. No threat identified.",
-      image: cctvImages[(cctvNum - 1) % cctvImages.length],
-    });
-  }
-  // Make some explicitly resolved
-  alerts[3].status = "resolved";
-  alerts[6].status = "resolved";
-  return alerts;
-}
-
-export function getDashboardStats() {
-  return {
-    totalIncidents: { value: 45, change: 12, dir: "up" },
-    activeAlerts: { value: 8, change: 33, dir: "up" },
-    suicideRisk: { value: 12, change: 20, dir: "up" },
-    pickpocketingRisk: { value: 18, change: 15, dir: "up" },
-    securityThreats: { value: 15, change: 25, dir: "up" },
-  };
-}
-
-export function getAlertStats() {
-  return {
-    total: { value: 28, change: 18, dir: "up" },
-    high: { value: 8, change: 33, dir: "up" },
-    medium: { value: 13, change: 8, dir: "up" },
-    low: { value: 7, change: 12, dir: "down" },
-    resolved: { value: 15, change: 25, dir: "up" },
-  };
-}
-
-export function getIncidentsByCCTV() {
-  return [
-    { name: "CCTV-1", value: 12, color: "#6366f1" },
-    { name: "CCTV-2", value: 15, color: "#ef4444" },
-    { name: "CCTV-3", value: 8, color: "#f97316" },
-    { name: "CCTV-4", value: 6, color: "#22c55e" },
-    { name: "CCTV-5", value: 4, color: "#3b82f6" },
-  ];
-}
-
-export function getIncidentTrend() {
-  const days = ["12 May", "13 May", "14 May", "15 May", "16 May", "17 May", "18 May"];
-  return days.map((d, i) => ({
-    date: d,
-    total: 25 + Math.round(rand(i + 1) * 25),
-    suicide: 15 + Math.round(rand(i + 2) * 10),
-    pickpocket: 8 + Math.round(rand(i + 3) * 8),
-    security: 4 + Math.round(rand(i + 4) * 6),
-  }));
-}
-
-export function getRiskDistribution() {
-  return [
-    { name: "Suicide Risk", value: 12, color: "#ef4444" },
-    { name: "Pickpocketing Risk", value: 18, color: "#f97316" },
-    { name: "Security Threat", value: 15, color: "#6366f1" },
-  ];
-}
-
-export function getPeakHours() {
-  const data = [];
-  for (let h = 0; h < 24; h++) {
-    const base = Math.exp(-Math.pow((h - 13) / 4, 2)) * 22;
-    data.push({ hour: `${String(h).padStart(2, "0")}:00`, incidents: Math.round(base + rand(h) * 3) });
-  }
-  return data;
-}
-
-export function getCCTVSummary() {
-  return [
-    { id: "CCTV-1", location: "Platform 1", status: "online", incidents: 12, alerts: 2, last: "10:45:17 AM", risk: "medium" },
-    { id: "CCTV-2", location: "Platform 2", status: "online", incidents: 15, alerts: 3, last: "10:45:28 AM", risk: "high" },
-    { id: "CCTV-3", location: "Platform 3", status: "online", incidents: 8, alerts: 2, last: "10:45:21 AM", risk: "medium" },
-    { id: "CCTV-4", location: "Platform 4", status: "online", incidents: 6, alerts: 1, last: "10:45:10 AM", risk: "low" },
-    { id: "CCTV-5", location: "Platform 5", status: "online", incidents: 4, alerts: 0, last: "10:44:55 AM", risk: "low" },
-  ] as const;
-}
-
-export function getPlatformHeatmap() {
-  return [
-    { name: "Platform 1", risk: "High Risk", level: "high" as const },
-    { name: "Platform 2", risk: "Very High Risk", level: "very-high" as const },
-    { name: "Platform 3", risk: "Medium Risk", level: "medium" as const },
-    { name: "Platform 4", risk: "Low Risk", level: "low" as const },
   ];
 }
 

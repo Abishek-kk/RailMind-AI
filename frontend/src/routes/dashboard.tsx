@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
@@ -23,6 +23,7 @@ import {
   getCCTVSummary,
   getRecentIncidents,
 } from "@/lib/api/dashboard";
+import { getFeeds } from "@/lib/api/feeds";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — RailMind AI" }] }),
@@ -33,6 +34,10 @@ const chartColors = ["#6366f1", "#ef4444", "#f97316", "#22c55e", "#3b82f6"];
 
 function DashboardPage() {
   const [feed, setFeed] = useState("all");
+  /** BUG 8 FIX: trendDays state, default 7 */
+  const [trendDays, setTrendDays] = useState<7 | 30>(7);
+  /** BUG 7 FIX: navigate hook for "View Full Heatmap" button */
+  const navigate = useNavigate();
 
   const {
     data: stats,
@@ -46,11 +51,12 @@ function DashboardPage() {
     error: byCctvError,
   } = useQuery({ queryKey: ["incidentsByCCTV"], queryFn: getIncidentsByCCTV });
 
+  /** BUG 8 FIX: queryKey and queryFn both use trendDays so selecting 30 days re-fetches */
   const {
     data: trend,
     isLoading: trendLoading,
     error: trendError,
-  } = useQuery({ queryKey: ["incidentTrend", 7], queryFn: () => getIncidentTrend(7) });
+  } = useQuery({ queryKey: ["incidentTrend", trendDays], queryFn: () => getIncidentTrend(trendDays) });
 
   const {
     data: dist,
@@ -82,6 +88,9 @@ function DashboardPage() {
     error: recentError,
   } = useQuery({ queryKey: ["recentIncidents"], queryFn: getRecentIncidents });
 
+  /** BUG 12 FIX: fetch feeds so TopBar can show dynamic camera list */
+  const { data: feedsData } = useQuery({ queryKey: ["liveFeeds"], queryFn: getFeeds });
+
   const isLoading = statsLoading || byCctvLoading || trendLoading || distLoading || peakLoading || heatmapLoading || summaryLoading || recentLoading;
   const error = statsError || byCctvError || trendError || distError || peakError || heatmapError || summaryError || recentError;
 
@@ -108,6 +117,18 @@ function DashboardPage() {
 
   const totalByCctv = byCctv.reduce((s, x) => s + x.value, 0);
   const totalDist = (dist ?? []).reduce((s, x) => s + x.value, 0);
+
+  /** BUG 13 FIX: compute actual peak hour from data */
+  const peakHour = useMemo(() => {
+    if (!peak || peak.length === 0) return null;
+    return peak.reduce((max, h) => (h.incidents > max.incidents ? h : max), peak[0]);
+  }, [peak]);
+
+  /** BUG 12 FIX: dynamic feeds for TopBar */
+  const dynamicFeeds = useMemo(() => {
+    if (!Array.isArray(feedsData) || feedsData.length === 0) return undefined;
+    return feedsData.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
+  }, [feedsData]);
 
   if (isLoading) {
     return (
@@ -142,14 +163,16 @@ function DashboardPage() {
         subtitle="Overview of all CCTV feeds and safety analytics"
         selectedFeed={feed}
         onFeedChange={setFeed}
+        feeds={dynamicFeeds}
       />
       <div className="space-y-6 p-6">
+        {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Total Incidents" value={stats?.total_incidents ?? 0} change={0} dir="up" icon={ClipboardList} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
-          <StatCard label="Active Alerts" value={stats?.active_alerts ?? 0} change={0} dir="up" icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="Suicide Risk" value={stats?.suicide_mitigations ?? 0} change={0} dir="up" icon={User} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
-          <StatCard label="Pickpocketing Risk" value={stats?.theft_preventions ?? 0} change={0} dir="up" icon={PersonStanding} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
-          <StatCard label="Security Threats" value={stats?.security_threats ?? 0} change={0} dir="up" icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Total Incidents" value={stats?.total_incidents ?? 0} icon={ClipboardList} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
+          <StatCard label="Active Alerts" value={stats?.active_alerts ?? 0} icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
+          <StatCard label="Suicide Risk" value={stats?.suicide_mitigations ?? 0} icon={User} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
+          <StatCard label="Pickpocketing Risk" value={stats?.theft_preventions ?? 0} icon={PersonStanding} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
+          <StatCard label="Security Threats" value={stats?.security_threats ?? 0} icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -193,15 +216,20 @@ function DashboardPage() {
             </Link>
           </div>
 
-          {/* Trend */}
+          {/* BUG 8 FIX: Trend with wired trendDays select */}
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">
-                Incident Trend <span className="text-muted-foreground">(Last 7 Days)</span>
+                Incident Trend <span className="text-muted-foreground">(Last {trendDays} Days)</span>
               </h3>
-              <select className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                <option>Last 7 Days</option>
-                <option>Last 30 Days</option>
+              <select
+                id="trend-period-select"
+                value={trendDays}
+                onChange={(e) => setTrendDays(Number(e.target.value) as 7 | 30)}
+                className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground"
+              >
+                <option value={7}>Last 7 Days</option>
+                <option value={30}>Last 30 Days</option>
               </select>
             </div>
             <div className="mt-4 h-56">
@@ -282,7 +310,12 @@ function DashboardPage() {
               <div className="mx-3 h-1.5 flex-1 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 via-orange-500 to-red-500" />
               <span>Very High</span>
             </div>
-            <button className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-secondary py-2 text-xs text-muted-foreground hover:text-foreground">
+            {/* BUG 7 FIX: navigate to /live on click */}
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/live" })}
+              className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-secondary py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
               View Full Heatmap <ExternalLink className="h-3 w-3" />
             </button>
           </div>
@@ -301,9 +334,15 @@ function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            {/* BUG 13 FIX: display computed peak hour from data */}
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs">
               <Clock className="h-4 w-4 text-primary" />
-              <span>Peak Time: <span className="font-semibold text-primary">12:00 PM – 04:00 PM</span></span>
+              <span>
+                Peak Time:{" "}
+                <span className="font-semibold text-primary">
+                  {peakHour?.hour ?? "—"}
+                </span>
+              </span>
             </div>
           </div>
 
@@ -390,7 +429,7 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-function Hotspots({ level }: { level: "high" | "very-high" | "medium" | "low" }) {
+function Hotspots({ level }: { level: string }) {
   const spots =
     level === "very-high"
       ? [{ x: 25, c: "#ef4444" }, { x: 45, c: "#f97316" }, { x: 60, c: "#ef4444" }, { x: 80, c: "#22c55e" }]

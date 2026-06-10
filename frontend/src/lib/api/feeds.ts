@@ -38,7 +38,7 @@ export async function getFeeds(): Promise<CCTVFeed[]> {
 export async function createFeed(payload: {
   id: string;
   name: string;
-  url: string;
+  source_url: string;
 }): Promise<{ id: string; status: string; msg: string }> {
   return apiFetch("/feeds", {
     method: "POST",

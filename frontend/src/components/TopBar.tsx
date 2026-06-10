@@ -10,9 +10,14 @@ interface TopBarProps {
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
   right?: ReactNode;
+  /**
+   * BUG 12 FIX: Optional dynamic feeds list. When provided, replaces the
+   * static CCTV_OPTIONS. "All CCTV Feeds" is always prepended automatically.
+   */
+  feeds?: Array<{ id: string; label: string }>;
 }
 
-export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabled = false, onSoundToggle, right }: TopBarProps) {
+export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabled = false, onSoundToggle, right, feeds }: TopBarProps) {
   const [now, setNow] = useState(new Date());
   const [open, setOpen] = useState(false);
 
@@ -23,7 +28,16 @@ export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabl
 
   const date = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const time = now.toLocaleTimeString("en-US", { hour12: true });
-  const current = CCTV_OPTIONS.find((c) => c.id === selectedFeed) ?? CCTV_OPTIONS[0];
+
+  /**
+   * BUG 12 FIX: Use dynamic feeds when provided, always prepend "All CCTV Feeds".
+   * Fall back to the static CCTV_OPTIONS when no feeds prop is given.
+   */
+  const feedOptions = feeds
+    ? [{ id: "all", label: "All CCTV Feeds" }, ...feeds]
+    : CCTV_OPTIONS;
+
+  const current = feedOptions.find((c) => c.id === selectedFeed) ?? feedOptions[0];
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border bg-background px-8 py-5">
@@ -51,7 +65,7 @@ export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabl
           </button>
           {open && (
             <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
-              {CCTV_OPTIONS.map((opt) => (
+              {feedOptions.map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => {

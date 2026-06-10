@@ -2,7 +2,7 @@ import { apiFetch } from "./client";
 import { Alert, AlertStatus, cctvImages, RiskLevel } from "@/lib/mock-data";
 
 export interface BackendAlert {
-  id: number;
+  id?: number;
   person_id: string;
   camera_id: string;
   platform: string;
@@ -11,6 +11,8 @@ export interface BackendAlert {
   risk_level: string;
   status: string;
   timestamp: string;
+  /** Operator assigned to this alert (may be null if unassigned) */
+  operator_assigned?: string | null;
 }
 
 export type ApiAlert = Alert & { backendId: number };
@@ -52,14 +54,16 @@ function getImageForCamera(cameraId: string) {
   return cctvImages[index % cctvImages.length] ?? cctvImages[0];
 }
 
-function mapBackendAlert(alert: BackendAlert): ApiAlert {
+export function mapBackendAlert(alert: BackendAlert): ApiAlert {
   const displayCameraId = getDisplayCameraId(alert.camera_id || "CCTV-1");
   const roundedRiskScore = Math.round(alert.risk_score);
   const clampedRiskScore = Math.min(100, Math.max(0, roundedRiskScore));
 
+  const alertId = alert.id !== undefined && alert.id !== null ? alert.id : Math.floor(Math.random() * 1000000) + 10000;
+
   return {
-    backendId: alert.id,
-    id: `ALT-${String(alert.id).padStart(3, "0")}`,
+    backendId: alertId,
+    id: `ALT-${String(alertId).padStart(3, "0")}`,
     cctv: displayCameraId,
     platform: alert.platform,
     type: alert.incident_type,
@@ -70,6 +74,7 @@ function mapBackendAlert(alert: BackendAlert): ApiAlert {
     status: normalizeStatus(alert.status),
     description: `${alert.incident_type} on ${alert.platform}`,
     image: getImageForCamera(alert.camera_id),
+    operator_assigned: alert.operator_assigned ?? null,
   };
 }
 
