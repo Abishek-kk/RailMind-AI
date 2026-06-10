@@ -1,6 +1,7 @@
 """Build sequences from pose data for LSTM input"""
 
 import numpy as np
+from collections import deque
 
 class SequenceBuilder:
     """Builds temporal sequences from pose keypoints"""
@@ -13,19 +14,15 @@ class SequenceBuilder:
     def add_frame(self, track_id, pose_features):
         """Add frame to sequence for tracked person"""
         if track_id not in self.sequences:
-            self.sequences[track_id] = []
+            self.sequences[track_id] = deque(maxlen=self.sequence_length)
 
         frame_vector = np.asarray(pose_features, dtype=float)
         self.sequences[track_id].append(frame_vector)
 
-        if len(self.sequences[track_id]) > self.sequence_length:
-            self.sequences[track_id].pop(0)
-
-        return self.sequences[track_id]
     
     def get_sequence(self, track_id):
         """Get current sequence for person"""
-        sequence = self.sequences.get(track_id, [])
+        sequence = list(self.sequences.get(track_id, []))  # Convert deque to list
         if not sequence:
             return np.zeros((self.sequence_length, 0), dtype=float)
         sequence_array = np.stack(sequence)

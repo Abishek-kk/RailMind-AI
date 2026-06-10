@@ -36,16 +36,32 @@ class RiskScorer:
         context_multiplier = float(incident_attributes.get("context_multiplier", 1.0))
         score += min(1.0, context_multiplier * 0.1)
 
-        return round(min(max(score, 0.0), 1.0), 2)
+        # Convert normalized [0.0, 1.0] score to 0-100 integer for API/dashboard.
+        normalized = min(max(score, 0.0), 1.0)
+        return int(round(normalized * 100))
 
     def classify(self, score):
-        """Classify a score as a human-readable risk level and action."""
-        if score <= settings.LOW_RISK_THRESHOLD:
+        """Classify a score (0-100) as a human-readable risk level and action.
+
+        Accepts either a 0-1 float or a 0-100 numeric score for backward
+        compatibility. Converts to 0-100 before comparing to thresholds.
+        """
+        # Normalize incoming score to 0-100 integer
+        try:
+            s = float(score)
+        except Exception:
+            s = 0.0
+        if s <= 1.0:
+            s = s * 100.0
+
+        s = int(round(s))
+
+        if s <= settings.LOW_RISK_THRESHOLD:
             return "Safe", "log_only"
-        if score <= settings.MEDIUM_RISK_THRESHOLD:
+        if s <= settings.MEDIUM_RISK_THRESHOLD:
             return "Low Risk", "passive_monitor"
-        if score <= settings.HIGH_RISK_THRESHOLD:
+        if s <= settings.HIGH_RISK_THRESHOLD:
             return "Medium Risk", "alert_staff"
-        if score <= settings.CRITICAL_RISK_THRESHOLD:
+        if s <= settings.CRITICAL_RISK_THRESHOLD:
             return "High Risk", "urgent_alert"
         return "Critical", "emergency_escalation"

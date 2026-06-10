@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.cv import PoseEstimator, VideoProcessor
+from app.cv.lstm_behavior import BehaviorAnalyzer
 
 
 def test_pose_estimator_import():
@@ -16,3 +17,29 @@ def test_pose_estimator_import():
 def test_video_processor_import():
     """Test that VideoProcessor is available"""
     assert VideoProcessor is not None
+
+
+def test_behavior_analyzer_maps_scores_to_pose_labels():
+    analyzer = BehaviorAnalyzer()
+    # high suicide score should map to distress
+    label = analyzer.determine_behavior_label({"suicide": 0.8, "pickpocket": 0.1, "anomaly": 0.1})
+    assert label == "distress"
+
+    # close following distance with pickpocket risk should map to following
+    label = analyzer.determine_behavior_label({"suicide": 0.1, "pickpocket": 0.7, "anomaly": 0.2}, following_distance=0.9)
+    assert label == "following"
+
+    # suspicious or anomaly scores above threshold should map to suspicious
+    label = analyzer.determine_behavior_label({"suicide": 0.1, "pickpocket": 0.7, "anomaly": 0.1})
+    assert label == "suspicious"
+
+    label = analyzer.determine_behavior_label({"suicide": 0.1, "pickpocket": 0.1, "anomaly": 0.8})
+    assert label == "suspicious"
+
+    # moderate values should map to erratic
+    label = analyzer.determine_behavior_label({"suicide": 0.3, "pickpocket": 0.4, "anomaly": 0.4})
+    assert label == "erratic"
+
+    # low scores should map to normal
+    label = analyzer.determine_behavior_label({"suicide": 0.2, "pickpocket": 0.1, "anomaly": 0.1})
+    assert label == "normal"

@@ -14,9 +14,11 @@ import os
 import sys
 import logging
 from pathlib import Path
+import pickle
 
 import numpy as np
 import torch
+from sklearn.preprocessing import StandardScaler
 
 from app.lstm.trainer import LSTMTrainer
 from app.core.config import settings
@@ -208,10 +210,10 @@ def create_binary_dataset(normal_sequences: np.ndarray,
                          val_split: float = 0.15,
                          test_split: float = 0.15) -> tuple:
     """
-    Create binary classification dataset (Normal vs Threat).
+    Create binary classification dataset (Normal vs Threat) with feature scaling.
     
     Returns:
-        (X_train, y_train, X_val, y_val, X_test, y_test)
+        (X_train, y_train, X_val, y_val, X_test, y_test, scaler)
     """
     # Combine sequences
     X = np.vstack([normal_sequences, threat_sequences])
@@ -237,14 +239,27 @@ def create_binary_dataset(normal_sequences: np.ndarray,
     X_test = X[n_train + n_val:]
     y_test = y[n_train + n_val:]
     
-    logger.info(f"Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
+    # Fit scaler on training data (all timesteps and samples)
+    n_timesteps = X_train.shape[1]
+    X_train_flat = X_train.reshape(-1, X_train.shape[-1])
+    scaler = StandardScaler()
+    scaler.fit(X_train_flat)
     
-    return X_train, y_train, X_val, y_val, X_test, y_test
+    # Apply scaler to all datasets
+    X_train = np.array([scaler.transform(seq) for seq in X_train])
+    X_val = np.array([scaler.transform(seq) for seq in X_val])
+    X_test = np.array([scaler.transform(seq) for seq in X_test])
+    
+    logger.info(f"Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
+    logger.info(f"Feature scaling applied (StandardScaler)")
+    
+    return X_train, y_train, X_val, y_val, X_test, y_test, scaler
 
 
 def train_model(model_name: str, X_train: np.ndarray, y_train: np.ndarray,
-                X_val: np.ndarray, y_val: np.ndarray, output_filename: str):
-    """Train and save a binary LSTM classifier."""
+                X_val: np.ndarray, y_val: np.ndarray, output_filename: str,
+                scaler = None):
+    """Train and save a binary LSTM classifier with optional feature scaler."""
     logger.info(f"\n{'='*60}")
     logger.info(f"Training {model_name} classifier...")
     logger.info(f"{'='*60}")
@@ -263,6 +278,14 @@ def train_model(model_name: str, X_train: np.ndarray, y_train: np.ndarray,
     )
     
     logger.info(f"✓ {model_name} model saved to {output_filename}")
+    
+    # Save scaler alongside model if provided
+    if scaler is not None:
+        scaler_filename = output_filename.replace(".pt", "_scaler.pkl")
+        with open(scaler_filename, "wb") as f:
+            pickle.dump(scaler, f)
+        logger.info(f"✓ Feature scaler saved to {scaler_filename}")
+    
     return history
 
 
@@ -284,39 +307,42 @@ def main():
     logger.info("\n" + "="*70)
     logger.info("1. Training Suicide Risk Classifier")
     logger.info("="*70)
-    X_train, y_train, X_val, y_val, X_test, y_test = create_binary_dataset(
+    X_train, y_train, X_val, y_val, X_test, y_test, scaler = create_binary_dataset(
         data["normal"], data["suicide"]
     )
     train_model(
         "Suicide Risk",
         X_train, y_train, X_val, y_val,
-        "suicide_classifier.pt"
+        os.path.join(settings.MODEL_DIR, "suicide_classifier.pt"),
+        scaler
     )
     
     # Train Pickpocket Classifier (Normal vs Pickpocketing)
     logger.info("\n" + "="*70)
     logger.info("2. Training Pickpocket Classifier")
     logger.info("="*70)
-    X_train, y_train, X_val, y_val, X_test, y_test = create_binary_dataset(
+    X_train, y_train, X_val, y_val, X_test, y_test, scaler = create_binary_dataset(
         data["normal"], data["pickpocket"]
     )
     train_model(
         "Pickpocket",
         X_train, y_train, X_val, y_val,
-        "pickpocket_classifier.pt"
+        os.path.join(settings.MODEL_DIR, "pickpocket_classifier.pt"),
+        scaler
     )
     
     # Train Anomaly/Security Threat Classifier (Normal vs Security Threat)
     logger.info("\n" + "="*70)
     logger.info("3. Training Anomaly/Security Threat Classifier")
     logger.info("="*70)
-    X_train, y_train, X_val, y_val, X_test, y_test = create_binary_dataset(
+    X_train, y_train, X_val, y_val, X_test, y_test, scaler = create_binary_dataset(
         data["normal"], data["security_threat"]
     )
     train_model(
         "Security Threat/Anomaly",
         X_train, y_train, X_val, y_val,
-        "anomaly_classifier.pt"
+        os.path.join(settings.MODEL_DIR, "anomaly_classifier.pt"),
+        scaler
     )
     
     logger.info("\n" + "="*70)

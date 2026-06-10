@@ -60,12 +60,13 @@ async def create_alert(alert: AlertCreate, db: Session = Depends(get_db)):
     return alert_obj
 
 @router.patch("/{id}/acknowledge", response_model=AlertRead)
-async def acknowledge_alert(id: int, db: Session = Depends(get_db)):
+async def acknowledge_alert(id: int, operator_id: str = None, db: Session = Depends(get_db)):
     alert = db.query(Alert).filter(Alert.id == id).first()
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
     alert.status = "acknowledged"
-    alert.operator_assigned = "Staff_Member_09"
+    alert.operator_assigned = operator_id or "Unknown Operator"
+    alert.acknowledged_at = datetime.utcnow()
     db.commit()
     db.refresh(alert)
     return alert

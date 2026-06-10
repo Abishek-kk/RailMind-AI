@@ -73,7 +73,7 @@ def test_intervention_agent_triggers_broadcast():
 
     result = intervention_node(state)
 
-    assert "websocket_broadcast_triggered" in result["execution_status"] or "websocket_broadcast_failed" in result["execution_status"]
+    assert "websocket_broadcast_required" in result["execution_status"] or "websocket_broadcast_failed" in result["execution_status"]
     assert result["alert_payload"]["risk_level"] == "Critical"
 
 
