@@ -108,11 +108,6 @@ function AlertsPage() {
   const pageSize = 8;
   const totalPages = Math.max(1, Math.ceil(searched.length / pageSize));
   const paged = searched.slice((page - 1) * pageSize, page * pageSize);
-  const selected = selectedId ? alerts.find((a) => a.id === selectedId) ?? null : null;
-
-  const setStatus = (id: string, status: AlertStatus) => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-  };
 
   return (
     <div>
