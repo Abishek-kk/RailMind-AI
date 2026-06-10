@@ -312,7 +312,9 @@ function AlertsPage() {
             {/* Pagination */}
             <div className="flex items-center justify-between border-t border-border p-4 text-xs text-muted-foreground">
               <span>
-                Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, searched.length)} of {searched.length} alerts
+                {searched.length === 0
+                  ? "No results"
+                  : `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, searched.length)} of ${searched.length} alerts`}
               </span>
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-border bg-secondary p-1.5 disabled:opacity-40">
@@ -488,7 +490,7 @@ function AlertDetails({
                 assignMutation.mutate(name);
               }
             }}
-            disabled={assignMutation.isLoading}
+            disabled={assignMutation.isPending}
             className="rounded-md border border-border bg-secondary px-2 py-1 text-xs"
           >
             <option value="Not Assigned">Not Assigned</option>

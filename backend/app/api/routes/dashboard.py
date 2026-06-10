@@ -10,6 +10,7 @@ async def get_dashboard_general_stats(db = Depends(get_db)):
     return {
         "total_incidents": 524,
         "active_alerts": 15,
+        "security_threats": 7,
         "suicide_mitigations": 4,
         "theft_preventions": 32,
         "system_status": "optimal"
