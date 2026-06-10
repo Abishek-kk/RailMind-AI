@@ -6,17 +6,17 @@ import { StatCard } from "@/components/StatCard";
 import { CCTVFeedCard } from "@/components/CCTVFeedCard";
 import { RiskBadge } from "@/components/RiskBadge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Camera, Users, AlertTriangle, Activity, Plus, ChevronDown, ArrowRight } from "lucide-react";
+import { Camera, Users, AlertTriangle, Activity, Plus, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { getAlerts, type ApiAlert } from "@/lib/api/alerts";
+import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
 import { createFeed, getFeeds } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { getLiveFeeds, riskColor } from "@/lib/mock-data";
+import { getLiveFeeds, riskColor, type RiskLevel } from "@/lib/mock-data";
 
 interface LiveDetectionPayload {
   camera_id: string;
   platform: string;
-  dimensions: {
+  dimensions?: {
     width: number;
     height: number;
   };
@@ -31,13 +31,14 @@ interface LiveDetectionPayload {
   }>;
 }
 
+/** BUG 4 FIX: id is number to satisfy BoundingBox interface */
 interface LiveBoundingBox {
-  id: string;
+  id: number;
   x: number;
   y: number;
   w: number;
   h: number;
-  level: string;
+  level: RiskLevel;
 }
 
 function mapCameraIdToFeedId(cameraId: string) {
@@ -55,11 +56,14 @@ export const Route = createFileRoute("/live")({
   component: LivePage,
 });
 
+/** BUG 1 FIX: source_url instead of url */
 interface CreateFeedRequest {
   id: string;
   name: string;
-  url: string;
+  source_url: string;
 }
+
+type FilterLevel = "all" | "high" | "medium" | "low";
 
 function LivePage() {
   const [feed, setFeed] = useState("all");
@@ -67,6 +71,10 @@ function LivePage() {
   const [cameraId, setCameraId] = useState("");
   const [rtspUrl, setRtspUrl] = useState("");
   const [platformName, setPlatformName] = useState("");
+  /** BUG 6 FIX: filter level state for Live Detections sidebar */
+  const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
+  /** BUG 15 FIX: allow user to dismiss mock-data banner */
+  const [mockBannerDismissed, setMockBannerDismissed] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -90,6 +98,10 @@ function LivePage() {
       setRtspUrl("");
       setPlatformName("");
       queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
+    },
+    /** BUG 3 FIX: show error toast on failure; do NOT close dialog */
+    onError: () => {
+      toast.error("Failed to add feed. Please check the camera ID and URL.");
     },
   });
 
@@ -172,6 +184,10 @@ function LivePage() {
     [playNotificationSound, soundEnabled],
   );
 
+  const isMockData = useMemo(() => {
+    return Array.isArray(feeds) && feeds.length === 0 && import.meta.env.MODE === "development";
+  }, [feeds]);
+
   const displayFeeds = useMemo(() => {
     if (!Array.isArray(feeds)) {
       return getLiveFeeds();
@@ -200,30 +216,43 @@ function LivePage() {
       return;
     }
 
-    if ("backendId" in latestMessage) {
-      const latestAlert = latestMessage as ApiAlert;
+    /**
+     * BUG 2 FIX: detect backend alert payloads by checking for fields that
+     * only exist on raw BackendAlert objects — NOT by checking for "backendId"
+     * which is only added after mapping.
+     */
+    if ("risk_score" in latestMessage && "incident_type" in latestMessage) {
+      const mappedAlert = mapBackendAlert(latestMessage as BackendAlert);
       setRealtimeAlerts((current) => {
-        if (current.some((alert) => alert.backendId === latestAlert.backendId)) {
+        if (current.some((a) => a.backendId === mappedAlert.backendId)) {
           return current;
         }
-        return [latestAlert, ...current];
+        return [mappedAlert, ...current];
       });
-      showAlertToast(latestAlert);
+      showAlertToast(mappedAlert);
       return;
     }
 
     if ("camera_id" in latestMessage && Array.isArray(latestMessage.detections)) {
       const latestDetection = latestMessage as LiveDetectionPayload;
       const feedId = mapCameraIdToFeedId(latestDetection.camera_id);
-      const { width, height } = latestDetection.dimensions;
-      const boxes = latestDetection.detections.map((detection) => {
+      const { width, height } = latestDetection.dimensions || {};
+      const safeWidth = width || 1;
+      const safeHeight = height || 1;
+      const boxes: LiveBoundingBox[] = latestDetection.detections.map((detection) => {
         const [x1, y1, x2, y2] = detection.bbox;
-        const safeWidth = width || 1;
-        const safeHeight = height || 1;
+        const normalizedLevel = (detection.risk_level.toLowerCase().includes("high")
+          ? "high"
+          : detection.risk_level.toLowerCase().includes("suspicious")
+          ? "suspicious"
+          : detection.risk_level.toLowerCase().includes("medium")
+          ? "medium"
+          : "low") as RiskLevel;
 
         return {
-          id: detection.track_id,
-          level: detection.risk_level,
+          /** BUG 4 FIX: convert track_id string to number for BoundingBox.id compatibility */
+          id: Number(detection.track_id),
+          level: normalizedLevel,
           x: Math.max(0, Math.min(100, (x1 / safeWidth) * 100)),
           y: Math.max(0, Math.min(100, (y1 / safeHeight) * 100)),
           w: Math.max(0, Math.min(100, ((x2 - x1) / safeWidth) * 100)),
@@ -236,16 +265,34 @@ function LivePage() {
         [feedId]: boxes,
       }));
     }
-  }, [latestMessage]);
+  }, [latestMessage, showAlertToast]);
 
+  /** BUG 6 FIX: filter alerts by both CCTV feed AND risk level */
   const filteredAlerts = useMemo(() => {
-    const list = realtimeAlerts;
-    return feed === "all" ? list : list.filter((a) => a.cctv === feed);
-  }, [realtimeAlerts, feed]);
+    let list = realtimeAlerts;
+    if (feed !== "all") {
+      list = list.filter((a) => a.cctv === feed);
+    }
+    if (filterLevel !== "all") {
+      list = list.filter((a) => {
+        if (filterLevel === "medium") {
+          return a.riskLevel === "medium" || a.riskLevel === "suspicious";
+        }
+        return a.riskLevel === filterLevel;
+      });
+    }
+    return list;
+  }, [realtimeAlerts, feed, filterLevel]);
 
   const totalPeople = filteredFeeds.reduce((s, f) => s + f.peopleDetected, 0);
   const active = filteredAlerts.filter((a) => a.status === "active").length;
   const highRisk = filteredAlerts.filter((a) => a.riskLevel === "high").length;
+
+  /** Build dynamic feeds list for TopBar (BUG 12) */
+  const dynamicFeeds = useMemo(() => {
+    if (!Array.isArray(feeds) || feeds.length === 0) return undefined;
+    return feeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
+  }, [feeds]);
 
   return (
     <div>
@@ -256,6 +303,7 @@ function LivePage() {
         onFeedChange={setFeed}
         soundEnabled={soundEnabled}
         onSoundToggle={() => setSoundEnabled((enabled) => !enabled)}
+        feeds={dynamicFeeds}
       />
       <div className="p-6">
         {wsError ? (
@@ -286,6 +334,19 @@ function LivePage() {
           </div>
         ) : (
           <>
+            {/* BUG 15 FIX: visible yellow banner when showing mock feeds in development */}
+            {isMockData && !mockBannerDismissed && (
+              <div className="mb-4 flex items-center justify-between rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                <span>⚠ Showing mock feeds — no camera feeds registered in backend.</span>
+                <button
+                  type="button"
+                  onClick={() => setMockBannerDismissed(true)}
+                  className="ml-4 rounded px-2 py-0.5 text-xs font-medium text-yellow-300 hover:bg-yellow-500/20"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatCard label="Total CCTV Feeds" value={feeds?.length ?? 0} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
           <StatCard label="People Detected" value={totalPeople} sublabel="Across All Feeds" icon={Users} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
@@ -309,10 +370,11 @@ function LivePage() {
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
+                  /** BUG 1 FIX: pass source_url instead of url */
                   addFeedMutation.mutate({
                     id: cameraId,
                     name: platformName,
-                    url: rtspUrl,
+                    source_url: rtspUrl,
                   });
                 }}
                 className="space-y-4"
@@ -342,7 +404,7 @@ function LivePage() {
                   <input
                     value={platformName}
                     onChange={(event) => setPlatformName(event.target.value)}
-                    placeholder="Platform 3 South"  
+                    placeholder="Platform 3 South"
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     required
                   />
@@ -387,9 +449,18 @@ function LivePage() {
           <aside className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 className="text-sm font-semibold">Live Detections</h3>
-              <button className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                All Alerts <ChevronDown className="h-3 w-3" />
-              </button>
+              {/* BUG 6 FIX: working filter dropdown */}
+              <select
+                id="live-detections-filter"
+                value={filterLevel}
+                onChange={(e) => setFilterLevel(e.target.value as FilterLevel)}
+                className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              >
+                <option value="all">All Alerts</option>
+                <option value="high">High Risk</option>
+                <option value="medium">Medium Risk</option>
+                <option value="low">Low Risk</option>
+              </select>
             </div>
             <div className="max-h-[640px] space-y-3 overflow-y-auto p-3">
               {filteredAlerts.slice(0, 6).map((a) => {
@@ -423,7 +494,7 @@ function LivePage() {
             </div>
           </aside>
         </div>
-      </>
+          </>
         )}
       </div>
     </div>

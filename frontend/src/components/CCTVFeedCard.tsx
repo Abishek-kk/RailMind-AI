@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Pause, Volume2, Maximize2, Expand } from "lucide-react";
+import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 function levelToColor(level: string) {
   return riskColor(level as never);
@@ -8,6 +11,14 @@ function levelToColor(level: string) {
 export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?: BoundingBox[] }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
   const boxes = detections ?? [];
+  /** BUG 5 FIX: state to open the fullscreen dialog */
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+
+  /** BUG 5 FIX: handler for Pause and Volume2 — no live stream URL available */
+  function handleUnsupportedControl() {
+    console.info("pause not supported — no live stream URL");
+    toast("Live stream controls are not yet connected.");
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -68,14 +79,66 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
       </div>
       <div className="flex items-center justify-between border-t border-border px-3 py-2 text-muted-foreground">
         <div className="flex items-center gap-3">
-          <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Pause className="h-4 w-4" /></button>
-          <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Volume2 className="h-4 w-4" /></button>
+          {/* BUG 5 FIX: Pause button shows toast */}
+          <button
+            type="button"
+            onClick={handleUnsupportedControl}
+            title="Pause (not available — no live stream URL)"
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            <Pause className="h-4 w-4" />
+          </button>
+          {/* BUG 5 FIX: Volume2 button shows toast */}
+          <button
+            type="button"
+            onClick={handleUnsupportedControl}
+            title="Volume (not available — no live stream URL)"
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            <Volume2 className="h-4 w-4" />
+          </button>
         </div>
         <div className="flex items-center gap-3">
-          <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Maximize2 className="h-4 w-4" /></button>
-          <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Expand className="h-4 w-4" /></button>
+          {/* BUG 5 FIX: Maximize2 opens fullscreen Dialog */}
+          <button
+            type="button"
+            onClick={() => setFullscreenOpen(true)}
+            title="Fullscreen view"
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+          {/* BUG 5 FIX: Expand also opens fullscreen Dialog */}
+          <button
+            type="button"
+            onClick={() => setFullscreenOpen(true)}
+            title="Expand view"
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            <Expand className="h-4 w-4" />
+          </button>
         </div>
       </div>
+
+      {/* BUG 5 FIX: Fullscreen Dialog */}
+      <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
+        <DialogContent className="max-w-5xl p-2">
+          <div className="overflow-hidden rounded-lg bg-black">
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="text-sm font-semibold text-white">{feed.id} — {feed.platform}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-bold text-[#22c55e]">
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-[#22c55e]" />
+                LIVE
+              </span>
+            </div>
+            <img
+              src={feed.image}
+              alt={`${feed.id} fullscreen`}
+              className="w-full object-contain max-h-[80vh]"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

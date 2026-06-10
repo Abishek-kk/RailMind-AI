@@ -6,8 +6,15 @@ import { StatCard } from "@/components/StatCard";
 import { RiskBadge, ScorePill } from "@/components/RiskBadge";
 import {
   AlertTriangle, AlertOctagon, UserCheck, Inbox, Search, Filter,
-  X, MoreVertical, CheckCircle, MapPin, Clock, ChevronLeft, ChevronRight, Play, Volume2, Maximize2,
+  X, CheckCircle, MapPin, Clock, ChevronLeft, ChevronRight, Play, Volume2, Maximize2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getAlerts, acknowledgeAlert, resolveAlert, assignAlert, type ApiAlert } from "@/lib/api/alerts";
 import { toast } from "sonner";
@@ -148,12 +155,13 @@ function AlertsPage() {
         onFeedChange={setFeed}
       />
       <div className="space-y-5 p-6">
+        {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Total Alerts" value={counts.all} change={18} dir="up" icon={AlertOctagon} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="High Risk" value={counts.high} change={33} dir="up" icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="Medium Risk" value={counts.medium} change={8} dir="up" icon={UserCheck} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
-          <StatCard label="Low Risk" value={counts.low} change={12} dir="down" icon={UserCheck} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
-          <StatCard label="Resolved" value={counts.resolved} change={25} dir="up" icon={Inbox} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Total Alerts" value={counts.all} icon={AlertOctagon} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
+          <StatCard label="High Risk" value={counts.high} icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
+          <StatCard label="Medium Risk" value={counts.medium} icon={UserCheck} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
+          <StatCard label="Low Risk" value={counts.low} icon={UserCheck} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
+          <StatCard label="Resolved" value={counts.resolved} icon={Inbox} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
         </div>
 
         <div className={selected ? "grid gap-5 xl:grid-cols-[1fr_360px]" : ""}>
@@ -294,9 +302,48 @@ function AlertsPage() {
                             >
                               View
                             </button>
-                            <button className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
+                            {/* BUG 9 FIX: DropdownMenu replacing dead MoreVertical button */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                  aria-label="More actions"
+                                >
+                                  {/* Using SVG inline to avoid extra import complexity */}
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                                  </svg>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem onClick={() => setSelectedId(a.id)}>
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {/* Only show Acknowledge if status is active */}
+                                {a.status === "active" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setStatus(a.id, "acknowledged");
+                                      acknowledgeMutation.mutate(a.backendId);
+                                    }}
+                                  >
+                                    Acknowledge
+                                  </DropdownMenuItem>
+                                )}
+                                {/* Only show Resolve if status is not resolved */}
+                                {a.status !== "resolved" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setStatus(a.id, "resolved");
+                                      resolveMutation.mutate(a.backendId);
+                                    }}
+                                  >
+                                    Mark Resolved
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
@@ -377,9 +424,18 @@ function AlertDetails({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
-  const [assignee, setAssignee] = useState<string>('Not Assigned');
+  /**
+   * BUG 10 FIX: initialize assignee from alert.operator_assigned instead of
+   * hardcoding "Not Assigned" regardless of the alert's actual state.
+   */
+  const [assignee, setAssignee] = useState<string>(alert.operator_assigned || 'Not Assigned');
   const queryClient = useQueryClient();
   const videoUrl = (alert as any).video || (alert as any).videoUrl || null;
+
+  /** BUG 10 FIX: reset assignee when the displayed alert changes */
+  useEffect(() => {
+    setAssignee(alert.operator_assigned || 'Not Assigned');
+  }, [alert.backendId, alert.operator_assigned]);
 
   const assignMutation = useMutation({
     mutationFn: (name: string) => assignAlert(alert.backendId, name),
