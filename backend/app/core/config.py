@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     # Database Architecture 
     DATABASE_URL: str = Field(default="sqlite:///./data/railmind.db", validation_alias="DATABASE_URL")
+    DEBUG: bool = False
+    SECRET_KEY: str = Field(default="your-secret-key-here")
+    LOG_LEVEL: str = Field(default="INFO")
     
     # Computer Vision Directories
     MODEL_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../lstm/saved_models")))
