@@ -13,11 +13,13 @@ def test_perception_agent():
         "camera_id": "CCTV_TEST_01",
         "platform": "Platform 7",
         "lstm_anomaly_score": 0.92,
+        "lstm_scores": {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31},
         "edge_distance_meters": 0.8,
+        "edge_proximity_seconds": 12.5,
         "behavior_duration_seconds": 45,
         "pose_classification": "distress",
         "following_distance": 0.7,
-        "speed_mps": 0.2,
+        "movement_speed": 0.2,
         "direction_changes": 4,
         "loitering_duration": 190,
         "track_intrusion": True,
@@ -28,7 +30,13 @@ def test_perception_agent():
     observation = result["observation"]
 
     assert observation["person_id"] == "test-person"
+    assert observation["lstm_anomaly_score"] == 0.92
+    assert observation["lstm_scores"] == {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31}
+    assert observation["edge_proximity_seconds"] == 12.5
+    assert observation["edge_time_seconds"] == 12.5
     assert observation["following_distance"] == 0.7
+    assert observation["movement_speed"] == 0.2
+    assert observation["loitering_duration"] == 190
     assert observation["track_intrusion"] is True
     assert observation["pose_classification"] == "distress"
 

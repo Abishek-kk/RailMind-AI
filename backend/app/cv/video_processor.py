@@ -21,6 +21,7 @@ from app.services.escalation_service import EscalationService
 from app.services.incident_service import IncidentService
 from app.services.alert_service import AlertService
 from app.agents.agent_graph import run_agent_pipeline
+from app.analytics.heatmap import update_live_heatmap
 from app.core.websocket_manager import manager
 
 logger = logging.getLogger("railmind")
@@ -119,6 +120,20 @@ class VideoProcessor:
                         "bbox": bbox,
                         "center": center,
                     }
+
+                update_live_heatmap(
+                    self.camera_id,
+                    self.platform,
+                    width,
+                    height,
+                    [
+                        {
+                            "center": person["center"],
+                            "bbox": person["bbox"],
+                        }
+                        for _, person in matched_detections
+                    ],
+                )
 
                 for track_id, person in matched_detections:
                     bbox = person["bbox"]
@@ -230,6 +245,7 @@ class VideoProcessor:
                         incident_payload = {
                             "alert_id": alert_record.id if alert_record else None,
                             "camera_id": raw_cv_state["camera_id"],
+                            "platform": raw_cv_state["platform"],
                             "incident_type": alert_payload.get("incident_type", "Normal Activity"),
                             "risk_score": alert_payload.get("risk_score", 0.0),
                             "risk_level": alert_payload.get("risk_level", "Safe"),

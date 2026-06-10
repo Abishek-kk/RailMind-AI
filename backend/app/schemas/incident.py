@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class IncidentBase(BaseModel):
     alert_id: Optional[int] = None
     camera_id: str
+    platform: str
     incident_type: str
     risk_score: float
     risk_level: str

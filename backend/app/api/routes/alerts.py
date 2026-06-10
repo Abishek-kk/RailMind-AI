@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.alert import Alert
 from app.schemas.alert import AlertCreate, AlertRead, AssignAlert
+from app.services.alert_service import AlertService
 
 router = APIRouter()
 
@@ -53,33 +54,23 @@ async def get_alert(id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=AlertRead, status_code=status.HTTP_201_CREATED)
 async def create_alert(alert: AlertCreate, db: Session = Depends(get_db)):
-    alert_obj = Alert(**alert.dict())
-    db.add(alert_obj)
-    db.commit()
-    db.refresh(alert_obj)
-    return alert_obj
+    service = AlertService(db)
+    return service.create_alert(alert.dict())
 
 @router.patch("/{id}/acknowledge", response_model=AlertRead)
 async def acknowledge_alert(id: int, operator_id: str = None, db: Session = Depends(get_db)):
-    alert = db.query(Alert).filter(Alert.id == id).first()
+    service = AlertService(db)
+    alert = service.acknowledge_alert(id, operator_id)
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
-    alert.status = "acknowledged"
-    alert.operator_assigned = operator_id or "Unknown Operator"
-    alert.acknowledged_at = datetime.utcnow()
-    db.commit()
-    db.refresh(alert)
     return alert
 
 @router.patch("/{id}/resolve", response_model=AlertRead)
 async def resolve_alert(id: int, db: Session = Depends(get_db)):
-    alert = db.query(Alert).filter(Alert.id == id).first()
+    service = AlertService(db)
+    alert = service.resolve_alert(id)
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
-    alert.status = "resolved"
-    alert.resolved_at = datetime.utcnow()
-    db.commit()
-    db.refresh(alert)
     return alert
 
 

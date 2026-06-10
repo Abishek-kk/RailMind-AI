@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import create_engine
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
@@ -37,3 +38,20 @@ def init_db() -> None:
     import app.models.feed
     
     Base.metadata.create_all(bind=Engine)
+    _ensure_incident_platform_column()
+
+
+def _ensure_incident_platform_column() -> None:
+    """Backfill the platform column for existing SQLite incidents tables."""
+    inspector = inspect(Engine)
+    if "incidents" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("incidents")}
+    if "platform" in columns:
+        return
+
+    with Engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE incidents ADD COLUMN platform VARCHAR NOT NULL DEFAULT 'Unknown Platform'")
+        )

@@ -1,6 +1,7 @@
-"""Generate heatmaps showing high-activity areas"""
+"""Generate heatmaps showing high-activity areas."""
 
 import numpy as np
+
 
 class HeatmapGenerator:
     """Generates heatmaps from tracking data"""
@@ -51,3 +52,53 @@ class HeatmapGenerator:
                 if self.heatmap[row, col] >= threshold:
                     hotspots.append({"row": row, "col": col, "value": float(self.heatmap[row, col])})
         return hotspots
+
+
+_heatmap_registry = {}
+
+
+def update_live_heatmap(camera_id, platform, frame_width, frame_height, poses):
+    """Update or create a live heatmap for a camera stream."""
+    if frame_width <= 0 or frame_height <= 0:
+        return None
+
+    entry = _heatmap_registry.get(camera_id)
+    if entry is None:
+        entry = {
+            "platform": platform,
+            "generator": HeatmapGenerator(frame_width, frame_height),
+        }
+        _heatmap_registry[camera_id] = entry
+    else:
+        entry["platform"] = platform
+
+    entry["generator"].update(poses)
+    return entry["generator"]
+
+
+def get_live_platform_heatmap():
+    """Return normalized live hotspot intensities grouped for dashboard rendering."""
+    rows = []
+    for camera_id, entry in _heatmap_registry.items():
+        generator = entry["generator"]
+        heatmap = generator.heatmap
+        max_value = float(heatmap.max()) if heatmap.size else 0.0
+        if max_value <= 0:
+            continue
+
+        for hotspot in generator.identify_hotspots():
+            intensity = min(1.0, hotspot["value"] / max_value)
+            rows.append(
+                {
+                    "platform": entry["platform"],
+                    "zone": f"{camera_id} R{hotspot['row']:02d} C{hotspot['col']:02d}",
+                    "intensity": round(intensity, 4),
+                }
+            )
+
+    return sorted(rows, key=lambda item: item["intensity"], reverse=True)
+
+
+def clear_live_heatmaps():
+    """Clear live heatmap state; intended for tests and process cleanup."""
+    _heatmap_registry.clear()
