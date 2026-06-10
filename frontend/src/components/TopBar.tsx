@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Calendar, Clock, Camera, ChevronDown, Check } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Bell, BellOff, Calendar, Clock, Camera, ChevronDown, Check } from "lucide-react";
 import { CCTV_OPTIONS } from "@/lib/mock-data";
 
 interface TopBarProps {
@@ -7,10 +7,12 @@ interface TopBarProps {
   subtitle: string;
   selectedFeed: string;
   onFeedChange: (id: string) => void;
-  right?: React.ReactNode;
+  soundEnabled?: boolean;
+  onSoundToggle?: () => void;
+  right?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, selectedFeed, onFeedChange, right }: TopBarProps) {
+export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabled = false, onSoundToggle, right }: TopBarProps) {
   const [now, setNow] = useState(new Date());
   const [open, setOpen] = useState(false);
 
@@ -65,6 +67,16 @@ export function TopBar({ title, subtitle, selectedFeed, onFeedChange, right }: T
             </div>
           )}
         </div>
+        {onSoundToggle ? (
+          <button
+            type="button"
+            onClick={onSoundToggle}
+            aria-pressed={soundEnabled}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:bg-secondary"
+          >
+            {soundEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+          </button>
+        ) : null}
         {right}
       </div>
     </header>
