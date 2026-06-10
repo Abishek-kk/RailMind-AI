@@ -2,6 +2,7 @@ import cv2
 import asyncio
 import logging
 import math
+from argparse import Namespace
 import numpy as np
 from ultralytics.trackers import BYTETracker
 from app.core.config import settings
@@ -25,7 +26,15 @@ class VideoProcessor:
         self.camera_id = camera_id
         self.platform = platform
         self.pose_estimator = PoseEstimator()
-        self.tracker = BYTETracker()
+        
+        # Initialize BYTETracker with required configuration arguments
+        tracker_args = Namespace(
+            track_thresh=0.5,      # Confidence threshold for tracking
+            track_buffer=30,       # Maximum number of frames to buffer before dropping track
+            match_thresh=0.8,      # Intersection-over-union threshold for matching
+            mot20=False            # Use MOT20 challenge format
+        )
+        self.tracker = BYTETracker(tracker_args)
         self.behavior_analyzer = BehaviorAnalyzer()
         self.edge_detector = EdgeProximityDetector()
         self.loitering_detector = LoiteringDetector()
