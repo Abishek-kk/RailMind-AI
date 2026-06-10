@@ -1,4 +1,15 @@
-"""Extract features from pose keypoints for LSTM training"""
+"""
+DEPRECATED: This offline feature extraction script is no longer used.
+
+The LSTM training pipeline now uses SYNTHETIC DATA GENERATION instead.
+See: app/lstm/train.py
+
+To train models:
+  cd backend
+  python -m app.lstm.train
+
+This file can be removed.
+"""
 import numpy as np
 from pathlib import Path
 import sys
