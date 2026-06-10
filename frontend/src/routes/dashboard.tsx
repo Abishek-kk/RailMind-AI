@@ -38,49 +38,49 @@ function DashboardPage() {
     data: stats,
     isLoading: statsLoading,
     error: statsError,
-  } = useQuery(["dashboardStats"], getDashboardStats);
+  } = useQuery({ queryKey: ["dashboardStats"], queryFn: getDashboardStats });
 
   const {
     data: byCctvData,
     isLoading: byCctvLoading,
     error: byCctvError,
-  } = useQuery(["incidentsByCCTV"], getIncidentsByCCTV);
+  } = useQuery({ queryKey: ["incidentsByCCTV"], queryFn: getIncidentsByCCTV });
 
   const {
     data: trend,
     isLoading: trendLoading,
     error: trendError,
-  } = useQuery(["incidentTrend", 7], () => getIncidentTrend(7));
+  } = useQuery({ queryKey: ["incidentTrend", 7], queryFn: () => getIncidentTrend(7) });
 
   const {
     data: dist,
     isLoading: distLoading,
     error: distError,
-  } = useQuery(["riskDistribution"], getRiskDistribution);
+  } = useQuery({ queryKey: ["riskDistribution"], queryFn: getRiskDistribution });
 
   const {
     data: peak,
     isLoading: peakLoading,
     error: peakError,
-  } = useQuery(["peakHours"], getPeakHours);
+  } = useQuery({ queryKey: ["peakHours"], queryFn: getPeakHours });
 
   const {
     data: heatmap,
     isLoading: heatmapLoading,
     error: heatmapError,
-  } = useQuery(["platformHeatmap"], getPlatformHeatmap);
+  } = useQuery({ queryKey: ["platformHeatmap"], queryFn: getPlatformHeatmap });
 
   const {
     data: summary,
     isLoading: summaryLoading,
     error: summaryError,
-  } = useQuery(["cctvSummary"], getCCTVSummary);
+  } = useQuery({ queryKey: ["cctvSummary"], queryFn: getCCTVSummary });
 
   const {
     data: recent,
     isLoading: recentLoading,
     error: recentError,
-  } = useQuery(["recentIncidents"], getRecentIncidents);
+  } = useQuery({ queryKey: ["recentIncidents"], queryFn: getRecentIncidents });
 
   const isLoading = statsLoading || byCctvLoading || trendLoading || distLoading || peakLoading || heatmapLoading || summaryLoading || recentLoading;
   const error = statsError || byCctvError || trendError || distError || peakError || heatmapError || summaryError || recentError;

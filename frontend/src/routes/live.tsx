@@ -74,13 +74,13 @@ function LivePage() {
     data: feeds,
     isLoading: feedsLoading,
     error: feedsError,
-  } = useQuery(["liveFeeds"], getFeeds);
+  } = useQuery({ queryKey: ["liveFeeds"], queryFn: getFeeds });
 
   const {
     data: alerts,
     isLoading: alertsLoading,
     error: alertsError,
-  } = useQuery(["liveAlerts"], getAlerts);
+  } = useQuery({ queryKey: ["liveAlerts"], queryFn: getAlerts });
 
   const addFeedMutation = useMutation({
     mutationFn: (payload: CreateFeedRequest) => createFeed(payload),
@@ -89,7 +89,7 @@ function LivePage() {
       setCameraId("");
       setRtspUrl("");
       setPlatformName("");
-      queryClient.invalidateQueries(["liveFeeds"]);
+      queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
     },
   });
 

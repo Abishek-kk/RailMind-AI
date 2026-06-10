@@ -24,8 +24,8 @@ function getImageForFeed(cameraId: string) {
 }
 
 export async function getFeeds(): Promise<CCTVFeed[]> {
-  const feeds = await apiFetch<BackendFeed[]>("/feeds");
-  return feeds.map((feed, index) => ({
+  const feeds = await apiFetch<BackendFeed[]>('/feeds');
+  return (Array.isArray(feeds) ? feeds : []).map((feed, index) => ({
     id: getDisplayFeedId(feed.id, index),
     platform: feed.name,
     image: getImageForFeed(feed.id),

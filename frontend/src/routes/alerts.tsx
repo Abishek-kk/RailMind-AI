@@ -41,12 +41,12 @@ function AlertsPage() {
 
   const acknowledgeMutation = useMutation({
     mutationFn: (backendId: number) => acknowledgeAlert(backendId),
-    onSuccess: () => queryClient.invalidateQueries(["alerts"]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 
   const resolveMutation = useMutation({
     mutationFn: (backendId: number) => resolveAlert(backendId),
-    onSuccess: () => queryClient.invalidateQueries(["alerts"]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 
   useEffect(() => {
@@ -383,7 +383,7 @@ function AlertDetails({
     mutationFn: (name: string) => assignAlert(alert.backendId, name),
     onSuccess: () => {
       toast.success('Assignment saved');
-      queryClient.invalidateQueries(['alerts']);
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
   return (
