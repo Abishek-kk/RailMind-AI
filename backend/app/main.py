@@ -15,14 +15,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Ensure the common frontend origin is allowed for CORS (helps HTTP requests).
-frontend_origin = "http://localhost:5173"
-if not settings.BACKEND_CORS_ORIGINS or frontend_origin not in settings.BACKEND_CORS_ORIGINS:
+# Ensure the common frontend origins are allowed for CORS (helps HTTP requests).
+frontend_origins = ["http://localhost:5173", "http://localhost:8080"]
+if not settings.BACKEND_CORS_ORIGINS:
+    settings.BACKEND_CORS_ORIGINS = frontend_origins
+else:
     try:
-        # mutate the settings list in-place when possible
         origins = list(settings.BACKEND_CORS_ORIGINS or [])
-        if frontend_origin not in origins:
-            origins.append(frontend_origin)
+        for origin in frontend_origins:
+            if origin not in origins:
+                origins.append(origin)
         settings.BACKEND_CORS_ORIGINS = origins
     except Exception:
         # If settings is immutable in the current environment, skip explicit mutation
