@@ -19,7 +19,7 @@ MODEL_FILES = [
 ]
 
 SEQUENCE_LENGTH = 30
-NUM_FEATURES = 34
+NUM_FEATURES = 7
 
 
 def create_default_model(model_file_path: str):

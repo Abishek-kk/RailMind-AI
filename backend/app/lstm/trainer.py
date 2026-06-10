@@ -14,7 +14,7 @@ logger = logging.getLogger("railmind")
 
 
 class LSTMTrainer:
-    def __init__(self, sequence_length: int = 30, num_features: int = 34, device: str = None):
+    def __init__(self, sequence_length: int = 30, num_features: int = 7, device: str = None):
         self.sequence_length = sequence_length
         self.num_features = num_features
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")

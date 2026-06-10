@@ -17,7 +17,7 @@ class LSTMPredictor:
         self.load_behavior_models()
         logger.info(f"LSTMPredictor using device: {self.device}")
 
-    def _create_default_model(self, model_file_path: str, sequence_length: int = 30, num_features: int = 34):
+    def _create_default_model(self, model_file_path: str, sequence_length: int = 30, num_features: int = 7):
         """Creates and saves a default model if one doesn't exist."""
         os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
         model = build_lstm_model(sequence_length=sequence_length, num_features=num_features)
