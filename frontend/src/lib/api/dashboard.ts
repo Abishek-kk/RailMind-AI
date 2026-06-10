@@ -24,6 +24,7 @@ export interface IncidentTrendItem {
 export interface RiskDistributionItem {
   name: string;
   value: number;
+  color: string;
 }
 
 export interface PeakHourItem {
@@ -112,8 +113,23 @@ export async function getIncidentTrend(days = 7): Promise<IncidentTrendItem[]> {
   return apiFetch<IncidentTrendItem[]>(`/analytics/summary?days=${days}`);
 }
 
+function mapRiskDistributionColor(item: Omit<RiskDistributionItem, 'color'>): RiskDistributionItem {
+  const colorMap: Record<string, string> = {
+    "Suicide Risk Detection": "#ef4444",
+    "Pickpocketing Actions": "#f97316",
+    "Loitering / Trespass": "#3b82f6",
+    "General Anomalies": "#a855f7",
+  };
+
+  return {
+    ...item,
+    color: colorMap[item.name] ?? "#64748b",
+  };
+}
+
 export async function getRiskDistribution(): Promise<RiskDistributionItem[]> {
-  return apiFetch<RiskDistributionItem[]>("/dashboard/risk-distribution");
+  const distribution = await apiFetch<Omit<RiskDistributionItem, 'color'>[]>("/dashboard/risk-distribution");
+  return distribution.map(mapRiskDistributionColor);
 }
 
 export async function getPeakHours(): Promise<PeakHourItem[]> {
