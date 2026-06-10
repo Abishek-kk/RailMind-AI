@@ -1,0 +1,45 @@
+import os
+import sys
+import logging
+
+os.environ.setdefault("KERAS_BACKEND", "torch")
+
+script_dir = os.path.dirname(__file__)
+sys.path.insert(0, script_dir)
+from model import build_lstm_model
+
+logger = logging.getLogger("railmind")
+logging.basicConfig(level=logging.INFO)
+
+MODEL_DIR = os.path.join(script_dir, "saved_models")
+MODEL_FILES = [
+    "suicide_classifier.h5",
+    "pickpocket_classifier.h5",
+    "anomaly_classifier.h5",
+]
+
+SEQUENCE_LENGTH = 30
+NUM_FEATURES = 34
+
+
+def create_default_model(model_file_path: str):
+    os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
+    model = build_lstm_model(sequence_length=SEQUENCE_LENGTH, num_features=NUM_FEATURES)
+    model.save(model_file_path, save_format="h5")
+    logger.info("Saved default LSTM model: %s", model_file_path)
+
+
+def main():
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    for model_file in MODEL_FILES:
+        model_file_path = os.path.join(MODEL_DIR, model_file)
+        if os.path.exists(model_file_path):
+            logger.info("Model already exists, skipping: %s", model_file_path)
+            continue
+        create_default_model(model_file_path)
+
+    logger.info("Default LSTM model generation complete.")
+
+
+if __name__ == "__main__":
+    main()

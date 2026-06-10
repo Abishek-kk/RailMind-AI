@@ -1,6 +1,7 @@
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+import os
+os.environ.setdefault("KERAS_BACKEND", "torch")
+from keras_core.models import Sequential
+from keras_core.layers import LSTM, Dense, Dropout
 
 def build_lstm_model(sequence_length: int = 30, num_features: int = 7, num_classes: int = 1) -> Sequential:
     """

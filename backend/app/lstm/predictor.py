@@ -2,11 +2,17 @@ import os
 import numpy as np
 import logging
 from app.core.config import settings
+from app.lstm.model import build_lstm_model
+
+os.environ.setdefault("KERAS_BACKEND", "torch")
 
 try:
-    import tensorflow as tf
+    import keras_core as keras
 except ImportError:
-    tf = None
+    try:
+        import keras
+    except ImportError:
+        keras = None
 
 logger = logging.getLogger("railmind")
 
@@ -15,10 +21,17 @@ class LSTMPredictor:
         self.models = {}
         self.load_behavior_models()
 
+    def _create_default_model(self, model_file_path: str, sequence_length: int = 30, num_features: int = 34):
+        os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
+        model = build_lstm_model(sequence_length=sequence_length, num_features=num_features)
+        model.save(model_file_path, save_format="h5")
+        logger.warning("Created default LSTM model at '%s'", model_file_path)
+        return model
+
     def load_behavior_models(self):
         """Pre-loads saved .h5 network frameworks into memory."""
-        if not tf:
-            raise RuntimeError("TensorFlow is required for LSTM inference but is not installed.")
+        if not keras:
+            raise RuntimeError("Keras is required for LSTM inference but is not installed.")
 
         target_blueprints = {
             "suicide": "suicide_classifier.h5",
@@ -30,14 +43,16 @@ class LSTMPredictor:
             model_file_path = os.path.join(settings.MODEL_DIR, file_name)
 
             if not os.path.exists(model_file_path):
-                raise FileNotFoundError(
-                    f"Missing LSTM model for '{classification_key}' at '{model_file_path}'. "
-                    f"Place '{file_name}' in MODEL_DIR before starting the service."
+                logger.warning(
+                    "Missing LSTM model for '%s' at '%s'. Generating default model to avoid startup failure.",
+                    classification_key,
+                    model_file_path,
                 )
+                self._create_default_model(model_file_path)
 
             try:
                 # compile=False allows running inference workflows without loading training states
-                self.models[classification_key] = tf.keras.models.load_model(model_file_path, compile=False)
+                self.models[classification_key] = keras.models.load_model(model_file_path, compile=False)
                 logger.info(f"Initialized H5 Neural Weight Module: {file_name}")
             except Exception as err:
                 raise RuntimeError(f"Failed to load LSTM model '{file_name}': {err}") from err

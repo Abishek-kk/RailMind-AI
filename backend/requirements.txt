@@ -15,6 +15,7 @@ opencv-python==4.8.1.78
 tensorflow==2.15.0; python_version < "3.14"
 torch==2.2.2
 keras==2.15.0; python_version < "3.14"
+keras-core==0.1.7
 
 # Computer vision helper
 ultralytics==8.4.63

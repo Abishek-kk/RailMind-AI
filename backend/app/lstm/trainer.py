@@ -1,6 +1,12 @@
 import os
 import numpy as np
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+os.environ.setdefault("KERAS_BACKEND", "torch")
+
+try:
+    from keras_core.callbacks import EarlyStopping, ModelCheckpoint
+except ImportError:
+    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+
 from app.lstm.model import build_lstm_model
 from app.core.config import settings
 
