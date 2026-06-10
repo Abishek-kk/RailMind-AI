@@ -54,6 +54,8 @@ function getImageForCamera(cameraId: string) {
 
 function mapBackendAlert(alert: BackendAlert): ApiAlert {
   const displayCameraId = getDisplayCameraId(alert.camera_id || "CCTV-1");
+  const roundedRiskScore = Math.round(alert.risk_score);
+  const clampedRiskScore = Math.min(100, Math.max(0, roundedRiskScore));
 
   return {
     backendId: alert.id,
@@ -61,19 +63,19 @@ function mapBackendAlert(alert: BackendAlert): ApiAlert {
     cctv: displayCameraId,
     platform: alert.platform,
     type: alert.incident_type,
-    riskScore: Math.round(alert.risk_score),
+    riskScore: clampedRiskScore,
     riskLevel: normalizeRiskLevel(alert.risk_level),
     time: formatTime(alert.timestamp),
     date: formatDate(alert.timestamp),
     status: normalizeStatus(alert.status),
-    description: `Detected ${alert.incident_type} on ${alert.platform}`,
+    description: `${alert.incident_type} on ${alert.platform}`,
     image: getImageForCamera(alert.camera_id),
   };
 }
 
 export async function getAlerts(): Promise<ApiAlert[]> {
   const alerts = await apiFetch<BackendAlert[]>("/alerts");
-  return alerts.map(mapBackendAlert);
+  return (Array.isArray(alerts) ? alerts : []).map(mapBackendAlert);
 }
 
 export async function acknowledgeAlert(id: number): Promise<ApiAlert> {
