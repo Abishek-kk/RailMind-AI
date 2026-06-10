@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # CORS Security Policies
     BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"],
+        default=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],
         validation_alias="CORS_ORIGINS"
     )
 
