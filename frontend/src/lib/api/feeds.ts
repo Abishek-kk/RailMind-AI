@@ -30,7 +30,7 @@ export async function getFeeds(): Promise<CCTVFeed[]> {
     platform: feed.name,
     image: getImageForFeed(feed.id),
     status: feed.status === "active" ? "online" : "offline",
-    peopleDetected: feed.status === "active" ? Math.max(0, Math.round(feed.fps * 2)) : 0,
+    peopleDetected: 0,
     boxes: [],
   }));
 }
