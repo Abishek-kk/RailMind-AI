@@ -42,7 +42,7 @@ def determine_incident_type(obs: dict, pose: str) -> str:
     edge_distance = obs.get("edge_distance", obs.get("edge_distance_meters", 5.0))
     if pose == "distress" and edge_distance < settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS:
         return "Suicide Risk"
-    if obs.get("following_distance") is not None and obs["following_distance"] < 1.2:
+    if obs.get("following_distance") is not None and obs["following_distance"] < settings.BEHAVIOR_FOLLOWING_DISTANCE_METERS:
         return "Pickpocketing"
     if obs.get("loitering_duration", obs.get("behavior_duration_seconds", 0)) >= 180:
         return "Loitering"

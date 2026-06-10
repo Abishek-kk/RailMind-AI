@@ -9,12 +9,12 @@ from app.lstm.sequence_builder import SequenceBuilder
 logger = logging.getLogger("railmind")
 
 class BehaviorAnalyzer:
-    def __init__(self, window_size: int = 30):
+    def __init__(self, window_size: int | None = None):
         """
         Sets up sequence building and inference for behavior classification.
         """
-        self.window_size = window_size
-        self.sequence_builder = SequenceBuilder(sequence_length=window_size)
+        self.window_size = window_size or settings.LSTM_SEQUENCE_LENGTH
+        self.sequence_builder = SequenceBuilder(sequence_length=self.window_size)
         self.predictor = LSTMPredictor()
         self.model_targets = ("suicide", "pickpocket", "anomaly")
         self.models_available = all(self.predictor.has_model(target) for target in self.model_targets)

@@ -7,8 +7,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
-from app.lstm.model import build_lstm_model
 from app.core.config import settings
+from app.lstm.model import build_lstm_model
 
 logger = logging.getLogger("railmind")
 

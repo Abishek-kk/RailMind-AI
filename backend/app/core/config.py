@@ -42,11 +42,42 @@ class Settings(BaseSettings):
     # Platform Warning Metrics
     PLATFORM_EDGE_SAFETY_LIMIT_METERS: float = 1.5
     PIXELS_PER_METER: float = 100.0
+    PLATFORM_CONTEXT_MULTIPLIERS: dict[str, float] = Field(
+        default_factory=lambda: {"Platform 1": 1.25}
+    )
+
+    # LSTM configuration
+    LSTM_SEQUENCE_LENGTH: int = 30
+    LSTM_FEATURE_NAMES: List[str] = Field(
+        default_factory=lambda: [
+            "edge_proximity_seconds",
+            "loitering_time",
+            "pacing_count",
+            "movement_speed",
+            "direction_changes",
+            "following_distance",
+            "crowd_interactions",
+        ]
+    )
+    LSTM_FEATURE_COUNT: int = 7
 
     # LSTM behavior label thresholds
     BEHAVIOR_HIGH_SCORE_THRESHOLD: float = 0.65
     BEHAVIOR_ERRATIC_SCORE_THRESHOLD: float = 0.4
     BEHAVIOR_FOLLOWING_DISTANCE_METERS: float = 1.2
+
+    # Risk scoring weights
+    RISK_SCORE_WEIGHTS: dict[str, float] = Field(
+        default_factory=lambda: {
+            "lstm": 0.4,
+            "edge": 0.2,
+            "duration": 0.15,
+            "loitering": 0.1,
+            "following": 0.1,
+            "pose": 0.1,
+            "context": 0.1,
+        }
+    )
 
     # Twilio Escalation Configuration
     TWILIO_ACCOUNT_SID: str = Field(default="")

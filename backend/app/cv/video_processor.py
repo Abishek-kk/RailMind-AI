@@ -62,9 +62,21 @@ class VideoProcessor:
         self.alert_service = AlertService(self.db)
 
         self.previous_track_ids: set[int] = set()
+        self.track_entry_times: dict[int, float] = {}
         self.is_running = False
         # Cooldown tracking for email alerts: {track_id: last_alert_timestamp}
         self.email_alert_cooldown: dict[int, float] = {}
+
+    def _get_context_multiplier(self) -> float:
+        """Resolve platform-specific context multiplier from configuration."""
+        multiplier_map = settings.PLATFORM_CONTEXT_MULTIPLIERS or {}
+        normalized_platform = self.platform.strip()
+        if normalized_platform in multiplier_map:
+            return multiplier_map[normalized_platform]
+        for key, value in multiplier_map.items():
+            if key.lower() in normalized_platform.lower():
+                return value
+        return 1.0
 
     async def start_processing_loop(self):
         """Asynchronously boots up and runs the camera feed frames processing thread."""
@@ -108,11 +120,15 @@ class VideoProcessor:
                 disappeared_tracks = self.previous_track_ids - current_track_ids
                 for track_id in disappeared_tracks:
                     self.behavior_analyzer.clear_track_history(track_id)
+                    self.track_entry_times.pop(track_id, None)
                 self.previous_track_ids = current_track_ids
 
+                current_time = time.time()
                 matched_detections = self._match_tracker_results(tracked_objects, pose_detections)
                 current_tracks = {}
                 for track_id, person in matched_detections:
+                    if track_id not in self.track_entry_times:
+                        self.track_entry_times[track_id] = current_time
                     bbox = person["bbox"]
                     center = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
                     person["center"] = center
@@ -170,6 +186,7 @@ class VideoProcessor:
                         following_distance=following_distance,
                     )
 
+                    duration_seconds = int(current_time - self.track_entry_times.get(track_id, current_time))
                     raw_cv_state = {
                         "person_id": track_id,
                         "camera_id": self.camera_id,
@@ -180,12 +197,12 @@ class VideoProcessor:
                         "edge_distance_meters": edge_distance_meters,
                         "edge_distance": edge_distance_meters,
                         "edge_proximity_seconds": edge_proximity_seconds,
-                        "behavior_duration_seconds": int(frame_count / 30),
-                        "duration_seconds": int(frame_count / 30),
+                        "behavior_duration_seconds": duration_seconds,
+                        "duration_seconds": duration_seconds,
                         "loitering_duration": loitering_time,
                         "following_distance": following_distance,
                         "pose_classification": pose_label,
-                        "context_multiplier": 1.25 if "Platform 1" in self.platform else 1.0,
+                        "context_multiplier": self._get_context_multiplier(),
                         "bounding_box": bbox
                     }
 

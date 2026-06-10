@@ -265,8 +265,8 @@ def train_model(model_name: str, X_train: np.ndarray, y_train: np.ndarray,
     logger.info(f"{'='*60}")
     
     trainer = LSTMTrainer(
-        sequence_length=30,
-        num_features=7,
+        sequence_length=settings.LSTM_SEQUENCE_LENGTH,
+        num_features=settings.LSTM_FEATURE_COUNT,
     )
     
     history = trainer.execute_training_run(
@@ -296,7 +296,10 @@ def main():
     logger.info("="*70)
     
     # Generate synthetic data
-    generator = SyntheticDataGenerator(sequence_length=30, num_features=7)
+    generator = SyntheticDataGenerator(
+        sequence_length=settings.LSTM_SEQUENCE_LENGTH,
+        num_features=settings.LSTM_FEATURE_COUNT,
+    )
     data = generator.generate_all_data()
     
     # Ensure model directory exists
