@@ -149,7 +149,7 @@ function DashboardPage() {
           <StatCard label="Active Alerts" value={stats?.active_alerts ?? 0} change={0} dir="up" icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
           <StatCard label="Suicide Risk" value={stats?.suicide_mitigations ?? 0} change={0} dir="up" icon={User} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
           <StatCard label="Pickpocketing Risk" value={stats?.theft_preventions ?? 0} change={0} dir="up" icon={PersonStanding} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
-          <StatCard label="Security Threats" value={stats?.active_alerts ?? 0} change={0} dir="up" icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Security Threats" value={stats?.security_threats ?? 0} change={0} dir="up" icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

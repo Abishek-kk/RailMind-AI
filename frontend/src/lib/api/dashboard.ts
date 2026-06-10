@@ -4,6 +4,7 @@ import { cctvImages, type RiskLevel } from "@/lib/mock-data";
 export interface DashboardStats {
   total_incidents: number;
   active_alerts: number;
+  security_threats: number;
   suicide_mitigations: number;
   theft_preventions: number;
   system_status: string;
