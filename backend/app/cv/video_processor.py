@@ -157,7 +157,7 @@ class VideoProcessor:
                 active_frame_detections.append({
                     "track_id": track_id,
                     "bbox": bbox,
-                    "distance": calculated_distance,
+                    "distance": edge_distance_meters,
                     "risk_score": alert_info.get("risk_score", 0.0),
                     "risk_level": alert_info.get("risk_level", "Safe"),
                     "incident_type": alert_info.get("incident_type", "Normal Activity")
