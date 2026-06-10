@@ -1,12 +1,14 @@
 import { Pause, Volume2, Maximize2, Expand } from "lucide-react";
-import { riskColor, type CCTVFeed } from "@/lib/mock-data";
+import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
 
 function levelToColor(level: string) {
   return riskColor(level as never);
 }
 
-export function CCTVFeedCard({ feed }: { feed: CCTVFeed }) {
+export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?: BoundingBox[] }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
+  const boxes = detections ?? [];
+
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between px-4 py-3">
@@ -21,8 +23,7 @@ export function CCTVFeedCard({ feed }: { feed: CCTVFeed }) {
       </div>
       <div className="relative aspect-video overflow-hidden bg-black">
         <img src={feed.image} alt={feed.id} className="h-full w-full object-cover" loading="lazy" />
-        {/* bounding boxes */}
-        {feed.boxes.map((b) => {
+        {boxes.map((b) => {
           const c = levelToColor(b.level);
           return (
             <div

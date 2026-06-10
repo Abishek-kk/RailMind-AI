@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
@@ -185,9 +185,12 @@ function DashboardPage() {
                 ))}
               </div>
             </div>
-            <button className="mt-4 w-full rounded-lg border border-border bg-secondary py-2 text-xs text-muted-foreground hover:text-foreground">
+            <Link
+              to="/live"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-border bg-secondary py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            >
               View All Cameras
-            </button>
+            </Link>
           </div>
 
           {/* Trend */}

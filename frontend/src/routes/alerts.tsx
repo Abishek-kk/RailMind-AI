@@ -25,17 +25,25 @@ function AlertsPage() {
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterRisk, setFilterRisk] = useState<'any' | 'high' | 'medium' | 'low'>('any');
+  const [filterStatus, setFilterStatus] = useState<'any' | AlertStatus>('any');
+  const [filterPlatform, setFilterPlatform] = useState<string>('any');
 
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, error } = useQuery<ApiAlert[]>(["alerts"], getAlerts, {
+  const { data, isLoading, isError, error } = useQuery<ApiAlert[]>({
+    queryKey: ["alerts"],
+    queryFn: getAlerts,
     staleTime: 1000 * 60,
   });
 
-  const acknowledgeMutation = useMutation((backendId: number) => acknowledgeAlert(backendId), {
+  const acknowledgeMutation = useMutation({
+    mutationFn: (backendId: number) => acknowledgeAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries(["alerts"]),
   });
 
-  const resolveMutation = useMutation((backendId: number) => resolveAlert(backendId), {
+  const resolveMutation = useMutation({
+    mutationFn: (backendId: number) => resolveAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries(["alerts"]),
   });
 
@@ -81,6 +89,12 @@ function AlertsPage() {
 
   const cctvFiltered = feed === "all" ? alerts : alerts.filter((a) => a.cctv === feed);
 
+  const platformOptions = useMemo(() => {
+    const setp = new Set<string>();
+    alerts.forEach((a) => setp.add(a.platform));
+    return Array.from(setp).sort();
+  }, [alerts]);
+
   const counts = {
     all: cctvFiltered.length,
     high: cctvFiltered.filter((a) => a.riskLevel === "high").length,
@@ -99,11 +113,25 @@ function AlertsPage() {
     }
   }, [tab, cctvFiltered]);
 
+  const panelFiltered = useMemo(() => {
+    let list = tabFiltered;
+    if (filterRisk !== 'any') {
+      list = list.filter((a) => a.riskLevel === filterRisk);
+    }
+    if (filterStatus !== 'any') {
+      list = list.filter((a) => a.status === filterStatus);
+    }
+    if (filterPlatform !== 'any') {
+      list = list.filter((a) => a.platform === filterPlatform);
+    }
+    return list;
+  }, [tabFiltered, filterRisk, filterStatus, filterPlatform]);
+
   const searched = search
-    ? tabFiltered.filter((a) =>
+    ? panelFiltered.filter((a) =>
         [a.id, a.type, a.platform, a.cctv].some((v) => v.toLowerCase().includes(search.toLowerCase())),
       )
-    : tabFiltered;
+    : panelFiltered;
 
   const pageSize = 8;
   const totalPages = Math.max(1, Math.ceil(searched.length / pageSize));
@@ -161,11 +189,55 @@ function AlertsPage() {
                     className="w-48 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </div>
-                <button className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((s) => !s)}
+                  className={`flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm ${showFilters ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+                >
                   <Filter className="h-4 w-4" /> Filters
                 </button>
               </div>
             </div>
+
+            {showFilters && (
+              <div className="border-b border-border p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="w-40">
+                    <label className="block text-xs text-muted-foreground">Risk Level</label>
+                    <select value={filterRisk} onChange={(e) => { setFilterRisk(e.target.value as any); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
+                      <option value="any">Any</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+
+                  <div className="w-40">
+                    <label className="block text-xs text-muted-foreground">Status</label>
+                    <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as any); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
+                      <option value="any">Any</option>
+                      <option value="active">Active</option>
+                      <option value="acknowledged">Acknowledged</option>
+                      <option value="resolved">Resolved</option>
+                    </select>
+                  </div>
+
+                  <div className="w-44">
+                    <label className="block text-xs text-muted-foreground">Platform</label>
+                    <select value={filterPlatform} onChange={(e) => { setFilterPlatform(e.target.value); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
+                      <option value="any">Any</option>
+                      {platformOptions.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <button type="button" onClick={() => { setFilterRisk('any'); setFilterStatus('any'); setFilterPlatform('any'); setPage(1); }} className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Clear Filters</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
