@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
@@ -7,6 +7,7 @@ import { CCTVFeedCard } from "@/components/CCTVFeedCard";
 import { RiskBadge } from "@/components/RiskBadge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Camera, Users, AlertTriangle, Activity, Plus, ChevronDown, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { getAlerts, type ApiAlert } from "@/lib/api/alerts";
 import { createFeed, getFeeds } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -96,6 +97,74 @@ function LivePage() {
   const latestMessage = useWebSocket<Record<string, any>>(`${websocketBase}/ws/alerts`);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedDetections, setFeedDetections] = useState<Record<string, LiveBoundingBox[]>>({});
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const shownToastIds = useRef<Set<number>>(new Set());
+
+  const playNotificationSound = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const context = new AudioCtx();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.12, context.currentTime);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.14);
+
+      oscillator.onended = () => {
+        context.close().catch(() => undefined);
+      };
+    } catch {
+      // Ignore audio failures in unsupported browsers or restricted contexts.
+    }
+  }, []);
+
+  const showAlertToast = useCallback(
+    (alert: ApiAlert) => {
+      if (shownToastIds.current.has(alert.backendId)) {
+        return;
+      }
+
+      shownToastIds.current.add(alert.backendId);
+      const message = `${alert.cctv} — ${alert.type} — Risk: ${alert.riskScore}%`;
+      const isHighRisk = alert.riskLevel === "high";
+      const isMediumRisk = alert.riskLevel === "medium" || alert.riskLevel === "suspicious";
+      const icon = (
+        <span
+          className={`inline-flex h-3.5 w-3.5 rounded-full ${
+            isHighRisk ? "bg-red-500" : isMediumRisk ? "bg-orange-500" : "bg-emerald-500"
+          }`}
+        />
+      );
+
+      const options = {
+        icon,
+        duration: isHighRisk ? Infinity : 5000,
+      } as const;
+
+      if (isHighRisk) {
+        toast.error(message, options);
+      } else if (alert.riskLevel === "low") {
+        toast.success(message, options);
+      } else {
+        toast(message, options);
+      }
+
+      if (isHighRisk && soundEnabled) {
+        playNotificationSound();
+      }
+    },
+    [playNotificationSound, soundEnabled],
+  );
 
   const displayFeeds = useMemo(() => {
     if (!Array.isArray(feeds)) {
@@ -133,6 +202,7 @@ function LivePage() {
         }
         return [latestAlert, ...current];
       });
+      showAlertToast(latestAlert);
       return;
     }
 
@@ -178,6 +248,8 @@ function LivePage() {
         subtitle="Real-time CCTV Monitoring & Threat Detection"
         selectedFeed={feed}
         onFeedChange={setFeed}
+        soundEnabled={soundEnabled}
+        onSoundToggle={() => setSoundEnabled((enabled) => !enabled)}
       />
       <div className="p-6">
         {feedsLoading || alertsLoading ? (
