@@ -2,6 +2,7 @@ import cv2
 import asyncio
 import logging
 import math
+import time
 from argparse import Namespace
 import numpy as np
 from ultralytics.trackers import BYTETracker
@@ -19,6 +20,9 @@ from app.agents.agent_graph import run_agent_pipeline
 from app.core.websocket_manager import manager
 
 logger = logging.getLogger("railmind")
+
+# Alert cooldown configuration (in seconds)
+EMAIL_ALERT_COOLDOWN_SECONDS = 300  # 5 minutes
 
 class VideoProcessor:
     def __init__(self, feed_source: str, camera_id: str, platform: str):
@@ -45,6 +49,8 @@ class VideoProcessor:
         self.escalation_service = EscalationService()
         self.previous_track_ids: set[int] = set()
         self.is_running = False
+        # Cooldown tracking for email alerts: {track_id: last_alert_timestamp}
+        self.email_alert_cooldown: dict[int, float] = {}
 
     async def start_processing_loop(self):
         """Asynchronously boots up and runs the camera feed frames processing thread."""
@@ -158,7 +164,23 @@ class VideoProcessor:
                 if "websocket_broadcast_required" in execution_status:
                     await manager.broadcast_detection(alert_payload)
                 if "email_alert_required" in execution_status:
-                    await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
+                    # Check cooldown before sending email alert
+                    current_time = time.time()
+                    last_alert_time = self.email_alert_cooldown.get(track_id, 0)
+                    time_since_last_alert = current_time - last_alert_time
+                    
+                    if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
+                        # Cooldown expired or first alert for this track - send email
+                        await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
+                        self.email_alert_cooldown[track_id] = current_time
+                        logger.info(f"Email alert sent for track {track_id}")
+                    else:
+                        # Cooldown still active - skip email but log for debugging
+                        remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
+                        logger.debug(
+                            f"Email alert skipped for track {track_id}: "
+                            f"cooldown active for {remaining_cooldown:.1f}s more"
+                        )
                 if "sms_escalation_required" in execution_status:
                     await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
 
