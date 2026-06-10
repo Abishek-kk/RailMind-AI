@@ -144,20 +144,8 @@ export async function getCCTVSummary(): Promise<CCTVSummaryRow[]> {
   return apiFetch<CCTVSummaryRow[]>("/dashboard/cctv-summary");
 }
 
-async function fetchRecentIncidentsData(): Promise<IncidentRead[]> {
-  try {
-    return await apiFetch<IncidentRead[]>("/incidents?status=active");
-  } catch (error) {
-    if (error instanceof Error && /404/.test(error.message)) {
-      return await apiFetch<IncidentRead[]>("/alerts?status=active");
-    }
-
-    throw error;
-  }
-}
-
 export async function getRecentIncidents(): Promise<DashboardAlert[]> {
-  const incidents = await fetchRecentIncidentsData();
+  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active");
   return incidents
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 4)

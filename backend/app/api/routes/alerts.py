@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.alert import Alert
-from app.schemas.alert import AlertCreate, AlertRead
+from app.schemas.alert import AlertCreate, AlertRead, AssignAlert
 
 router = APIRouter()
 
@@ -83,16 +83,13 @@ async def resolve_alert(id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{id}/assign", response_model=AlertRead)
-async def assign_alert(id: int, payload: dict, db: Session = Depends(get_db)):
+async def assign_alert(id: int, payload: AssignAlert, db: Session = Depends(get_db)):
     """Assign an operator/staff member to an alert record."""
     alert = db.query(Alert).filter(Alert.id == id).first()
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
 
-    assignee = payload.get("assignee") or payload.get("operator_assigned")
-    if not assignee:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing assignee in payload")
-
+    assignee = payload.assignee
     alert.operator_assigned = assignee
     # Optionally mark who acknowledged when assigning
     alert.acknowledged_by = assignee

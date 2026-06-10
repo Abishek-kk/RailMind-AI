@@ -94,11 +94,17 @@ function LivePage() {
   });
 
   const websocketBase = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
-  const latestMessage = useWebSocket<Record<string, any>>(`${websocketBase}/ws/alerts`);
+  const { data: latestMessage, status: wsStatus, error: wsError } = useWebSocket<Record<string, any>>(`${websocketBase}/ws/alerts`);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedDetections, setFeedDetections] = useState<Record<string, LiveBoundingBox[]>>({});
   const [soundEnabled, setSoundEnabled] = useState(true);
   const shownToastIds = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (wsError) {
+      toast.error(`Real-time updates unavailable: ${wsError}`);
+    }
+  }, [wsError]);
 
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") {
@@ -252,6 +258,11 @@ function LivePage() {
         onSoundToggle={() => setSoundEnabled((enabled) => !enabled)}
       />
       <div className="p-6">
+        {wsError ? (
+          <div className="mb-6 rounded-xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Real-time updates are blocked. {wsError}
+          </div>
+        ) : null}
         {feedsLoading || alertsLoading ? (
           <div className="space-y-4">
             <div className="h-6 w-1/3 rounded bg-muted/30 animate-pulse" />

@@ -5,6 +5,7 @@ type WebSocketStatus = "connecting" | "connected" | "disconnected" | "error";
 export function useWebSocket<T>(url: string) {
   const [data, setData] = useState<T | null>(null);
   const [status, setStatus] = useState<WebSocketStatus>("connecting");
+  const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<number | null>(null);
   const retryCount = useRef(0);
@@ -31,7 +32,13 @@ export function useWebSocket<T>(url: string) {
 
   const scheduleReconnect = useCallback(
     (connectFn: () => void) => {
-      if (isUnmounted.current || retryCount.current >= 5) {
+      if (isUnmounted.current) {
+        return;
+      }
+
+      if (retryCount.current >= 5) {
+        setError("Unable to connect to real-time updates after several attempts.");
+        setStatus("error");
         return;
       }
 
@@ -55,6 +62,7 @@ export function useWebSocket<T>(url: string) {
     clearReconnect();
     closeSocket();
     setStatus("connecting");
+    setError(null);
 
     const socket = new WebSocket(url);
     socketRef.current = socket;
@@ -66,6 +74,7 @@ export function useWebSocket<T>(url: string) {
       }
 
       retryCount.current = 0;
+      setError(null);
       setStatus("connected");
     };
 
@@ -81,18 +90,33 @@ export function useWebSocket<T>(url: string) {
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       socketRef.current = null;
       if (isUnmounted.current) {
         setStatus("disconnected");
         return;
       }
+
+      if (event.code === 1008) {
+        const reason = event.reason || "WebSocket connection rejected by server origin policy.";
+        setError(reason);
+        setStatus("error");
+        return;
+      }
+
+      if (retryCount.current >= 5) {
+        setError("Unable to connect to real-time updates after several attempts.");
+        setStatus("error");
+        return;
+      }
+
       setStatus("disconnected");
       scheduleReconnect(connect);
     };
 
     socket.onerror = (event) => {
       console.error("useWebSocket: socket error", event);
+      setError("WebSocket error occurred while connecting to real-time updates.");
       setStatus("error");
       socket.close();
     };
@@ -110,5 +134,5 @@ export function useWebSocket<T>(url: string) {
     };
   }, [connect, clearReconnect, closeSocket]);
 
-  return { data, status } as const;
+  return { data, status, error } as const;
 }
