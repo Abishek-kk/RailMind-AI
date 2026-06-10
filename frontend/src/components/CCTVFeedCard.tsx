@@ -16,8 +16,12 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           <div className="text-sm font-semibold">{feed.id}</div>
           <div className="text-xs text-muted-foreground">{feed.platform}</div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-bold text-[#22c55e]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${boxes.length > 0 ? "bg-[#ef4444]/15 text-[#ef4444]" : "bg-[#22c55e]/15 text-[#22c55e]"}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${boxes.length > 0 ? "animate-pulse bg-[#ef4444]" : "bg-[#22c55e]"}`}
+          />
           LIVE
         </span>
       </div>
