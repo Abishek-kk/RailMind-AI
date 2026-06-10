@@ -3,10 +3,14 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.cv import PoseEstimator, VideoProcessor
 from app.cv.lstm_behavior import BehaviorAnalyzer
+from app.core.config import settings
+from app.lstm.predictor import LSTMPredictor
 
 
 def test_pose_estimator_import():
@@ -43,3 +47,14 @@ def test_behavior_analyzer_maps_scores_to_pose_labels():
     # low scores should map to normal
     label = analyzer.determine_behavior_label({"suicide": 0.2, "pickpocket": 0.1, "anomaly": 0.1})
     assert label == "normal"
+
+
+def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
+
+    predictor = LSTMPredictor(device="cpu")
+
+    assert predictor.models == {}
+    assert predictor.unavailable_models == {"suicide", "pickpocket", "anomaly"}
+    assert predictor.run_inference("anomaly", np.zeros((1, 30, 7), dtype=np.float32)) == 0.0
+    assert list(tmp_path.glob("*.pt")) == []
