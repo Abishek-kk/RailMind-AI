@@ -1,42 +1,36 @@
 import os
-import numpy as np
 import logging
+
+import numpy as np
+import torch
+
 from app.core.config import settings
 from app.lstm.model import build_lstm_model
 
-os.environ.setdefault("KERAS_BACKEND", "torch")
-
-try:
-    import keras_core as keras
-except ImportError:
-    try:
-        import keras
-    except ImportError:
-        keras = None
-
 logger = logging.getLogger("railmind")
 
+
 class LSTMPredictor:
-    def __init__(self):
+    def __init__(self, device: str = None):
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.models = {}
         self.load_behavior_models()
+        logger.info(f"LSTMPredictor using device: {self.device}")
 
     def _create_default_model(self, model_file_path: str, sequence_length: int = 30, num_features: int = 34):
+        """Creates and saves a default model if one doesn't exist."""
         os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
         model = build_lstm_model(sequence_length=sequence_length, num_features=num_features)
-        model.save(model_file_path, save_format="h5")
+        torch.save(model.state_dict(), model_file_path)
         logger.warning("Created default LSTM model at '%s'", model_file_path)
         return model
 
     def load_behavior_models(self):
-        """Pre-loads saved .h5 network frameworks into memory."""
-        if not keras:
-            raise RuntimeError("Keras is required for LSTM inference but is not installed.")
-
+        """Pre-loads saved .pt model weights into memory."""
         target_blueprints = {
-            "suicide": "suicide_classifier.h5",
-            "pickpocket": "pickpocket_classifier.h5",
-            "anomaly": "anomaly_classifier.h5"
+            "suicide": "suicide_classifier.pt",
+            "pickpocket": "pickpocket_classifier.pt",
+            "anomaly": "anomaly_classifier.pt",
         }
 
         for classification_key, file_name in target_blueprints.items():
@@ -48,24 +42,42 @@ class LSTMPredictor:
                     classification_key,
                     model_file_path,
                 )
-                self._create_default_model(model_file_path)
-
-            try:
-                # compile=False allows running inference workflows without loading training states
-                self.models[classification_key] = keras.models.load_model(model_file_path, compile=False)
-                logger.info(f"Initialized H5 Neural Weight Module: {file_name}")
-            except Exception as err:
-                raise RuntimeError(f"Failed to load LSTM model '{file_name}': {err}") from err
+                model = self._create_default_model(model_file_path)
+                self.models[classification_key] = model.to(self.device)
+            else:
+                try:
+                    # Load model weights
+                    model = build_lstm_model()
+                    model.load_state_dict(torch.load(model_file_path, map_location=self.device))
+                    model.to(self.device)
+                    model.eval()  # Set to evaluation mode
+                    self.models[classification_key] = model
+                    logger.info(f"Initialized PyTorch Model: {file_name}")
+                except Exception as err:
+                    raise RuntimeError(f"Failed to load LSTM model '{file_name}': {err}") from err
 
     def run_inference(self, model_target: str, input_tensor: np.ndarray) -> float:
         """Runs the prepared input matrix block down target network tracks."""
-        if model_target in self.models:
-            try:
-                raw_prediction = self.models[model_target].predict(input_tensor, verbose=0)
-                return float(raw_prediction[0][0])
-            except Exception as inference_err:
-                raise RuntimeError(f"LSTM inference failure for target '{model_target}': {inference_err}") from inference_err
+        if model_target not in self.models:
+            raise RuntimeError(
+                f"Requested LSTM model '{model_target}' is not loaded. Loaded models: {list(self.models.keys())}."
+            )
 
-        raise RuntimeError(
-            f"Requested LSTM model '{model_target}' is not loaded. Loaded models: {list(self.models.keys())}."
-        )
+        try:
+            # Convert numpy array to torch tensor
+            input_torch = torch.tensor(input_tensor, dtype=torch.float32).to(self.device)
+
+            # Add batch dimension if necessary
+            if len(input_torch.shape) == 2:
+                input_torch = input_torch.unsqueeze(0)
+
+            # Run inference
+            with torch.no_grad():
+                model = self.models[model_target]
+                output = model(input_torch)
+
+            return float(output[0][0].cpu().numpy())
+        except Exception as inference_err:
+            raise RuntimeError(
+                f"LSTM inference failure for target '{model_target}': {inference_err}"
+            ) from inference_err

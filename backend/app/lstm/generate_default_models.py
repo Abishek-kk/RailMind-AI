@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 
-os.environ.setdefault("KERAS_BACKEND", "torch")
+import torch
 
 script_dir = os.path.dirname(__file__)
 sys.path.insert(0, script_dir)
@@ -13,9 +13,9 @@ logging.basicConfig(level=logging.INFO)
 
 MODEL_DIR = os.path.join(script_dir, "saved_models")
 MODEL_FILES = [
-    "suicide_classifier.h5",
-    "pickpocket_classifier.h5",
-    "anomaly_classifier.h5",
+    "suicide_classifier.pt",
+    "pickpocket_classifier.pt",
+    "anomaly_classifier.pt",
 ]
 
 SEQUENCE_LENGTH = 30
@@ -25,7 +25,7 @@ NUM_FEATURES = 34
 def create_default_model(model_file_path: str):
     os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
     model = build_lstm_model(sequence_length=SEQUENCE_LENGTH, num_features=NUM_FEATURES)
-    model.save(model_file_path, save_format="h5")
+    torch.save(model.state_dict(), model_file_path)
     logger.info("Saved default LSTM model: %s", model_file_path)
 
 
