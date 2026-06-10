@@ -10,7 +10,7 @@ import { Camera, Users, AlertTriangle, Activity, Plus, ChevronDown, ArrowRight }
 import { getAlerts, type ApiAlert } from "@/lib/api/alerts";
 import { createFeed, getFeeds } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { riskColor } from "@/lib/mock-data";
+import { getLiveFeeds, riskColor } from "@/lib/mock-data";
 
 interface LiveDetectionPayload {
   camera_id: string;
@@ -92,14 +92,27 @@ function LivePage() {
     },
   });
 
-  const latestMessage = useWebSocket<Record<string, any>>("ws://localhost:8000/ws/alerts");
+  const websocketBase = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
+  const latestMessage = useWebSocket<Record<string, any>>(`${websocketBase}/ws/alerts`);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedDetections, setFeedDetections] = useState<Record<string, LiveBoundingBox[]>>({});
 
+  const displayFeeds = useMemo(() => {
+    if (!Array.isArray(feeds)) {
+      return getLiveFeeds();
+    }
+
+    if (feeds.length === 0 && import.meta.env.MODE === "development") {
+      return getLiveFeeds();
+    }
+
+    return feeds;
+  }, [feeds]);
+
   const filteredFeeds = useMemo(() => {
-    const list = feeds ?? [];
+    const list = displayFeeds;
     return feed === "all" ? list : list.filter((f) => f.id === feed);
-  }, [feeds, feed]);
+  }, [displayFeeds, feed]);
 
   useEffect(() => {
     if (alerts) {
@@ -273,11 +286,20 @@ function LivePage() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {filteredFeeds.map((f) => (
-              <CCTVFeedCard key={f.id} feed={f} detections={feedDetections[f.id]} />
-            ))}
-          </div>
+          {filteredFeeds.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-8 text-center">
+              <h2 className="text-xl font-semibold text-foreground">No camera feeds registered yet</h2>
+              <p className="mt-3 text-sm text-muted-foreground">
+                No camera feeds registered yet. Click "Add CCTV Feed" to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {filteredFeeds.map((f) => (
+                <CCTVFeedCard key={f.id} feed={f} detections={feedDetections[f.id]} />
+              ))}
+            </div>
+          )}
 
           <aside className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
