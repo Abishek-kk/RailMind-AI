@@ -14,7 +14,7 @@ class Alert(Base):
     incident_type = Column(String, nullable=False)
     risk_score = Column(Float, nullable=False, default=0.0)
     risk_level = Column(String, nullable=False, default="Safe")
-    status = Column(String, nullable=False, default="unacknowledged")
+    status = Column(String, nullable=False, default="active")
     escalation_level = Column(Integer, nullable=False, default=0)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     acknowledged_by = Column(String, nullable=True)

@@ -51,12 +51,15 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
     connections from unknown origins with a 403-like close code.
     """
     origin = websocket.headers.get("origin")
-    allowed = set(settings.BACKEND_CORS_ORIGINS or [])
+    allowed = {origin.rstrip("/") for origin in (settings.BACKEND_CORS_ORIGINS or [])}
     try:
-        if origin and origin not in allowed:
-            # Reject the handshake by closing with policy violation
-            await websocket.close(code=1008)
-            return
+        if origin:
+            normalized_origin = origin.rstrip("/")
+            if normalized_origin not in allowed:
+                # Reject the handshake by closing with policy violation.
+                # Include a reason so clients can surface the failure instead of silently retrying.
+                await websocket.close(code=1008, reason="Origin not allowed")
+                return
 
         await websocket_manager.manager.connect(websocket)
         try:

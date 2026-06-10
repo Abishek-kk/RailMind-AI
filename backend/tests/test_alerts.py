@@ -17,7 +17,7 @@ def test_alert_creation():
         incident_type="Loitering",
         risk_score=0.75,
         risk_level="Medium Risk",
-        status="unacknowledged",
+        status="active",
     )
     assert alert.person_id == "P1"
     assert alert.risk_level == "Medium Risk"
@@ -33,7 +33,7 @@ def test_get_alerts():
             incident_type="Pickpocketing",
             risk_score=0.85,
             risk_level="High Risk",
-            status="unacknowledged",
+            status="active",
         )
     ]
     assert len(alerts) == 1
