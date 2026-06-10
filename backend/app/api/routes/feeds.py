@@ -1,34 +1,119 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+import logging
 from typing import List
-from app.api.deps import get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
+from app.api.deps import get_db
+from app.models.feed import Feed
+from app.schemas.feed import FeedCreate, FeedRead
+from app.cv.video_processor import VideoProcessor
+
+logger = logging.getLogger("railmind.feeds")
 router = APIRouter()
 
-@router.get("")
-async def list_feeds(db = Depends(get_db)):
-    """List all connected station CCTV streams alongside operational health checks."""
-    return [
-        {"id": "CCTV_P1_04", "name": "Platform 1 East Edge", "status": "active", "fps": 29.97},
-        {"id": "CCTV_P2_01", "name": "Platform 2 Main Stairs", "status": "active", "fps": 30.0},
-        {"id": "CCTV_B1_02", "name": "Baggage Counter Rest", "status": "inactive", "fps": 0.0}
-    ]
+# Global registry of active VideoProcessor instances
+# Key: feed_id, Value: VideoProcessor instance
+active_processors = {}
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def register_feed(feed_data: dict, db = Depends(get_db)):
+
+@router.get("", response_model=List[FeedRead])
+async def list_feeds(db: Session = Depends(get_db)):
+    """List all connected station CCTV streams alongside operational health checks."""
+    feeds = db.query(Feed).all()
+    return feeds
+
+
+@router.post("", response_model=FeedRead, status_code=status.HTTP_201_CREATED)
+async def register_feed(feed: FeedCreate, db: Session = Depends(get_db)):
     """Register a new active IP Camera RTSP protocol stream network node into RailMind."""
-    return {"id": feed_data.get("id", "CCTV_NEW"), "status": "registered", "msg": "Ingestion active"}
+    # Check if feed already exists
+    existing = db.query(Feed).filter(Feed.id == feed.id).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Feed with id '{feed.id}' already exists"
+        )
+    
+    # Create new feed record
+    db_feed = Feed(
+        id=feed.id,
+        name=feed.name,
+        status="active",
+        fps=feed.fps or 30.0
+    )
+    db.add(db_feed)
+    db.commit()
+    db.refresh(db_feed)
+    
+    # Start VideoProcessor as background task
+    try:
+        # Extract platform from feed id (e.g., "CCTV_P1_04" -> "Platform 1")
+        platform = f"Platform {feed.id.split('_')[1][1]}"  # Extract the number after 'P'
+        processor = VideoProcessor(feed_source=feed.source_url, camera_id=feed.id, platform=platform)
+        task = asyncio.create_task(processor.start_processing_loop())
+        active_processors[feed.id] = {"processor": processor, "task": task}
+        logger.info(f"Started VideoProcessor for feed {feed.id}")
+    except Exception as e:
+        logger.error(f"Failed to start VideoProcessor for feed {feed.id}: {e}")
+        # Don't fail the entire feed registration if processor startup fails
+    
+    return db_feed
+
 
 @router.get("/{id}/stream")
-async def get_live_stream_metadata(id: str, db = Depends(get_db)):
+async def get_live_stream_metadata(id: str, db: Session = Depends(get_db)):
     """Returns endpoint stream pipeline specifications for client rendering loops."""
+    feed = db.query(Feed).filter(Feed.id == id).first()
+    if not feed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feed with id '{id}' not found"
+        )
+    
     return {
         "feed_id": id,
         "stream_protocol": "HLS/WebRTC",
         "endpoint_url": f"/api/v1/feeds/{id}/live.m3u8",
-        "inference_overlay": True
+        "inference_overlay": True,
+        "status": feed.status
     }
 
-@router.delete("/{id}")
-async def remove_feed(id: str, db = Depends(get_db)):
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_feed(id: str, db: Session = Depends(get_db)):
     """Safely stop parsing frames and tear down ingestion threads for a specified camera."""
-    return {"id": id, "status": "deprovisioned"}
+    feed = db.query(Feed).filter(Feed.id == id).first()
+    if not feed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feed with id '{id}' not found"
+        )
+    
+    # Stop and cleanup VideoProcessor
+    if id in active_processors:
+        try:
+            processor_info = active_processors[id]
+            processor = processor_info["processor"]
+            task = processor_info["task"]
+            
+            # Signal processor to stop
+            processor.stop_processing_loop()
+            
+            # Cancel the task
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                logger.info(f"VideoProcessor task for feed {id} cancelled")
+            
+            del active_processors[id]
+            logger.info(f"Stopped VideoProcessor for feed {id}")
+        except Exception as e:
+            logger.error(f"Error stopping VideoProcessor for feed {id}: {e}")
+    
+    # Delete from database
+    db.delete(feed)
+    db.commit()
+    
+    return None

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # Database Architecture 
     DATABASE_URL: str = Field(default="sqlite:///./data/railmind.db", validation_alias="DATABASE_URL")
     DEBUG: bool = False
-    SECRET_KEY: str = Field(default="your-secret-key-here")
+    SECRET_KEY: str = Field(default="")
     LOG_LEVEL: str = Field(default="INFO")
     
     # Computer Vision Directories
@@ -34,10 +34,10 @@ class Settings(BaseSettings):
     
     # Dynamic Agent Behavior Evaluation Thresholds
     # Used by Reasoning Agent to classify incident urgency
-    LOW_RISK_THRESHOLD: float = 0.30
-    MEDIUM_RISK_THRESHOLD: float = 0.50
-    HIGH_RISK_THRESHOLD: float = 0.70
-    CRITICAL_RISK_THRESHOLD: float = 0.90
+    LOW_RISK_THRESHOLD: int = 40
+    MEDIUM_RISK_THRESHOLD: int = 70
+    HIGH_RISK_THRESHOLD: int = 90
+    CRITICAL_RISK_THRESHOLD: int = 100
     
     # Platform Warning Metrics
     PLATFORM_EDGE_SAFETY_LIMIT_METERS: float = 1.5
@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = Field(default="")
     TWILIO_FROM_NUMBER: str = Field(default="")
     TWILIO_TO_NUMBERS: List[str] = Field(default=[], validation_alias="TWILIO_TO_NUMBERS")
+
+    @field_validator("SECRET_KEY", mode="before")
+    @classmethod
+    def _validate_secret_key(cls, value):
+        import secrets
+        if not value or value == "your-secret-key-here":
+            # Auto-generate a secure random key if not set or using default
+            return secrets.token_hex(32)
+        return value
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

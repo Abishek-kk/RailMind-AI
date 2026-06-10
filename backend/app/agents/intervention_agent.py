@@ -27,6 +27,7 @@ def intervention_node(state: Dict[str, Any]) -> Dict[str, Any]:
     execution_status = []
 
     if action in ["alert_staff", "urgent_alert", "emergency_escalation"]:
+        # Indicate a websocket broadcast is required for the frontend and persistence flow.
         execution_status.append("websocket_broadcast_required")
         execution_status.append("email_alert_required")
 

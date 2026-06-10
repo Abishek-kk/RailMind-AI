@@ -9,13 +9,10 @@ pydantic-settings==2.1.0
 pydantic>=2.7.4,<3.0.0
 
 # Computer Vision
-opencv-python==4.8.1.78
+opencv-python>=4.10.0
 
 # Deep Learning
-tensorflow==2.15.0; python_version < "3.14"
 torch>=2.9.0
-keras==2.15.0; python_version < "3.14"
-keras-core==0.1.7
 
 # Computer vision helper
 ultralytics==8.4.63

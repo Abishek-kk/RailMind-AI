@@ -15,15 +15,15 @@ class LSTMBehaviorModel(nn.Module):
         self.num_classes = num_classes
 
         # Layer 1: Processes individual frame vectors sequentially, maintaining sequence memory
-        self.lstm1 = nn.LSTM(num_features, 64, batch_first=True, return_sequences=True)
+        self.lstm1 = nn.LSTM(num_features, 64, batch_first=True, bidirectional=True)
         self.dropout1 = nn.Dropout(0.2)
 
         # Layer 2: Condenses temporal outputs into a single aggregated feature vector
-        self.lstm2 = nn.LSTM(64, 32, batch_first=True, return_sequences=False)
+        self.lstm2 = nn.LSTM(64 * 2, 32, batch_first=True, bidirectional=True)
         self.dropout2 = nn.Dropout(0.2)
 
         # Dense Layer Context Mapping
-        self.fc1 = nn.Linear(32, 16)
+        self.fc1 = nn.Linear(32 * 2, 16)
         self.relu = nn.ReLU()
 
         # Classification Output Layer (Sigmoid output boundary for binary anomaly risk probabilities)
@@ -43,6 +43,7 @@ class LSTMBehaviorModel(nn.Module):
 
         # LSTM Layer 2
         x, _ = self.lstm2(x)
+        x = x[:, -1, :]
         x = self.dropout2(x)
 
         # Dense layers

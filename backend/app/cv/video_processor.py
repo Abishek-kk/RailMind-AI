@@ -7,6 +7,7 @@ from argparse import Namespace
 import numpy as np
 from ultralytics.trackers import BYTETracker
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.cv.pose_estimator import PoseEstimator
 from app.cv.lstm_behavior import BehaviorAnalyzer
 from app.features.edge_proximity import EdgeProximityDetector
@@ -16,6 +17,8 @@ from app.features.following_detector import FollowingDetector
 from app.features.movement_analyzer import MovementAnalyzer
 from app.services.notification_service import NotificationService
 from app.services.escalation_service import EscalationService
+from app.services.incident_service import IncidentService
+from app.services.alert_service import AlertService
 from app.agents.agent_graph import run_agent_pipeline
 from app.core.websocket_manager import manager
 
@@ -47,6 +50,11 @@ class VideoProcessor:
         self.movement_analyzer = MovementAnalyzer()
         self.notification_service = NotificationService()
         self.escalation_service = EscalationService()
+
+        self.db = SessionLocal()
+        self.incident_service = IncidentService(self.db)
+        self.alert_service = AlertService(self.db)
+
         self.previous_track_ids: set[int] = set()
         self.is_running = False
         # Cooldown tracking for email alerts: {track_id: last_alert_timestamp}
@@ -56,159 +64,200 @@ class VideoProcessor:
         """Asynchronously boots up and runs the camera feed frames processing thread."""
         self.is_running = True
         cap = cv2.VideoCapture(self.feed_source)
-        
-        if not cap.isOpened():
-            logger.error(f"Critical Ingestion Failure: Unable to parse stream {self.feed_source}")
-            self.is_running = False
-            return
+        try:
+            if not cap.isOpened():
+                logger.error(f"Critical Ingestion Failure: Unable to parse stream {self.feed_source}")
+                self.is_running = False
+                return
 
-        frame_count = 0
-        logger.info(f"CV Processing Pipeline active for channel {self.camera_id} on {self.platform}")
+            frame_count = 0
+            logger.info(f"CV Processing Pipeline active for channel {self.camera_id} on {self.platform}")
 
-        while self.is_running:
-            ret, frame = cap.read()
-            if not ret:
-                # If reading a mock mp4 file, loop it seamlessly back to the start frame
-                if isinstance(self.feed_source, str) and not self.feed_source.startswith("rtsp"):
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                else:
-                    logger.warning(f"Connection stream dropped out for camera: {self.camera_id}")
-                    break
-
-            frame_count += 1
-            # Skip frames strategically to optimize edge hardware performance overhead
-            if frame_count % 2 != 0:
-                await asyncio.sleep(0.001)
-                continue
-
-            height, width, _ = frame.shape
-
-            # 1. Capture spatial skeletons and update tracker with YOLOv8 pose detections
-            results = self.pose_estimator.model(frame, verbose=False)[0]
-            pose_detections = self._extract_pose_detections(results)
-            tracked_objects = self.tracker.update(results, frame)
-            active_frame_detections = []
-
-            current_track_ids = {int(row[4]) for row in tracked_objects} if tracked_objects is not None else set()
-            disappeared_tracks = self.previous_track_ids - current_track_ids
-            for track_id in disappeared_tracks:
-                self.behavior_analyzer.clear_track_history(track_id)
-            self.previous_track_ids = current_track_ids
-
-            matched_detections = self._match_tracker_results(tracked_objects, pose_detections)
-            current_tracks = {}
-            for track_id, person in matched_detections:
-                bbox = person["bbox"]
-                center = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
-                person["center"] = center
-                current_tracks[track_id] = {
-                    "bbox": bbox,
-                    "center": center,
-                }
-
-            for track_id, person in matched_detections:
-                bbox = person["bbox"]
-                person_center = person["center"]
-
-                edge_proximity_seconds = self.edge_detector.update(track_id, bbox, height)
-                edge_distance_meters = self.edge_detector.get_distance_to_edge(bbox, height)
-                if edge_distance_meters is None:
-                    edge_distance_meters = settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS * 2
-
-                loitering_time = self.loitering_detector.detect(track_id, person, frame_count)
-                pacing_count = self.pacing_detector.detect(track_id, person)
-                movement_speed = self.movement_analyzer.update_track(track_id, person)
-                direction_changes = self.movement_analyzer.get_direction_changes(track_id)
-                following_distance = self.following_detector.get_following_distance(track_id, current_tracks)
-                if following_distance == float("inf"):
-                    following_distance = float(max(height, width))
-                crowd_interactions = self.following_detector.get_crowd_interaction_count(track_id, current_tracks)
-
-                feature_vector = [
-                    float(edge_proximity_seconds),
-                    float(loitering_time),
-                    float(pacing_count),
-                    float(movement_speed),
-                    float(direction_changes),
-                    float(following_distance),
-                    float(crowd_interactions),
-                ]
-
-                lstm_anomaly_score = self.behavior_analyzer.analyze_temporal_sequence(track_id, feature_vector)
-
-                raw_cv_state = {
-                    "person_id": track_id,
-                    "camera_id": self.camera_id,
-                    "platform": self.platform,
-                    "lstm_anomaly_score": lstm_anomaly_score,
-                    "lstm_score": lstm_anomaly_score,
-                    "edge_distance_meters": edge_distance_meters,
-                    "edge_distance": edge_distance_meters,
-                    "edge_proximity_seconds": edge_proximity_seconds,
-                    "behavior_duration_seconds": int(frame_count / 30),
-                    "duration_seconds": int(frame_count / 30),
-                    "loitering_duration": loitering_time,
-                    "following_distance": following_distance,
-                    "pose_classification": "erratic" if lstm_anomaly_score > 0.65 else "normal",
-                    "context_multiplier": 1.25 if "Platform 1" in self.platform else 1.0,
-                    "bounding_box": bbox
-                }
-
-                # 5. Invoke LangGraph Execution Workflow
-                final_state = await run_agent_pipeline(raw_cv_state)
-                alert_payload = final_state.get("alert_payload", {})
-                execution_status = final_state.get("execution_status", [])
-                alert_info = alert_payload
-
-                if "websocket_broadcast_required" in execution_status:
-                    await manager.broadcast_detection(alert_payload)
-                if "email_alert_required" in execution_status:
-                    # Check cooldown before sending email alert
-                    current_time = time.time()
-                    last_alert_time = self.email_alert_cooldown.get(track_id, 0)
-                    time_since_last_alert = current_time - last_alert_time
-                    
-                    if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
-                        # Cooldown expired or first alert for this track - send email
-                        await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
-                        self.email_alert_cooldown[track_id] = current_time
-                        logger.info(f"Email alert sent for track {track_id}")
+            while self.is_running:
+                ret, frame = cap.read()
+                if not ret:
+                    # If reading a mock mp4 file, loop it seamlessly back to the start frame
+                    if isinstance(self.feed_source, str) and not self.feed_source.startswith("rtsp"):
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
                     else:
-                        # Cooldown still active - skip email but log for debugging
-                        remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
-                        logger.debug(
-                            f"Email alert skipped for track {track_id}: "
-                            f"cooldown active for {remaining_cooldown:.1f}s more"
-                        )
-                if "sms_escalation_required" in execution_status:
-                    await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
+                        logger.warning(f"Connection stream dropped out for camera: {self.camera_id}")
+                        break
 
-                # 6. Accumulate visual metadata overlay values
-                active_frame_detections.append({
-                    "track_id": track_id,
-                    "bbox": bbox,
-                    "distance": edge_distance_meters,
-                    "risk_score": alert_info.get("risk_score", 0.0),
-                    "risk_level": alert_info.get("risk_level", "Safe"),
-                    "incident_type": alert_info.get("incident_type", "Normal Activity")
-                })
+                frame_count += 1
+                # Skip frames strategically to optimize edge hardware performance overhead
+                if frame_count % 2 != 0:
+                    await asyncio.sleep(0.001)
+                    continue
 
-            # 7. Asynchronously broadcast frame telemetry data straight out to frontend components
-            if active_frame_detections:
-                live_broadcast_packet = {
-                    "camera_id": self.camera_id,
-                    "platform": self.platform,
-                    "dimensions": {"width": width, "height": height},
-                    "timestamp": frame_count,
-                    "detections": active_frame_detections
-                }
-                await manager.broadcast_detection(live_broadcast_packet)
+                height, width, _ = frame.shape
 
-            # Control frequency to match expected video runtime speeds (~30 frames/sec execution)
-            await asyncio.sleep(0.033)
+                # 1. Capture spatial skeletons and update tracker with YOLOv8 pose detections
+                results = self.pose_estimator.model(frame, verbose=False)[0]
+                pose_detections = self._extract_pose_detections(results)
+                tracked_objects = self.tracker.update(results, frame)
+                active_frame_detections = []
 
-        cap.release()
+                current_track_ids = {int(row[4]) for row in tracked_objects} if tracked_objects is not None else set()
+                disappeared_tracks = self.previous_track_ids - current_track_ids
+                for track_id in disappeared_tracks:
+                    self.behavior_analyzer.clear_track_history(track_id)
+                self.previous_track_ids = current_track_ids
+
+                matched_detections = self._match_tracker_results(tracked_objects, pose_detections)
+                current_tracks = {}
+                for track_id, person in matched_detections:
+                    bbox = person["bbox"]
+                    center = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
+                    person["center"] = center
+                    current_tracks[track_id] = {
+                        "bbox": bbox,
+                        "center": center,
+                    }
+
+                for track_id, person in matched_detections:
+                    bbox = person["bbox"]
+                    person_center = person["center"]
+
+                    edge_proximity_seconds = self.edge_detector.update(track_id, bbox, height)
+                    edge_distance_meters = self.edge_detector.get_distance_to_edge(bbox, height)
+                    if edge_distance_meters is None:
+                        edge_distance_meters = settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS * 2
+
+                    loitering_time = self.loitering_detector.detect(track_id, person, frame_count)
+                    pacing_count = self.pacing_detector.detect(track_id, person)
+                    movement_speed = self.movement_analyzer.update_track(track_id, person)
+                    direction_changes = self.movement_analyzer.get_direction_changes(track_id)
+                    following_distance = self.following_detector.get_following_distance(track_id, current_tracks)
+                    if following_distance == float("inf"):
+                        following_distance = float(max(height, width))
+                    crowd_interactions = self.following_detector.get_crowd_interaction_count(track_id, current_tracks)
+
+                    feature_vector = [
+                        float(edge_proximity_seconds),
+                        float(loitering_time),
+                        float(pacing_count),
+                        float(movement_speed),
+                        float(direction_changes),
+                        float(following_distance),
+                        float(crowd_interactions),
+                    ]
+
+                    lstm_scores = self.behavior_analyzer.analyze_temporal_sequence(track_id, feature_vector)
+                    lstm_score = max(lstm_scores.values()) if lstm_scores else 0.0
+                    pose_label = self.behavior_analyzer.determine_behavior_label(
+                        lstm_scores,
+                        following_distance=following_distance,
+                    )
+
+                    raw_cv_state = {
+                        "person_id": track_id,
+                        "camera_id": self.camera_id,
+                        "platform": self.platform,
+                        "lstm_anomaly_score": lstm_scores.get("anomaly", 0.0),
+                        "lstm_score": lstm_score,
+                        "lstm_scores": lstm_scores,
+                        "edge_distance_meters": edge_distance_meters,
+                        "edge_distance": edge_distance_meters,
+                        "edge_proximity_seconds": edge_proximity_seconds,
+                        "behavior_duration_seconds": int(frame_count / 30),
+                        "duration_seconds": int(frame_count / 30),
+                        "loitering_duration": loitering_time,
+                        "following_distance": following_distance,
+                        "pose_classification": pose_label,
+                        "context_multiplier": 1.25 if "Platform 1" in self.platform else 1.0,
+                        "bounding_box": bbox
+                    }
+
+                    # 5. Invoke LangGraph Execution Workflow
+                    final_state = await run_agent_pipeline(raw_cv_state)
+                    alert_payload = final_state.get("alert_payload", {})
+                    execution_status = final_state.get("execution_status", [])
+                    alert_info = alert_payload
+
+                    if "websocket_broadcast_required" in execution_status:
+                        await manager.broadcast_detection(alert_payload)
+                    if "email_alert_required" in execution_status:
+                        # Check cooldown before sending email alert
+                        current_time = time.time()
+                        last_alert_time = self.email_alert_cooldown.get(track_id, 0)
+                        time_since_last_alert = current_time - last_alert_time
+                        
+                        if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
+                            # Cooldown expired or first alert for this track - send email
+                            await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
+                            self.email_alert_cooldown[track_id] = current_time
+                            logger.info(f"Email alert sent for track {track_id}")
+                        else:
+                            # Cooldown still active - skip email but log for debugging
+                            remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
+                            logger.debug(
+                                f"Email alert skipped for track {track_id}: "
+                                f"cooldown active for {remaining_cooldown:.1f}s more"
+                            )
+                    if "sms_escalation_required" in execution_status:
+                        await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
+
+                    # Persist alert and incident records when a high-risk event is generated
+                    should_persist_alert = any(
+                        flag in execution_status
+                        for flag in [
+                            "websocket_broadcast_required",
+                            "email_alert_required",
+                            "sms_escalation_required",
+                        ]
+                    )
+
+                    alert_record = None
+                    if should_persist_alert:
+                        alert_record = self.alert_service.create_alert({
+                            "person_id": raw_cv_state["person_id"],
+                            "camera_id": raw_cv_state["camera_id"],
+                            "platform": raw_cv_state["platform"],
+                            "incident_type": alert_payload.get("incident_type", "Normal Activity"),
+                            "risk_score": alert_payload.get("risk_score", 0.0),
+                            "risk_level": alert_payload.get("risk_level", "Safe"),
+                            "status": "active",
+                            "bounding_box": raw_cv_state.get("bounding_box"),
+                        })
+
+                    if alert_payload.get("risk_score", 0.0) >= settings.MEDIUM_RISK_THRESHOLD:
+                        incident_payload = {
+                            "alert_id": alert_record.id if alert_record else None,
+                            "camera_id": raw_cv_state["camera_id"],
+                            "incident_type": alert_payload.get("incident_type", "Normal Activity"),
+                            "risk_score": alert_payload.get("risk_score", 0.0),
+                            "risk_level": alert_payload.get("risk_level", "Safe"),
+                            "status": "unacknowledged",
+                        }
+                        self.incident_service.create_incident(incident_payload)
+
+                    # 6. Accumulate visual metadata overlay values
+                    active_frame_detections.append({
+                        "track_id": track_id,
+                        "bbox": bbox,
+                        "distance": edge_distance_meters,
+                        "risk_score": alert_info.get("risk_score", 0.0),
+                        "risk_level": alert_info.get("risk_level", "Safe"),
+                        "incident_type": alert_info.get("incident_type", "Normal Activity")
+                    })
+
+                # 7. Asynchronously broadcast frame telemetry data straight out to frontend components
+                if active_frame_detections:
+                    live_broadcast_packet = {
+                        "camera_id": self.camera_id,
+                        "platform": self.platform,
+                        "dimensions": {"width": width, "height": height},
+                        "timestamp": frame_count,
+                        "detections": active_frame_detections
+                    }
+                    await manager.broadcast_detection(live_broadcast_packet)
+
+                # Control frequency to match expected video runtime speeds (~30 frames/sec execution)
+                await asyncio.sleep(0.033)
+        finally:
+            cap.release()
+            self.db.close()
 
     def _extract_pose_detections(self, results) -> list[dict]:
         pose_detections = []

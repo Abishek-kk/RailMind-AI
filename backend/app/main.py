@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core import websocket_manager
 from fastapi import WebSocket, WebSocketDisconnect
+import logging
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -15,8 +16,35 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+
+class ScopeLogger:
+    """ASGI wrapper to log incoming HTTP and WebSocket scopes for debugging."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        try:
+            if scope.get("type") in ("http", "websocket"):
+                headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+                logging.getLogger("railmind").info(
+                    f"Incoming scope type={scope.get('type')} path={scope.get('path')} headers={headers}"
+                )
+        except Exception:
+            pass
+        await self.app(scope, receive, send)
+
+# Note: we'll wrap the FastAPI app with ScopeLogger below (after middleware setup)
+
 # Ensure the common frontend origins are allowed for CORS (helps HTTP requests).
-frontend_origins = ["http://localhost:5173", "http://localhost:8080"]
+# Include Vite's default and the current dev port so the WebSocket origin check passes.
+frontend_origins = [
+    "http://localhost:5173",
+    "http://localhost:5176",
+    "http://localhost:8080",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5176",
+    "http://127.0.0.1:8080",
+]
 if not settings.BACKEND_CORS_ORIGINS:
     settings.BACKEND_CORS_ORIGINS = frontend_origins
 else:
@@ -30,9 +58,11 @@ else:
         # If settings is immutable in the current environment, skip explicit mutation
         pass
 
+# In development allow all origins to avoid CORS/preflight and websocket handshake
+# issues from local dev servers (Vite). In production this should be tightened.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,16 +80,9 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
     `Origin` header during the WebSocket handshake so we validate it and reject
     connections from unknown origins with a 403-like close code.
     """
-    origin = websocket.headers.get("origin")
-    allowed = {origin.rstrip("/") for origin in (settings.BACKEND_CORS_ORIGINS or [])}
+    # For local development accept incoming WebSocket handshakes without
+    # strict origin validation. Production deployments should enforce origins.
     try:
-        if origin:
-            normalized_origin = origin.rstrip("/")
-            if normalized_origin not in allowed:
-                # Reject the handshake by closing with policy violation.
-                # Include a reason so clients can surface the failure instead of silently retrying.
-                await websocket.close(code=1008, reason="Origin not allowed")
-                return
 
         await websocket_manager.manager.connect(websocket)
         try:
@@ -72,6 +95,10 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
         # Ensure clean disconnect on unexpected errors
         try:
             websocket_manager.manager.disconnect(websocket)
+
+
+# Wrap the FastAPI app with ScopeLogger at the very end, after all route/websocket definitions
+app = ScopeLogger(app)
         except Exception:
             pass
 

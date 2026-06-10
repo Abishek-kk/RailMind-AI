@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, Any, TypedDict, List
 from langgraph.graph import StateGraph, END
 from app.agents.perception_agent import perception_node
@@ -44,6 +45,6 @@ async def run_agent_pipeline(raw_cv_data: Dict[str, Any]) -> Dict[str, Any]:
     
     # Invoke the LangGraph pipeline
     # LangGraph returns the final state object after traversing all nodes
-    final_state = agent_pipeline.invoke(initial_state)
+    final_state = await asyncio.to_thread(agent_pipeline.invoke, initial_state)
     
     return final_state

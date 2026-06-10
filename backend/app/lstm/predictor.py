@@ -1,5 +1,6 @@
 import os
 import logging
+import pickle
 
 import numpy as np
 import torch
@@ -14,6 +15,7 @@ class LSTMPredictor:
     def __init__(self, device: str = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.models = {}
+        self.scalers = {}
         self.load_behavior_models()
         logger.info(f"LSTMPredictor using device: {self.device}")
 
@@ -26,7 +28,7 @@ class LSTMPredictor:
         return model
 
     def load_behavior_models(self):
-        """Pre-loads saved .pt model weights into memory."""
+        """Pre-loads saved .pt model weights and feature scalers into memory."""
         target_blueprints = {
             "suicide": "suicide_classifier.pt",
             "pickpocket": "pickpocket_classifier.pt",
@@ -35,6 +37,7 @@ class LSTMPredictor:
 
         for classification_key, file_name in target_blueprints.items():
             model_file_path = os.path.join(settings.MODEL_DIR, file_name)
+            scaler_file_path = model_file_path.replace(".pt", "_scaler.pkl")
 
             if not os.path.exists(model_file_path):
                 logger.warning(
@@ -44,6 +47,7 @@ class LSTMPredictor:
                 )
                 model = self._create_default_model(model_file_path)
                 self.models[classification_key] = model.to(self.device)
+                self.scalers[classification_key] = None
             else:
                 try:
                     # Load model weights
@@ -53,6 +57,17 @@ class LSTMPredictor:
                     model.eval()  # Set to evaluation mode
                     self.models[classification_key] = model
                     logger.info(f"Initialized PyTorch Model: {file_name}")
+                    
+                    # Load feature scaler if available
+                    scaler = None
+                    if os.path.exists(scaler_file_path):
+                        with open(scaler_file_path, "rb") as f:
+                            scaler = pickle.load(f)
+                        logger.info(f"Loaded feature scaler for {classification_key}")
+                    else:
+                        logger.warning(f"Feature scaler not found for {classification_key} at {scaler_file_path}")
+                    
+                    self.scalers[classification_key] = scaler
                 except Exception as err:
                     raise RuntimeError(f"Failed to load LSTM model '{file_name}': {err}") from err
 
@@ -64,8 +79,18 @@ class LSTMPredictor:
             )
 
         try:
+            # Apply feature scaling if scaler is available
+            scaled_input = input_tensor.copy()
+            scaler = self.scalers.get(model_target)
+            if scaler is not None:
+                # Reshape for scaler application
+                orig_shape = scaled_input.shape
+                scaled_input = scaled_input.reshape(-1, orig_shape[-1])
+                scaled_input = scaler.transform(scaled_input)
+                scaled_input = scaled_input.reshape(orig_shape)
+            
             # Convert numpy array to torch tensor
-            input_torch = torch.tensor(input_tensor, dtype=torch.float32).to(self.device)
+            input_torch = torch.tensor(scaled_input, dtype=torch.float32).to(self.device)
 
             # Add batch dimension if necessary
             if len(input_torch.shape) == 2:

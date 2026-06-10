@@ -1,15 +1,23 @@
 """Alert service business logic"""
+import asyncio
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.alert import Alert
+from app.services.escalation_service import EscalationService
+
+logger = logging.getLogger("railmind.alerts")
 
 class AlertService:
     """Handles alert operations"""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, escalation_service: Optional[EscalationService] = None):
         self.db = db
+        self.escalation_service = escalation_service or EscalationService()
+        # Track active escalation timers: {alert_id: asyncio.Task}
+        self.escalation_timers: Dict[int, asyncio.Task] = {}
 
     def list_alerts(self, filters: Optional[Dict[str, str]] = None) -> List[Alert]:
         query = self.db.query(Alert)
@@ -22,12 +30,46 @@ class AlertService:
                 query = query.filter(Alert.platform == filters["platform"])
         return query.order_by(Alert.timestamp.desc()).all()
 
-    def create_alert(self, payload: Dict[str, any]) -> Alert:
+    def create_alert(self, payload: Dict[str, any], start_escalation_timer: bool = True) -> Alert:
         alert = Alert(**payload)
         self.db.add(alert)
         self.db.commit()
         self.db.refresh(alert)
+        
+        # Start escalation timer for critical alerts
+        if start_escalation_timer and alert.risk_level in ["HIGH", "CRITICAL"]:
+            self._start_escalation_timer(alert)
+        
         return alert
+
+    def _start_escalation_timer(self, alert: Alert, timeout_seconds: int = 60) -> None:
+        """Start a background task that escalates alert after timeout if not acknowledged."""
+        async def escalation_task():
+            await self.escalation_service.escalate_after_timeout(
+                alert.id,
+                timeout_seconds,
+                self._get_alert_async,
+                {
+                    "alert_id": alert.id,
+                    "incident_type": alert.incident_type,
+                    "platform": alert.platform,
+                    "risk_score": alert.risk_score,
+                    "risk_level": alert.risk_level,
+                    "timestamp": alert.timestamp.isoformat() if alert.timestamp else None
+                }
+            )
+            # Clean up timer reference after completion
+            if alert.id in self.escalation_timers:
+                del self.escalation_timers[alert.id]
+        
+        # Create and store the task
+        task = asyncio.create_task(escalation_task())
+        self.escalation_timers[alert.id] = task
+        logger.info(f"Started escalation timer for alert {alert.id}")
+
+    async def _get_alert_async(self, alert_id: int) -> Optional[Alert]:
+        """Async wrapper to get alert status."""
+        return self.get_alert(alert_id)
 
     def get_alert(self, alert_id: int) -> Optional[Alert]:
         return self.db.query(Alert).filter(Alert.id == alert_id).first()
@@ -42,6 +84,13 @@ class AlertService:
             alert.acknowledged_by = staff_id
         self.db.commit()
         self.db.refresh(alert)
+        
+        # Cancel escalation timer if one is active
+        if alert_id in self.escalation_timers:
+            self.escalation_timers[alert_id].cancel()
+            del self.escalation_timers[alert_id]
+            logger.info(f"Cancelled escalation timer for acknowledged alert {alert_id}")
+        
         return alert
 
     def escalate_alert(self, alert_id: int) -> Optional[Alert]:
@@ -62,4 +111,11 @@ class AlertService:
         alert.resolved_at = func.now()
         self.db.commit()
         self.db.refresh(alert)
+        
+        # Cancel escalation timer if one is active
+        if alert_id in self.escalation_timers:
+            self.escalation_timers[alert_id].cancel()
+            del self.escalation_timers[alert_id]
+            logger.info(f"Cancelled escalation timer for resolved alert {alert_id}")
+        
         return alert

@@ -31,7 +31,7 @@ class AlertRead(AlertBase):
     resolved_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AlertUpdate(BaseModel):
     status: Optional[str] = None

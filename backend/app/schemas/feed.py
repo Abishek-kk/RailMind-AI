@@ -1,7 +1,15 @@
 ﻿"""Feed schemas"""
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
+
+class FeedCreate(BaseModel):
+    id: str
+    name: str
+    source_url: str
+    fps: Optional[float] = 30.0
+
 
 class FeedRead(BaseModel):
     id: str
@@ -11,4 +19,4 @@ class FeedRead(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
