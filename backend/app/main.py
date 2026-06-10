@@ -83,7 +83,6 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
     # For local development accept incoming WebSocket handshakes without
     # strict origin validation. Production deployments should enforce origins.
     try:
-
         await websocket_manager.manager.connect(websocket)
         try:
             while True:
@@ -93,14 +92,12 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
             websocket_manager.manager.disconnect(websocket)
     except Exception:
         # Ensure clean disconnect on unexpected errors
-        try:
-            websocket_manager.manager.disconnect(websocket)
+        websocket_manager.manager.disconnect(websocket)
 
 
-# Wrap the FastAPI app with ScopeLogger at the very end, after all route/websocket definitions
-app = ScopeLogger(app)
-        except Exception:
-            pass
+# Keep the FastAPI app object intact so decorators and startup hooks work normally.
+# Wrap the app with ScopeLogger only for the ASGI server entry point.
+asgi_app = ScopeLogger(app)
 
 @app.on_event("startup")
 async def startup_event():
@@ -119,4 +116,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(asgi_app, host="0.0.0.0", port=8000)
