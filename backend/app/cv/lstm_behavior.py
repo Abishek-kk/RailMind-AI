@@ -1,8 +1,11 @@
 import numpy as np
+import logging
 from typing import List
 
 from app.lstm.predictor import LSTMPredictor
 from app.lstm.sequence_builder import SequenceBuilder
+
+logger = logging.getLogger("railmind")
 
 class BehaviorAnalyzer:
     def __init__(self, window_size: int = 30):
@@ -12,6 +15,13 @@ class BehaviorAnalyzer:
         self.window_size = window_size
         self.sequence_builder = SequenceBuilder(sequence_length=window_size)
         self.predictor = LSTMPredictor()
+        self.model_targets = ("suicide", "pickpocket", "anomaly")
+        self.models_available = all(self.predictor.has_model(target) for target in self.model_targets)
+        if not self.models_available:
+            logger.error(
+                "LSTM behavior analysis disabled because trained model weights are missing: %s",
+                sorted(self.predictor.unavailable_models),
+            )
 
     def analyze_temporal_sequence(self, track_id: str, feature_vector: List[float]) -> dict[str, float]:
         """
@@ -21,6 +31,9 @@ class BehaviorAnalyzer:
         self.sequence_builder.add_frame(track_id, feature_vector)
 
         if not self.sequence_builder.is_sequence_complete(track_id):
+            return {"suicide": 0.0, "pickpocket": 0.0, "anomaly": 0.0}
+
+        if not self.models_available:
             return {"suicide": 0.0, "pickpocket": 0.0, "anomaly": 0.0}
 
         sequence_matrix = self.sequence_builder.get_sequence(track_id)

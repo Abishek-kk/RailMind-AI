@@ -4,6 +4,7 @@ import logging
 import math
 import time
 from argparse import Namespace
+from inspect import signature
 import numpy as np
 from ultralytics.trackers import BYTETracker
 from app.core.config import settings
@@ -36,10 +37,14 @@ class VideoProcessor:
         
         # Initialize BYTETracker with required configuration arguments
         tracker_args = Namespace(
-            track_thresh=0.5,      # Confidence threshold for tracking
-            track_buffer=30,       # Maximum number of frames to buffer before dropping track
-            match_thresh=0.8,      # Intersection-over-union threshold for matching
-            mot20=False            # Use MOT20 challenge format
+            track_high_thresh=0.5,  # Confidence threshold for first association
+            track_low_thresh=0.1,   # Confidence threshold for second association
+            new_track_thresh=0.5,   # Confidence threshold for starting a new track
+            track_thresh=0.5,       # Backward-compatible alias used by older ByteTrack builds
+            track_buffer=30,        # Maximum number of frames to buffer before dropping track
+            match_thresh=0.8,       # Intersection-over-union threshold for matching
+            fuse_score=True,        # Combine confidence with IoU distance during matching
+            mot20=False             # Use MOT20 challenge format
         )
         self.tracker = BYTETracker(tracker_args)
         self.behavior_analyzer = BehaviorAnalyzer()
@@ -95,7 +100,7 @@ class VideoProcessor:
                 # 1. Capture spatial skeletons and update tracker with YOLOv8 pose detections
                 results = self.pose_estimator.model(frame, verbose=False)[0]
                 pose_detections = self._extract_pose_detections(results)
-                tracked_objects = self.tracker.update(results, frame)
+                tracked_objects = self._update_tracker(results, frame)
                 active_frame_detections = []
 
                 current_track_ids = {int(row[4]) for row in tracked_objects} if tracked_objects is not None else set()
@@ -273,6 +278,41 @@ class VideoProcessor:
             })
 
         return pose_detections
+
+    def _update_tracker(self, results, frame: np.ndarray) -> np.ndarray:
+        boxes = getattr(results, "boxes", None)
+        if boxes is None or len(boxes) == 0:
+            return np.empty((0, 5), dtype=float)
+
+        update_params = signature(self.tracker.update).parameters
+        param_names = [name for name in update_params if name != "self"]
+
+        if "img" in update_params or "feats" in update_params:
+            return self.tracker.update(boxes, frame)
+
+        detections = self._boxes_to_tracker_detections(boxes)
+        img_size = frame.shape[:2]
+
+        # Older ByteTrack integrations commonly accept detections, img_size, orig_img_size.
+        if len(param_names) >= 3:
+            return self.tracker.update(detections, img_size, img_size)
+
+        return self.tracker.update(detections)
+
+    def _boxes_to_tracker_detections(self, boxes) -> np.ndarray:
+        xyxy = self._to_numpy(boxes.xyxy)
+        conf = self._to_numpy(boxes.conf).reshape(-1, 1)
+        cls = self._to_numpy(boxes.cls).reshape(-1, 1)
+        return np.concatenate([xyxy, conf, cls], axis=1)
+
+    def _to_numpy(self, value) -> np.ndarray:
+        if hasattr(value, "detach"):
+            value = value.detach()
+        if hasattr(value, "cpu"):
+            value = value.cpu()
+        if hasattr(value, "numpy"):
+            return value.numpy()
+        return np.asarray(value)
 
     def _match_tracker_results(self, tracked_objects: np.ndarray, pose_detections: list[dict]) -> list[tuple[int, dict]]:
         if tracked_objects is None or len(pose_detections) == 0:
