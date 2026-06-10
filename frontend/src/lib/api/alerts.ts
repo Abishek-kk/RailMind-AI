@@ -85,3 +85,11 @@ export async function resolveAlert(id: number): Promise<ApiAlert> {
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/resolve`, { method: "PATCH" });
   return mapBackendAlert(alert);
 }
+
+export async function assignAlert(id: number, assignee: string): Promise<ApiAlert> {
+  const alert = await apiFetch<BackendAlert>(`/alerts/${id}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify({ assignee }),
+  });
+  return mapBackendAlert(alert);
+}

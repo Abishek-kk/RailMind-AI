@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
@@ -8,7 +8,9 @@ import {
   AlertTriangle, AlertOctagon, UserCheck, Inbox, Search, Filter,
   X, MoreVertical, CheckCircle, MapPin, Clock, ChevronLeft, ChevronRight, Play, Volume2, Maximize2,
 } from "lucide-react";
-import { getAlerts, acknowledgeAlert, resolveAlert, type ApiAlert } from "@/lib/api/alerts";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { getAlerts, acknowledgeAlert, resolveAlert, assignAlert, type ApiAlert } from "@/lib/api/alerts";
+import { toast } from "sonner";
 import { riskColor, type Alert, type AlertStatus } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/alerts")({
@@ -367,8 +369,23 @@ function StatusPill({ status }: { status: AlertStatus }) {
 
 function AlertDetails({
   alert, onClose, onAcknowledge, onResolve,
-}: { alert: Alert; onClose: () => void; onAcknowledge: () => void; onResolve: () => void; }) {
+}: { alert: ApiAlert; onClose: () => void; onAcknowledge: () => void; onResolve: () => void; }) {
   const c = riskColor(alert.riskLevel);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [assignee, setAssignee] = useState<string>('Not Assigned');
+  const queryClient = useQueryClient();
+  const videoUrl = (alert as any).video || (alert as any).videoUrl || null;
+
+  const assignMutation = useMutation({
+    mutationFn: (name: string) => assignAlert(alert.backendId, name),
+    onSuccess: () => {
+      toast.success('Assignment saved');
+      queryClient.invalidateQueries(['alerts']);
+    },
+  });
   return (
     <aside className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border p-4">
@@ -389,31 +406,94 @@ function AlertDetails({
           <div className="text-3xl font-bold" style={{ color: c }}>{alert.riskScore}%</div>
         </div>
         <div className="relative overflow-hidden rounded-lg bg-black">
-          <img src={alert.image} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-          <div className="absolute left-[40%] top-[28%] h-[58%] w-[18%] border-2" style={{ borderColor: c }}>
-            <span className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: c }}>
-              ID: 7
-            </span>
-          </div>
+          {videoUrl ? (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={alert.image}
+              className="aspect-video w-full object-cover bg-black"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              muted={isMuted}
+              controls={false}
+            />
+          ) : (
+            <>
+              <img src={alert.image} alt="Snapshot" className="aspect-video w-full object-cover" loading="lazy" />
+              <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">Snapshot</div>
+            </>
+          )}
         </div>
         <div className="flex items-center justify-between text-muted-foreground">
           <div className="flex items-center gap-2">
-            <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Play className="h-4 w-4" /></button>
-            <span className="text-xs tabular-nums">0:02 / 0:05</span>
+            <button
+              onClick={() => {
+                if (!videoRef.current) return;
+                if (videoRef.current.paused) {
+                  videoRef.current.play().catch(() => {});
+                } else {
+                  videoRef.current.pause();
+                }
+              }}
+              className="rounded p-1 hover:bg-secondary hover:text-foreground"
+              aria-pressed={isPlaying}
+              title={videoUrl ? (isPlaying ? 'Pause' : 'Play') : 'No video available'}
+            >
+              <Play className="h-4 w-4" />
+            </button>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Volume2 className="h-4 w-4" /></button>
-            <button className="rounded p-1 hover:bg-secondary hover:text-foreground"><Maximize2 className="h-4 w-4" /></button>
+            <button
+              onClick={() => {
+                if (!videoRef.current) return;
+                videoRef.current.muted = !videoRef.current.muted;
+                setIsMuted(videoRef.current.muted);
+              }}
+              className={`rounded p-1 hover:bg-secondary hover:text-foreground ${!videoUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={videoUrl ? (isMuted ? 'Unmute' : 'Mute') : 'No video available'}
+            >
+              <Volume2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setIsFullscreenOpen(true)}
+              className="rounded p-1 hover:bg-secondary hover:text-foreground"
+              title="Open fullscreen"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
+
+        <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+          <DialogContent>
+            <div className="w-full">
+              {videoUrl ? (
+                <video src={videoUrl} controls autoPlay className="w-full max-h-[90vh] bg-black" />
+              ) : (
+                <img src={alert.image} alt="Snapshot fullscreen" className="w-full object-contain max-h-[90vh]" />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
         <DetailRow label="Event Type"><span className="font-semibold" style={{ color: c }}>{alert.type}</span></DetailRow>
         <DetailRow label="Description"><p className="text-right text-xs text-muted-foreground">{alert.description}</p></DetailRow>
         <DetailRow label="Status"><StatusPill status={alert.status} /></DetailRow>
         <DetailRow label="Assigned To">
-          <select className="rounded-md border border-border bg-secondary px-2 py-1 text-xs">
-            <option>Not Assigned</option>
-            <option>Officer A. Khan</option>
-            <option>Officer R. Mehta</option>
+          <select
+            value={assignee}
+            onChange={(e) => {
+              const name = e.target.value;
+              setAssignee(name);
+              if (name) {
+                assignMutation.mutate(name);
+              }
+            }}
+            disabled={assignMutation.isLoading}
+            className="rounded-md border border-border bg-secondary px-2 py-1 text-xs"
+          >
+            <option value="Not Assigned">Not Assigned</option>
+            <option value="Officer A. Khan">Officer A. Khan</option>
+            <option value="Officer R. Mehta">Officer R. Mehta</option>
           </select>
         </DetailRow>
         <div className="flex gap-2 pt-2">

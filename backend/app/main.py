@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import api_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.core import websocket_manager
+from fastapi import WebSocket, WebSocketDisconnect
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -12,6 +14,19 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Ensure the common frontend origin is allowed for CORS (helps HTTP requests).
+frontend_origin = "http://localhost:5173"
+if not settings.BACKEND_CORS_ORIGINS or frontend_origin not in settings.BACKEND_CORS_ORIGINS:
+    try:
+        # mutate the settings list in-place when possible
+        origins = list(settings.BACKEND_CORS_ORIGINS or [])
+        if frontend_origin not in origins:
+            origins.append(frontend_origin)
+        settings.BACKEND_CORS_ORIGINS = origins
+    except Exception:
+        # If settings is immutable in the current environment, skip explicit mutation
+        pass
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +37,38 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.websocket("/ws/alerts")
+async def websocket_alerts_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for streaming live alerts and detections to frontend clients.
+
+    This endpoint performs a basic origin check against `settings.BACKEND_CORS_ORIGINS`
+    to mimic the CORS protections used for HTTP endpoints. Browsers include an
+    `Origin` header during the WebSocket handshake so we validate it and reject
+    connections from unknown origins with a 403-like close code.
+    """
+    origin = websocket.headers.get("origin")
+    allowed = set(settings.BACKEND_CORS_ORIGINS or [])
+    try:
+        if origin and origin not in allowed:
+            # Reject the handshake by closing with policy violation
+            await websocket.close(code=1008)
+            return
+
+        await websocket_manager.manager.connect(websocket)
+        try:
+            while True:
+                # Keep the connection open to allow server pushes; echo incoming pings if any
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            websocket_manager.manager.disconnect(websocket)
+    except Exception:
+        # Ensure clean disconnect on unexpected errors
+        try:
+            websocket_manager.manager.disconnect(websocket)
+        except Exception:
+            pass
 
 @app.on_event("startup")
 async def startup_event():
