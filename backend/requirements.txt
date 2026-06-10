@@ -1,0 +1,46 @@
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.23
+pydantic-settings==2.1.0
+pydantic==2.6.4
+
+# Computer Vision
+opencv-python==4.8.1.78
+
+# Deep Learning
+tensorflow==2.15.0; python_version < "3.14"
+torch==2.2.2
+keras==2.15.0; python_version < "3.14"
+
+# Computer vision helper
+ultralytics==8.4.63
+
+# Data processing
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.5.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Utilities
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+requests==2.31.0
+
+# Agent orchestration
+langgraph==0.5.4
+
+# Database migrations
+alembic>=1.13.0
+
+# Messaging
+twilio>=8.0.0
+
+# Logging and monitoring
+loguru==0.7.2
