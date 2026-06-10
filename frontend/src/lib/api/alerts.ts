@@ -23,6 +23,12 @@ function normalizeRiskLevel(value: string): RiskLevel {
   return "low";
 }
 
+function getDisplayCameraId(cameraId: string): string {
+  const match = cameraId.match(/CCTV(?:[_-]P?(\d+)|[_-](\d+))/i);
+  const number = match ? Number(match[1] ?? match[2]) : NaN;
+  return Number.isFinite(number) && number > 0 ? `CCTV-${number}` : cameraId;
+}
+
 function normalizeStatus(value: string): AlertStatus {
   const lower = value.toLowerCase();
   if (lower === "acknowledged") return "acknowledged";
@@ -47,10 +53,12 @@ function getImageForCamera(cameraId: string) {
 }
 
 function mapBackendAlert(alert: BackendAlert): ApiAlert {
+  const displayCameraId = getDisplayCameraId(alert.camera_id || "CCTV-1");
+
   return {
     backendId: alert.id,
     id: `ALT-${String(alert.id).padStart(3, "0")}`,
-    cctv: alert.camera_id || "CCTV-1",
+    cctv: displayCameraId,
     platform: alert.platform,
     type: alert.incident_type,
     riskScore: Math.round(alert.risk_score),

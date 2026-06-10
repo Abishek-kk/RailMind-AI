@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
 import { CCTVFeedCard } from "@/components/CCTVFeedCard";
 import { RiskBadge } from "@/components/RiskBadge";
 import { Camera, Users, AlertTriangle, Activity, Plus, ChevronDown, ArrowRight } from "lucide-react";
-import { generateAlerts, getLiveFeeds, riskColor } from "@/lib/mock-data";
+import { getAlerts } from "@/lib/api/alerts";
+import { getFeeds } from "@/lib/api/feeds";
+import { riskColor } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/live")({
   head: () => ({ meta: [{ title: "Live Monitoring — RailMind AI" }] }),
@@ -14,11 +17,28 @@ export const Route = createFileRoute("/live")({
 
 function LivePage() {
   const [feed, setFeed] = useState("all");
-  const feeds = useMemo(getLiveFeeds, []);
-  const alerts = useMemo(() => generateAlerts(20), []);
 
-  const filteredFeeds = feed === "all" ? feeds : feeds.filter((f) => f.id === feed);
-  const filteredAlerts = feed === "all" ? alerts : alerts.filter((a) => a.cctv === feed);
+  const {
+    data: feeds,
+    isLoading: feedsLoading,
+    error: feedsError,
+  } = useQuery(["liveFeeds"], getFeeds);
+
+  const {
+    data: alerts,
+    isLoading: alertsLoading,
+    error: alertsError,
+  } = useQuery(["liveAlerts"], getAlerts);
+
+  const filteredFeeds = useMemo(() => {
+    const list = feeds ?? [];
+    return feed === "all" ? list : list.filter((f) => f.id === feed);
+  }, [feeds, feed]);
+
+  const filteredAlerts = useMemo(() => {
+    const list = alerts ?? [];
+    return feed === "all" ? list : list.filter((a) => a.cctv === feed);
+  }, [alerts, feed]);
 
   const totalPeople = filteredFeeds.reduce((s, f) => s + f.peopleDetected, 0);
   const active = filteredAlerts.filter((a) => a.status === "active").length;
@@ -33,8 +53,31 @@ function LivePage() {
         onFeedChange={setFeed}
       />
       <div className="p-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Total CCTV Feeds" value={feeds.length} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+        {feedsLoading || alertsLoading ? (
+          <div className="space-y-4">
+            <div className="h-6 w-1/3 rounded bg-muted/30 animate-pulse" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-24 rounded-xl bg-muted/20 p-4 animate-pulse" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
+              <div className="space-y-4">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="h-80 rounded-xl bg-muted/20 p-4 animate-pulse" />
+                ))}
+              </div>
+              <div className="h-[640px] rounded-xl bg-muted/20 p-4 animate-pulse" />
+            </div>
+          </div>
+        ) : feedsError || alertsError ? (
+          <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-destructive">
+            Unable to load live monitoring data. Please refresh the page.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Total CCTV Feeds" value={feeds?.length ?? 0} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
           <StatCard label="People Detected" value={totalPeople} sublabel="Across All Feeds" icon={Users} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
           <StatCard label="Active Alerts" value={active} sublabel="Across All Feeds" icon={AlertTriangle} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
           <StatCard label="High Risk Detected" value={highRisk} sublabel="Require Attention" icon={Activity} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
@@ -89,6 +132,8 @@ function LivePage() {
             </div>
           </aside>
         </div>
+      </>
+        )}
       </div>
     </div>
   );

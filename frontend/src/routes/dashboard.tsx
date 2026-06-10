@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
 import { RiskBadge } from "@/components/RiskBadge";
@@ -11,29 +12,128 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, BarChart, Bar,
 } from "recharts";
+import { riskColor } from "@/lib/mock-data";
 import {
-  generateAlerts, getCCTVSummary, getDashboardStats, getIncidentTrend,
-  getIncidentsByCCTV, getPeakHours, getPlatformHeatmap, getRiskDistribution, riskColor,
-} from "@/lib/mock-data";
+  getDashboardStats,
+  getIncidentsByCCTV,
+  getIncidentTrend,
+  getRiskDistribution,
+  getPeakHours,
+  getPlatformHeatmap,
+  getCCTVSummary,
+  getRecentIncidents,
+} from "@/lib/api/dashboard";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — RailMind AI" }] }),
   component: DashboardPage,
 });
 
+const chartColors = ["#6366f1", "#ef4444", "#f97316", "#22c55e", "#3b82f6"];
+
 function DashboardPage() {
   const [feed, setFeed] = useState("all");
-  const stats = getDashboardStats();
-  const byCctv = useMemo(getIncidentsByCCTV, []);
-  const trend = useMemo(getIncidentTrend, []);
-  const dist = useMemo(getRiskDistribution, []);
-  const peak = useMemo(getPeakHours, []);
-  const heatmap = getPlatformHeatmap();
-  const summary = getCCTVSummary();
-  const recent = useMemo(() => generateAlerts(8).slice(0, 4), []);
+
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useQuery(["dashboardStats"], getDashboardStats);
+
+  const {
+    data: byCctvData,
+    isLoading: byCctvLoading,
+    error: byCctvError,
+  } = useQuery(["incidentsByCCTV"], getIncidentsByCCTV);
+
+  const {
+    data: trend,
+    isLoading: trendLoading,
+    error: trendError,
+  } = useQuery(["incidentTrend", 7], () => getIncidentTrend(7));
+
+  const {
+    data: dist,
+    isLoading: distLoading,
+    error: distError,
+  } = useQuery(["riskDistribution"], getRiskDistribution);
+
+  const {
+    data: peak,
+    isLoading: peakLoading,
+    error: peakError,
+  } = useQuery(["peakHours"], getPeakHours);
+
+  const {
+    data: heatmap,
+    isLoading: heatmapLoading,
+    error: heatmapError,
+  } = useQuery(["platformHeatmap"], getPlatformHeatmap);
+
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    error: summaryError,
+  } = useQuery(["cctvSummary"], getCCTVSummary);
+
+  const {
+    data: recent,
+    isLoading: recentLoading,
+    error: recentError,
+  } = useQuery(["recentIncidents"], getRecentIncidents);
+
+  const isLoading = statsLoading || byCctvLoading || trendLoading || distLoading || peakLoading || heatmapLoading || summaryLoading || recentLoading;
+  const error = statsError || byCctvError || trendError || distError || peakError || heatmapError || summaryError || recentError;
+
+  const byCctv = useMemo(() => {
+    return (byCctvData ?? []).map((item, index) => ({
+      name: item.camera_id,
+      value: item.incidents,
+      color: chartColors[index % chartColors.length],
+    }));
+  }, [byCctvData]);
+
+  const heatmapRows = useMemo(() => {
+    return (heatmap ?? []).map((point) => {
+      const level = point.intensity >= 0.75 ? "very-high" : point.intensity >= 0.5 ? "high" : point.intensity >= 0.25 ? "medium" : "low";
+      const risk = point.intensity >= 0.75 ? "Very High Risk" : point.intensity >= 0.5 ? "High Risk" : point.intensity >= 0.25 ? "Medium Risk" : "Low Risk";
+      return {
+        ...point,
+        name: `${point.platform} ${point.zone}`,
+        risk,
+        level,
+      };
+    });
+  }, [heatmap]);
 
   const totalByCctv = byCctv.reduce((s, x) => s + x.value, 0);
-  const totalDist = dist.reduce((s, x) => s + x.value, 0);
+  const totalDist = (dist ?? []).reduce((s, x) => s + x.value, 0);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="h-6 w-1/3 rounded bg-muted/30 animate-pulse" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-24 rounded-xl bg-muted/20 p-4 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-80 rounded-xl bg-muted/20 p-5 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center text-sm text-destructive">
+        Unable to load dashboard data. {error instanceof Error ? error.message : "Please try again later."}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -45,11 +145,11 @@ function DashboardPage() {
       />
       <div className="space-y-6 p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Total Incidents" value={stats.totalIncidents.value} change={stats.totalIncidents.change} dir="up" icon={ClipboardList} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
-          <StatCard label="Active Alerts" value={stats.activeAlerts.value} change={stats.activeAlerts.change} dir="up" icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="Suicide Risk" value={stats.suicideRisk.value} change={stats.suicideRisk.change} dir="up" icon={User} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
-          <StatCard label="Pickpocketing Risk" value={stats.pickpocketingRisk.value} change={stats.pickpocketingRisk.change} dir="up" icon={PersonStanding} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
-          <StatCard label="Security Threats" value={stats.securityThreats.value} change={stats.securityThreats.change} dir="up" icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Total Incidents" value={stats?.total_incidents ?? 0} change={0} dir="up" icon={ClipboardList} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
+          <StatCard label="Active Alerts" value={stats?.active_alerts ?? 0} change={0} dir="up" icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
+          <StatCard label="Suicide Risk" value={stats?.suicide_mitigations ?? 0} change={0} dir="up" icon={User} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
+          <StatCard label="Pickpocketing Risk" value={stats?.theft_preventions ?? 0} change={0} dir="up" icon={PersonStanding} iconColor="#a855f7" iconBg="rgba(168,85,247,0.15)" />
+          <StatCard label="Security Threats" value={stats?.active_alerts ?? 0} change={0} dir="up" icon={Shield} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -79,7 +179,7 @@ function DashboardPage() {
                       <span>{d.name}</span>
                     </div>
                     <span className="tabular-nums text-muted-foreground">
-                      {d.value} ({Math.round((d.value / totalByCctv) * 100)}%)
+                      {d.value} ({Math.round(totalByCctv ? (d.value / totalByCctv) * 100 : 0)}%)
                     </span>
                   </div>
                 ))}
@@ -103,16 +203,15 @@ function DashboardPage() {
             </div>
             <div className="mt-4 h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <LineChart data={trend ?? []} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                   <CartesianGrid stroke="#1e1e2e" vertical={false} />
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
                   <YAxis stroke="#94a3b8" fontSize={11} />
                   <Tooltip contentStyle={tooltipStyle} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="total" name="Total Incidents" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="suicide" name="Suicide Risk" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="pickpocket" name="Pickpocketing Risk" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="security" name="Security Threats" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Suicide Risk" name="Suicide Risk" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Pickpocketing" name="Pickpocketing" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Loitering" name="Loitering" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -125,8 +224,8 @@ function DashboardPage() {
               <div className="relative h-44 w-44 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={dist} dataKey="value" innerRadius={50} outerRadius={75} stroke="none">
-                      {dist.map((d) => <Cell key={d.name} fill={d.color} />)}
+                    <Pie data={dist ?? []} dataKey="value" innerRadius={50} outerRadius={75} stroke="none">
+                      {(dist ?? []).map((d) => <Cell key={d.name} fill={d.color} />)}
                     </Pie>
                     <Tooltip contentStyle={tooltipStyle} />
                   </PieChart>
@@ -137,14 +236,14 @@ function DashboardPage() {
                 </div>
               </div>
               <div className="flex-1 space-y-2 text-sm">
-                {dist.map((d) => (
+                {(dist ?? []).map((d) => (
                   <div key={d.name}>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
                       <span>{d.name}</span>
                     </div>
                     <div className="ml-4 text-xs text-muted-foreground">
-                      {((d.value / totalDist) * 100).toFixed(1)}% ({d.value})
+                      {totalDist ? ((d.value / totalDist) * 100).toFixed(1) : "0.0"}% ({d.value})
                     </div>
                   </div>
                 ))}
@@ -161,7 +260,7 @@ function DashboardPage() {
               Platform Heatmap <span className="text-muted-foreground">(Risk Intensity)</span>
             </h3>
             <div className="mt-4 space-y-4">
-              {heatmap.map((p) => (
+              {heatmapRows.map((p) => (
                 <div key={p.name} className="flex items-center gap-3">
                   <div className="w-24">
                     <div className="text-xs font-medium">{p.name}</div>
@@ -190,7 +289,7 @@ function DashboardPage() {
             <h3 className="text-sm font-semibold">Peak Risk Hours</h3>
             <div className="mt-4 h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={peak} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <BarChart data={peak ?? []} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                   <CartesianGrid stroke="#1e1e2e" vertical={false} />
                   <XAxis dataKey="hour" stroke="#94a3b8" fontSize={10} interval={3} />
                   <YAxis stroke="#94a3b8" fontSize={11} />
@@ -212,7 +311,7 @@ function DashboardPage() {
               <a href="/alerts" className="text-xs font-medium text-primary hover:underline">View All</a>
             </div>
             <div className="space-y-3 p-3">
-              {recent.map((a) => (
+              {(recent ?? []).map((a) => (
                 <div key={a.id} className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-secondary/50">
                   <img src={a.image} alt="" className="h-14 w-20 rounded object-cover" loading="lazy" />
                   <div className="flex-1 min-w-0">
@@ -246,18 +345,29 @@ function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {summary.map((row) => (
-                  <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/40">
-                    <td className="px-4 py-3 font-medium">{row.id}</td>
+                {(summary ?? []).map((row) => (
+                  <tr key={row.camera_id} className="border-t border-border transition-colors hover:bg-secondary/40">
+                    <td className="px-4 py-3 font-medium">{row.camera_id}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.location}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[11px] font-semibold text-[#22c55e]">Online</span>
+                      <span className="inline-flex rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[11px] font-semibold text-[#22c55e]">{row.status === "active" ? "Online" : "Offline"}</span>
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{row.incidents}</td>
-                    <td className="px-4 py-3 tabular-nums">{row.alerts}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.last}</td>
+                    <td className="px-4 py-3 tabular-nums">{row.total_incidents}</td>
+                    <td className="px-4 py-3 tabular-nums">{row.active_alerts}</td>
+                    <td className="px-4 py-3 text-muted-foreground">—</td>
                     <td className="px-4 py-3">
-                      <RiskBadge level={row.risk as never} label={row.risk.toUpperCase()} />
+                      <RiskBadge
+                        level={
+                          row.current_risk_level.toLowerCase().includes("high")
+                            ? "high"
+                            : row.current_risk_level.toLowerCase().includes("medium")
+                            ? "medium"
+                            : row.current_risk_level.toLowerCase().includes("suspicious")
+                            ? "suspicious"
+                            : "low"
+                        }
+                        label={row.current_risk_level.toUpperCase()}
+                      />
                     </td>
                   </tr>
                 ))}
