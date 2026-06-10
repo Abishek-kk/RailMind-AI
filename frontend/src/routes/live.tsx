@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
@@ -312,9 +312,9 @@ function LivePage() {
               })}
             </div>
             <div className="border-t border-border p-3 text-center">
-              <a className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" href="/alerts">
+              <Link to="/alerts" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
                 View All Alerts <ArrowRight className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           </aside>
         </div>

@@ -80,3 +80,22 @@ async def resolve_alert(id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(alert)
     return alert
+
+
+@router.patch("/{id}/assign", response_model=AlertRead)
+async def assign_alert(id: int, payload: dict, db: Session = Depends(get_db)):
+    """Assign an operator/staff member to an alert record."""
+    alert = db.query(Alert).filter(Alert.id == id).first()
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
+
+    assignee = payload.get("assignee") or payload.get("operator_assigned")
+    if not assignee:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing assignee in payload")
+
+    alert.operator_assigned = assignee
+    # Optionally mark who acknowledged when assigning
+    alert.acknowledged_by = assignee
+    db.commit()
+    db.refresh(alert)
+    return alert
