@@ -11,6 +11,7 @@ class Incident(Base):
     id = Column(Integer, primary_key=True, index=True)
     alert_id = Column(Integer, nullable=True)
     camera_id = Column(String, nullable=False)
+    platform = Column(String, nullable=False)
     incident_type = Column(String, nullable=False)
     risk_score = Column(Float, nullable=False, default=0.0)
     risk_level = Column(String, nullable=False, default="Safe")

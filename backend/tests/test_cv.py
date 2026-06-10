@@ -49,6 +49,31 @@ def test_behavior_analyzer_maps_scores_to_pose_labels():
     assert label == "normal"
 
 
+def test_behavior_label_thresholds_are_configurable(monkeypatch):
+    monkeypatch.setattr(settings, "BEHAVIOR_HIGH_SCORE_THRESHOLD", 0.75)
+    monkeypatch.setattr(settings, "BEHAVIOR_ERRATIC_SCORE_THRESHOLD", 0.45)
+    monkeypatch.setattr(settings, "BEHAVIOR_FOLLOWING_DISTANCE_METERS", 0.8)
+
+    analyzer = BehaviorAnalyzer()
+
+    assert analyzer.determine_behavior_label({"suicide": 0.7, "pickpocket": 0.1, "anomaly": 0.1}) == "erratic"
+    assert analyzer.determine_behavior_label({"suicide": 0.75, "pickpocket": 0.1, "anomaly": 0.1}) == "distress"
+    assert (
+        analyzer.determine_behavior_label(
+            {"suicide": 0.1, "pickpocket": 0.75, "anomaly": 0.1},
+            following_distance=0.9,
+        )
+        == "suspicious"
+    )
+    assert (
+        analyzer.determine_behavior_label(
+            {"suicide": 0.1, "pickpocket": 0.75, "anomaly": 0.1},
+            following_distance=0.7,
+        )
+        == "following"
+    )
+
+
 def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
 

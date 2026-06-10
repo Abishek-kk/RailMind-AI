@@ -111,7 +111,7 @@ export async function getIncidentsByCCTV(): Promise<IncidentsByCCTVItem[]> {
 }
 
 export async function getIncidentTrend(days = 7): Promise<IncidentTrendItem[]> {
-  return apiFetch<IncidentTrendItem[]>(`/analytics/summary?days=${days}`);
+  return apiFetch<IncidentTrendItem[]>(`/dashboard/trend?days=${days}`);
 }
 
 function mapRiskDistributionColor(item: Omit<RiskDistributionItem, 'color'>): RiskDistributionItem {

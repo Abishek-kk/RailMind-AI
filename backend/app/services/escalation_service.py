@@ -78,9 +78,9 @@ class EscalationService:
             logger.info(f"Starting escalation timer for alert {alert_id} ({timeout_seconds}s timeout)")
             await asyncio.sleep(timeout_seconds)
             
-            # Check if alert is still unacknowledged
+            # Check if alert is still active/unacknowledged.
             alert = await get_alert_fn(alert_id)
-            if alert and alert.status != "acknowledged":
+            if alert and alert.status in {"active", "unacknowledged"}:
                 logger.warning(f"Alert {alert_id} still unacknowledged after {timeout_seconds}s. Escalating...")
                 self.escalate(alert_payload)
             else:

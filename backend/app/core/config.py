@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     PLATFORM_EDGE_SAFETY_LIMIT_METERS: float = 1.5
     PIXELS_PER_METER: float = 100.0
 
+    # LSTM behavior label thresholds
+    BEHAVIOR_HIGH_SCORE_THRESHOLD: float = 0.65
+    BEHAVIOR_ERRATIC_SCORE_THRESHOLD: float = 0.4
+    BEHAVIOR_FOLLOWING_DISTANCE_METERS: float = 1.2
+
     # Twilio Escalation Configuration
     TWILIO_ACCOUNT_SID: str = Field(default="")
     TWILIO_AUTH_TOKEN: str = Field(default="")

@@ -2,6 +2,7 @@ import numpy as np
 import logging
 from typing import List
 
+from app.core.config import settings
 from app.lstm.predictor import LSTMPredictor
 from app.lstm.sequence_builder import SequenceBuilder
 
@@ -59,15 +60,22 @@ class BehaviorAnalyzer:
         suicide_score = scores.get("suicide", 0.0)
         pickpocket_score = scores.get("pickpocket", 0.0)
         anomaly_score = scores.get("anomaly", 0.0)
+        high_score_threshold = settings.BEHAVIOR_HIGH_SCORE_THRESHOLD
+        erratic_score_threshold = settings.BEHAVIOR_ERRATIC_SCORE_THRESHOLD
+        following_distance_threshold = settings.BEHAVIOR_FOLLOWING_DISTANCE_METERS
 
-        if suicide_score > 0.65:
+        if suicide_score >= high_score_threshold:
             return "distress"
-        if pickpocket_score > 0.65 and following_distance is not None and following_distance < 1.2:
+        if (
+            pickpocket_score >= high_score_threshold
+            and following_distance is not None
+            and following_distance < following_distance_threshold
+        ):
             return "following"
-        if pickpocket_score > 0.65:
+        if pickpocket_score >= high_score_threshold:
             return "suspicious"
-        if anomaly_score > 0.65:
+        if anomaly_score >= high_score_threshold:
             return "suspicious"
-        if max(suicide_score, pickpocket_score, anomaly_score) > 0.4:
+        if max(suicide_score, pickpocket_score, anomaly_score) >= erratic_score_threshold:
             return "erratic"
         return "normal"

@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.models.alert import Alert
 from app.services.escalation_service import EscalationService
 
@@ -36,11 +37,21 @@ class AlertService:
         self.db.commit()
         self.db.refresh(alert)
         
-        # Start escalation timer for critical alerts
-        if start_escalation_timer and alert.risk_level in ["HIGH", "CRITICAL"]:
+        if start_escalation_timer and self.should_start_escalation_timer(alert):
             self._start_escalation_timer(alert)
         
         return alert
+
+    def should_start_escalation_timer(self, alert: Alert) -> bool:
+        """Return whether an alert should auto-escalate if left active."""
+        if alert.status not in {"active", "unacknowledged"}:
+            return False
+
+        risk_level = (alert.risk_level or "").strip().lower()
+        if any(level in risk_level for level in ("medium", "high", "critical")):
+            return True
+
+        return (alert.risk_score or 0.0) >= settings.MEDIUM_RISK_THRESHOLD
 
     def _start_escalation_timer(self, alert: Alert, timeout_seconds: int = 60) -> None:
         """Start a background task that escalates alert after timeout if not acknowledged."""
@@ -62,8 +73,8 @@ class AlertService:
             if alert.id in self.escalation_timers:
                 del self.escalation_timers[alert.id]
         
-        # Create and store the task
-        task = asyncio.create_task(escalation_task())
+        # Create and store the task on the running event loop.
+        task = asyncio.get_running_loop().create_task(escalation_task())
         self.escalation_timers[alert.id] = task
         logger.info(f"Started escalation timer for alert {alert.id}")
 
@@ -80,8 +91,9 @@ class AlertService:
             return None
         alert.status = "acknowledged"
         alert.acknowledged_at = datetime.utcnow()
-        if staff_id is not None:
-            alert.acknowledged_by = staff_id
+        assignee = staff_id or "Unknown Operator"
+        alert.operator_assigned = assignee
+        alert.acknowledged_by = assignee
         self.db.commit()
         self.db.refresh(alert)
         

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -15,6 +16,29 @@ router = APIRouter()
 # Global registry of active VideoProcessor instances
 # Key: feed_id, Value: VideoProcessor instance
 active_processors = {}
+
+
+def derive_platform_from_feed_id(feed_id: str) -> str:
+    """Derive a platform label from common camera ID formats without assuming one shape."""
+    match = re.search(r"(?:^|[_-])P(?:LATFORM)?\s*0*(\d+)(?:$|[_-])", feed_id, re.IGNORECASE)
+    if match:
+        return f"Platform {int(match.group(1))}"
+
+    numeric_tokens = re.findall(r"\d+", feed_id)
+    if len(numeric_tokens) == 1:
+        platform_number = int(numeric_tokens[0])
+        logger.info(
+            "Derived platform %s from single numeric token in feed id '%s'.",
+            platform_number,
+            feed_id,
+        )
+        return f"Platform {platform_number}"
+
+    logger.warning(
+        "Unable to derive platform from feed id '%s'; using 'Unknown Platform'.",
+        feed_id,
+    )
+    return "Unknown Platform"
 
 
 @router.get("", response_model=List[FeedRead])
@@ -46,14 +70,14 @@ async def register_feed(feed: FeedCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_feed)
     
+    platform = derive_platform_from_feed_id(feed.id)
+
     # Start VideoProcessor as background task
     try:
-        # Extract platform from feed id (e.g., "CCTV_P1_04" -> "Platform 1")
-        platform = f"Platform {feed.id.split('_')[1][1]}"  # Extract the number after 'P'
         processor = VideoProcessor(feed_source=feed.source_url, camera_id=feed.id, platform=platform)
         task = asyncio.create_task(processor.start_processing_loop())
         active_processors[feed.id] = {"processor": processor, "task": task}
-        logger.info(f"Started VideoProcessor for feed {feed.id}")
+        logger.info("Started VideoProcessor for feed %s on %s", feed.id, platform)
     except Exception as e:
         logger.error(f"Failed to start VideoProcessor for feed {feed.id}: {e}")
         # Don't fail the entire feed registration if processor startup fails
