@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from app.core.config import settings
+
 
 class LSTMBehaviorModel(nn.Module):
     """

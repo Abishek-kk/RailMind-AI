@@ -46,7 +46,10 @@ class LSTMPredictor:
             else:
                 try:
                     # Load model weights
-                    model = build_lstm_model()
+                    model = build_lstm_model(
+                        sequence_length=settings.LSTM_SEQUENCE_LENGTH,
+                        num_features=settings.LSTM_FEATURE_COUNT,
+                    )
                     model.load_state_dict(torch.load(model_file_path, map_location=self.device))
                     model.to(self.device)
                     model.eval()  # Set to evaluation mode

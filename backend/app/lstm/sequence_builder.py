@@ -3,12 +3,14 @@
 import numpy as np
 from collections import deque
 
+from app.core.config import settings
+
 class SequenceBuilder:
     """Builds temporal sequences from pose keypoints"""
     
-    def __init__(self, sequence_length=30):
+    def __init__(self, sequence_length: int | None = None):
         """Initialize sequence builder"""
-        self.sequence_length = sequence_length
+        self.sequence_length = sequence_length or settings.LSTM_SEQUENCE_LENGTH
         self.sequences = {}
     
     def add_frame(self, track_id, pose_features):
