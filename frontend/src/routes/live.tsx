@@ -206,7 +206,7 @@ function LivePage() {
   }, [displayFeeds, feed]);
 
   useEffect(() => {
-    if (alerts) {
+    if (alerts && alerts.length > 0) {
       setRealtimeAlerts(alerts);
     }
   }, [alerts]);
@@ -289,9 +289,9 @@ function LivePage() {
 
   /** Build dynamic feeds list for TopBar (BUG 12) */
   const dynamicFeeds = useMemo(() => {
-    if (!Array.isArray(feeds) || feeds.length === 0) return undefined;
-    return feeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
-  }, [feeds]);
+    if (!Array.isArray(displayFeeds) || displayFeeds.length === 0) return undefined;
+    return displayFeeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
+  }, [displayFeeds]);
 
   return (
     <div>
@@ -347,7 +347,7 @@ function LivePage() {
               </div>
             )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Total CCTV Feeds" value={feeds?.length ?? 0} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Total CCTV Feeds" value={displayFeeds.length} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
           <StatCard label="People Detected" value={totalPeople} sublabel="Across All Feeds" icon={Users} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
           <StatCard label="Active Alerts" value={active} sublabel="Across All Feeds" icon={AlertTriangle} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
           <StatCard label="High Risk Detected" value={highRisk} sublabel="Require Attention" icon={Activity} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
