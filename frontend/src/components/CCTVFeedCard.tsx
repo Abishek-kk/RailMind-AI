@@ -154,11 +154,38 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
                 LIVE
               </span>
             </div>
-            <img
-              src={feed.image}
-              alt={`${feed.id} fullscreen`}
-              className="w-full object-contain max-h-[80vh]"
-            />
+            <div className="relative w-full bg-black max-h-[80vh] overflow-hidden">
+              <img
+                src={feed.image}
+                alt={`${feed.id} fullscreen`}
+                className="w-full object-contain"
+              />
+              {/* Render bounding boxes on fullscreen image */}
+              {activeDetections.map((b) => {
+                const c = levelToColor(b.level);
+                return (
+                  <div
+                    key={b.id}
+                    className="absolute"
+                    style={{
+                      left: `${b.x}%`,
+                      top: `${b.y}%`,
+                      width: `${b.w}%`,
+                      height: `${b.h}%`,
+                      border: `2px solid ${c}`,
+                      boxShadow: `0 0 0 1px ${c}33`,
+                    }}
+                  >
+                    <span
+                      className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white"
+                      style={{ backgroundColor: c }}
+                    >
+                      ID: {b.id}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
