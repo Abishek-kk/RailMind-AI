@@ -22,6 +22,7 @@ async def list_incidents(
     status: Optional[str] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
+    limit: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     service = IncidentService(db)
@@ -33,7 +34,7 @@ async def list_incidents(
         "date_from": date_from,
         "date_to": date_to,
     }
-    return service.list_incidents({k: v for k, v in filters.items() if v is not None})
+    return service.list_incidents({k: v for k, v in filters.items() if v is not None}, limit=limit)
 
 
 @router.get("/{id}", response_model=IncidentRead)

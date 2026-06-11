@@ -146,7 +146,7 @@ export async function getCCTVSummary(): Promise<CCTVSummaryRow[]> {
 }
 
 export async function getRecentIncidents(): Promise<DashboardAlert[]> {
-  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active");
+  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active&limit=10");
   return incidents
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 4)
