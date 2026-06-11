@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime, time, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, cast, Date
 from app.api.deps import get_db
 from app.analytics.heatmap import get_live_platform_heatmap
 from app.models.alert import Alert
@@ -110,8 +110,35 @@ async def get_incident_trend(days: int = 7, db = Depends(get_db)):
     days = max(days, 1)
     start_date = today - timedelta(days=days - 1)
     start_at = datetime.combine(start_date, time.min)
-    alerts = db.query(Alert).filter(Alert.timestamp >= start_at).all()
-    return build_incident_trend(alerts, days, today)
+
+    grouped_alerts = db.query(
+        cast(Alert.timestamp, Date).label("alert_date"),
+        Alert.incident_type,
+        func.count(Alert.id).label("count"),
+    ).filter(
+        Alert.timestamp >= start_at,
+    ).group_by(
+        cast(Alert.timestamp, Date),
+        Alert.incident_type,
+    ).all()
+
+    rows = {
+        today - timedelta(days=i): {
+            "date": (today - timedelta(days=i)).isoformat(),
+            **{column: 0 for column in TREND_COLUMNS},
+        }
+        for i in range(days)
+    }
+
+    for alert_date, incident_type, count in grouped_alerts:
+        if alert_date not in rows:
+            continue
+
+        bucket = get_trend_bucket(incident_type)
+        if bucket:
+            rows[alert_date][bucket] += count
+
+    return [rows[day] for day in sorted(rows)]
 
 @router.get("/risk-distribution")
 async def get_risk_distribution(db = Depends(get_db)):

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
 import { createFeed, getFeeds } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { getLiveFeeds, riskColor, type RiskLevel } from "@/lib/mock-data";
+import { getLiveFeeds, riskColor, type BoundingBox, type RiskLevel } from "@/lib/mock-data";
 
 interface LiveDetectionPayload {
   camera_id: string;
@@ -32,13 +32,11 @@ interface LiveDetectionPayload {
 }
 
 /** BUG 4 FIX: id is number to satisfy BoundingBox interface */
-interface LiveBoundingBox {
-  id: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  level: RiskLevel;
+interface LiveBoundingBox extends BoundingBox {}
+
+function normalizeTrackId(trackId: string): number {
+  const parsed = Number(trackId);
+  return Number.isFinite(parsed) ? parsed : trackId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
 }
 
 function mapCameraIdToFeedId(cameraId: string) {
@@ -250,8 +248,7 @@ function LivePage() {
           : "low") as RiskLevel;
 
         return {
-          /** BUG 4 FIX: convert track_id string to number for BoundingBox.id compatibility */
-          id: Number(detection.track_id),
+          id: normalizeTrackId(detection.track_id),
           level: normalizedLevel,
           x: Math.max(0, Math.min(100, (x1 / safeWidth) * 100)),
           y: Math.max(0, Math.min(100, (y1 / safeHeight) * 100)),
@@ -264,10 +261,10 @@ function LivePage() {
         ...current,
         [feedId]: boxes,
       }));
+      return;
     }
   }, [latestMessage, showAlertToast]);
 
-  /** BUG 6 FIX: filter alerts by both CCTV feed AND risk level */
   const filteredAlerts = useMemo(() => {
     let list = realtimeAlerts;
     if (feed !== "all") {
