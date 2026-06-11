@@ -6,12 +6,40 @@ interface BackendFeed {
   name: string;
   status: string;
   fps: number;
+  source_url?: string;
+  stream_url?: string;
 }
 
 function getImageForFeed(cameraId: string) {
   const match = cameraId.match(/\d+/);
   const index = match ? Number(match[0]) - 1 : 0;
   return cctvImages[index % cctvImages.length] ?? cctvImages[0];
+}
+
+/**
+ * The backend stores stream_url as a relative path (e.g. "/uploads/video.mp4").
+ * StaticFiles are served directly by FastAPI at its root (port 8000), NOT under
+ * the /api prefix. We must prepend the backend origin so the browser's <video>
+ * element can actually fetch the file.
+ */
+function resolveStreamUrl(streamUrl: string | undefined): string | undefined {
+  if (!streamUrl) return undefined;
+  // Already an absolute URL — return as-is.
+  if (streamUrl.startsWith("http://") || streamUrl.startsWith("https://")) {
+    return streamUrl;
+  }
+  // Derive the backend origin from VITE_API_BASE_URL env var, or fall back to
+  // the default backend address used in development.
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+  try {
+    const baseToUse = apiBase.startsWith("/") && typeof window !== "undefined"
+      ? `${window.location.origin}${apiBase}`
+      : apiBase;
+    const origin = new URL(baseToUse).origin;
+    return `${origin}${streamUrl.startsWith("/") ? "" : "/"}${streamUrl}`;
+  } catch {
+    return streamUrl;
+  }
 }
 
 export async function getFeeds(): Promise<CCTVFeed[]> {
@@ -24,6 +52,7 @@ export async function getFeeds(): Promise<CCTVFeed[]> {
     id: feed.id,
     platform: feed.name,
     image: getImageForFeed(feed.id),
+    streamUrl: resolveStreamUrl(feed.stream_url),
     status: feed.status === "active" ? "online" : "offline",
     peopleDetected: 0,
     boxes: [],
