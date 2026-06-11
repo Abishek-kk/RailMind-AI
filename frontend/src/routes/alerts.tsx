@@ -57,11 +57,23 @@ function AlertsPage() {
   const acknowledgeMutation = useMutation({
     mutationFn: (backendId: number) => acknowledgeAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+    onError: (error: Error) => {
+      toast.error(
+        error.message || "Failed to acknowledge alert. Please try again."
+      );
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    },
   });
 
   const resolveMutation = useMutation({
     mutationFn: (backendId: number) => resolveAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+    onError: (error: Error) => {
+      toast.error(
+        error.message || "Failed to resolve alert. Please try again."
+      );
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    },
   });
 
   useEffect(() => {
