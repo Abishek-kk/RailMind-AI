@@ -84,14 +84,38 @@ function AlertsPage() {
 
   const handleAcknowledge = async () => {
     if (!selected) return;
+    const previousStatus = selected.status;
     setStatus(selected.id, "acknowledged");
-    await acknowledgeMutation.mutateAsync(selected.backendId);
+
+    try {
+      await acknowledgeMutation.mutateAsync(selected.backendId);
+      toast.success("Alert acknowledged successfully.");
+    } catch (error) {
+      setStatus(selected.id, previousStatus);
+      toast.error(
+        error instanceof Error
+          ? `Failed to acknowledge alert: ${error.message}`
+          : "Failed to acknowledge alert."
+      );
+    }
   };
 
   const handleResolve = async () => {
     if (!selected) return;
+    const previousStatus = selected.status;
     setStatus(selected.id, "resolved");
-    await resolveMutation.mutateAsync(selected.backendId);
+
+    try {
+      await resolveMutation.mutateAsync(selected.backendId);
+      toast.success("Alert resolved successfully.");
+    } catch (error) {
+      setStatus(selected.id, previousStatus);
+      toast.error(
+        error instanceof Error
+          ? `Failed to resolve alert: ${error.message}`
+          : "Failed to resolve alert."
+      );
+    }
   };
 
   if (isLoading) {
