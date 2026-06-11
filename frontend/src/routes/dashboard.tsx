@@ -116,7 +116,6 @@ function DashboardPage() {
   }, [heatmap]);
 
   const totalByCctv = byCctv.reduce((s, x) => s + x.value, 0);
-  const totalDist = (dist ?? []).reduce((s, x) => s + x.value, 0);
 
   /** BUG 13 FIX: compute actual peak hour from data */
   const peakHour = useMemo(() => {
@@ -262,8 +261,8 @@ function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-2xl font-bold">{totalDist}</div>
-                  <div className="text-[11px] text-muted-foreground">Total</div>
+                  <div className="text-2xl font-bold">100%</div>
+                  <div className="text-[11px] text-muted-foreground">Coverage</div>
                 </div>
               </div>
               <div className="flex-1 space-y-2 text-sm">
@@ -274,7 +273,7 @@ function DashboardPage() {
                       <span>{d.name}</span>
                     </div>
                     <div className="ml-4 text-xs text-muted-foreground">
-                      {totalDist ? ((d.value / totalDist) * 100).toFixed(1) : "0.0"}% ({d.value})
+                      {d.value}%
                     </div>
                   </div>
                 ))}
