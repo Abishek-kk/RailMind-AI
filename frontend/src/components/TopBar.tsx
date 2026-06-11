@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Bell, BellOff, Calendar, Clock, Camera, ChevronDown, Check } from "lucide-react";
-import { CCTV_OPTIONS } from "@/lib/mock-data";
 
 interface TopBarProps {
   title: string;
@@ -30,12 +29,13 @@ export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabl
   const time = now.toLocaleTimeString("en-US", { hour12: true });
 
   /**
-   * BUG 12 FIX: Use dynamic feeds when provided, always prepend "All CCTV Feeds".
-   * Fall back to the static CCTV_OPTIONS when no feeds prop is given.
+   * BUG 13 FIX: Use dynamic feeds when provided, always prepend "All CCTV Feeds".
+   * When feeds is undefined (loading), show only a single "All CCTV Feeds" option
+   * instead of the stale CCTV_OPTIONS to avoid flashing outdated camera data.
    */
   const feedOptions = feeds
     ? [{ id: "all", label: "All CCTV Feeds" }, ...feeds]
-    : CCTV_OPTIONS;
+    : [{ id: "all", label: "All CCTV Feeds" }];
 
   const current = feedOptions.find((c) => c.id === selectedFeed) ?? feedOptions[0];
 
