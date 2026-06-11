@@ -280,6 +280,11 @@ async def get_cctv_summary_matrix(db = Depends(get_db)):
         ).first()
         
         current_risk_level = max_risk[0] if max_risk else "Safe"
+
+        last_alert = db.query(Alert.timestamp).filter(
+            Alert.camera_id == feed.id
+        ).order_by(Alert.timestamp.desc()).first()
+        last_incident = last_alert[0].strftime("%Y-%m-%d %H:%M") if last_alert and last_alert[0] else None
         
         result.append({
             "camera_id": feed.id,
@@ -287,7 +292,8 @@ async def get_cctv_summary_matrix(db = Depends(get_db)):
             "status": feed.status,
             "total_incidents": total_incidents,
             "active_alerts": active_alerts,
-            "current_risk_level": current_risk_level
+            "current_risk_level": current_risk_level,
+            "last_incident": last_incident,
         })
     
     return result
