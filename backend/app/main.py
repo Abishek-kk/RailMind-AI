@@ -1,10 +1,14 @@
 """Main FastAPI application entry point for the RailMind AI backend."""
+import glob
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import api_router
 from app.core.config import settings
-from app.core.database import init_db
+from app.core.database import SessionLocal, init_db
 from app.core import websocket_manager
+from app.core.processor_manager import start_processor
+from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
 
 app = FastAPI(
@@ -83,11 +87,52 @@ async def startup_event():
     """Initialize application on startup."""
     init_db()
 
+    _ensure_default_station_feeds()
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown."""
     # Add shutdown cleanup steps here if needed in the future.
     return None
+
+
+def _ensure_default_station_feeds() -> None:
+    """Ensure two default station feeds are registered and started."""
+    video_dir = settings.MOCK_FEED_DIR
+    if not os.path.isdir(video_dir):
+        return
+
+    video_paths = sorted(
+        glob.glob(os.path.join(video_dir, "*.mp4"))
+        + glob.glob(os.path.join(video_dir, "*.mov"))
+        + glob.glob(os.path.join(video_dir, "*.mkv"))
+        + glob.glob(os.path.join(video_dir, "*.avi"))
+    )
+    if len(video_paths) < 2:
+        return
+
+    default_feeds = [
+        {"id": "CCTV_STATION_1", "name": "Station 1", "platform": "Station 1"},
+        {"id": "CCTV_STATION_2", "name": "Station 2", "platform": "Station 2"},
+    ]
+
+    with SessionLocal() as db:
+        for idx, feed_info in enumerate(default_feeds):
+            feed = db.query(Feed).filter(Feed.id == feed_info["id"]).first()
+            if feed is None:
+                feed = Feed(
+                    id=feed_info["id"],
+                    name=feed_info["name"],
+                    status="active",
+                    fps=30.0,
+                )
+                db.add(feed)
+                db.commit()
+                db.refresh(feed)
+            try:
+                start_processor(video_paths[idx], feed.id, feed_info["platform"])
+            except Exception as e:
+                print(f"Failed to start default station processor for {feed.id}: {e}")
 
 @app.get("/")
 async def root():
