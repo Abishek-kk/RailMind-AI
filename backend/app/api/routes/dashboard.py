@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime, time, timedelta
-from sqlalchemy import func, cast, Date
+from sqlalchemy import func, cast, Date, case
 from app.api.deps import get_db
 from app.analytics.heatmap import get_live_platform_heatmap
 from app.models.alert import Alert
@@ -270,7 +270,7 @@ async def get_cctv_summary_matrix(db = Depends(get_db)):
             Alert.camera_id == feed.id
         ).order_by(
             # Order by risk level priority
-            func.case(
+            case(
                 (Alert.risk_level == "Critical", 1),
                 (Alert.risk_level == "High", 2),
                 (Alert.risk_level == "Medium", 3),

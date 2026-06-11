@@ -1,8 +1,10 @@
 """Alert service business logic"""
 import asyncio
+import concurrent.futures
 import logging
+import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -11,14 +13,35 @@ from app.services.escalation_service import EscalationService
 
 logger = logging.getLogger("railmind.alerts")
 
+_fallback_escalation_loop: Optional[asyncio.AbstractEventLoop] = None
+_fallback_escalation_thread: Optional[threading.Thread] = None
+
+
+def _start_fallback_escalation_loop() -> asyncio.AbstractEventLoop:
+    global _fallback_escalation_loop, _fallback_escalation_thread
+    if _fallback_escalation_loop is None or not _fallback_escalation_loop.is_running():
+        _fallback_escalation_loop = asyncio.new_event_loop()
+
+        def _run_loop(loop: asyncio.AbstractEventLoop) -> None:
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        _fallback_escalation_thread = threading.Thread(
+            target=_run_loop,
+            args=(_fallback_escalation_loop,),
+            daemon=True,
+        )
+        _fallback_escalation_thread.start()
+    return _fallback_escalation_loop
+
 class AlertService:
     """Handles alert operations"""
 
     def __init__(self, db: Session, escalation_service: Optional[EscalationService] = None):
         self.db = db
         self.escalation_service = escalation_service or EscalationService()
-        # Track active escalation timers: {alert_id: asyncio.Task}
-        self.escalation_timers: Dict[int, asyncio.Task] = {}
+        # Track active escalation timers: {alert_id: asyncio.Task | concurrent.futures.Future}
+        self.escalation_timers: Dict[int, Union[asyncio.Task[Any], concurrent.futures.Future[Any]]] = {}
 
     def list_alerts(self, filters: Optional[Dict[str, str]] = None) -> List[Alert]:
         query = self.db.query(Alert)
@@ -73,8 +96,13 @@ class AlertService:
             if alert.id in self.escalation_timers:
                 del self.escalation_timers[alert.id]
         
-        # Create and store the task on the running event loop.
-        task = asyncio.get_running_loop().create_task(escalation_task())
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(escalation_task())
+        except RuntimeError:
+            loop = _start_fallback_escalation_loop()
+            task = asyncio.run_coroutine_threadsafe(escalation_task(), loop)
+
         self.escalation_timers[alert.id] = task
         logger.info(f"Started escalation timer for alert {alert.id}")
 

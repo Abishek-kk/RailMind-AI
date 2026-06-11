@@ -34,7 +34,8 @@ class VideoProcessor:
         self.feed_source = feed_source
         self.camera_id = camera_id
         self.platform = platform
-        self.pose_estimator = PoseEstimator()
+        # Use configured pose model path to ensure the correct weights are loaded
+        self.pose_estimator = PoseEstimator(model_path=settings.POSE_MODEL_PATH, device=settings.POSE_DEVICE)
         
         # Initialize BYTETracker with required configuration arguments
         tracker_args = Namespace(

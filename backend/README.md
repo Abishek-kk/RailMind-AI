@@ -101,3 +101,41 @@ pytest
 ## License
 
 Proprietary - TeamAccelerate
+
+## Quickstart (Local Prototype)
+
+Start the backend FastAPI server (from repository root):
+
+```bash
+# Activate your venv first
+f:/teamaccelerate/.venv/Scripts/Activate.ps1  # PowerShell (Windows)
+f:/teamaccelerate/.venv/Scripts/python.exe backend/run.py
+```
+
+Run the demo pipeline simulator (separate terminal):
+
+```bash
+f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/demo_runner.py
+```
+
+Notes:
+- The demo runner simulates CV/LSTM outputs and executes the LangGraph agent pipeline locally.
+- For a full CV pipeline, provide MP4 files under `backend/data/mock_feeds` or an RTSP URL and start
+   the `VideoProcessor` via a small runner.
+
+Run the full CV pipeline (YOLOv8-Pose + ByteTrack + feature extraction):
+
+```bash
+# Ensure you have model weights `backend/yolov8n-pose.pt` available and mock videos in data/mock_feeds
+f:/teamaccelerate/.venv/Scripts/Activate.ps1
+f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/run_video_processors.py --device cuda:0
+
+Or force CPU-only:
+```
+f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/run_video_processors.py --device cpu
+```
+
+Notes:
+- The runner uses the lightest pose model `yolov8n-pose.pt` by default (configured in `settings.POSE_MODEL_PATH`).
+- Use `--device` to override the configured device at runtime.
+```
