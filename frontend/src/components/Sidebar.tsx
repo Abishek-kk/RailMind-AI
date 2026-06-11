@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Video, LayoutDashboard, Bell, Train } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useWebSocket } from "@/hooks/useWebSocket";
 
 const navItems = [
   { to: "/live", label: "Live Monitoring", icon: Video },
@@ -27,29 +26,18 @@ export function Sidebar() {
     retry: 1,
   });
 
-  const websocketBase = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
-  const { status: wsStatus } = useWebSocket(`${websocketBase}/ws/alerts`);
-
-  // Determine health states
   const isHttpHealthy = !isHttpError && !isHttpPending;
-  const isWsHealthy = wsStatus === "connected";
-  const isHealthy = isHttpHealthy && isWsHealthy;
-  const isPulsing = isHealthy || wsStatus === "connecting" || (isHttpPending && !isHttpError);
+  const isHealthy = isHttpHealthy;
+  const isPulsing = isHealthy || isHttpPending;
 
-  // Set label and color based on combined state
+  // Set label and color based on health state
   let statusLabel = "Checking...";
   let statusColor = "#f97316"; // orange
 
   if (isHttpError) {
     statusLabel = "Backend Unreachable";
     statusColor = "#ef4444"; // red
-  } else if (wsStatus === "error") {
-    statusLabel = "Connection Error";
-    statusColor = "#ef4444"; // red
-  } else if (wsStatus === "disconnected") {
-    statusLabel = "Live Stream Offline";
-    statusColor = "#ef4444"; // red
-  } else if (wsStatus === "connecting" || isHttpPending) {
+  } else if (isHttpPending) {
     statusLabel = "Checking...";
     statusColor = "#f97316"; // orange
   } else if (isHealthy) {
