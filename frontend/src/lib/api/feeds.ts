@@ -69,3 +69,30 @@ export async function createFeed(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function uploadVideo(file: File, feed_id?: string, name?: string) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  if (feed_id) form.append("feed_id", feed_id);
+  if (name) form.append("name", name);
+
+  const url = (import.meta.env.VITE_API_BASE_URL ?? "/api") + "/feeds/upload";
+  const resp = await fetch(url, {
+    method: "POST",
+    body: form,
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Upload failed: ${resp.status} ${text}`);
+  }
+  return await resp.json();
+}
+
+export async function deleteFeed(id: string): Promise<void> {
+  const url = (import.meta.env.VITE_API_BASE_URL ?? "/api") + `/feeds/${encodeURIComponent(id)}`;
+  const resp = await fetch(url, { method: "DELETE" });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Delete failed: ${resp.status} ${text}`);
+  }
+}

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Computer Vision Directories
     MODEL_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../lstm/saved_models")))
     MOCK_FEED_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/mock_feeds")))
+    # Default pose model path (relative to backend folder). Override via env if needed.
+    POSE_MODEL_PATH: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../yolov8n-pose.pt")))
+    # Device used for pose model inference. Use 'cpu' or 'cuda:0', etc.
+    POSE_DEVICE: str = Field(default="cpu")
     
     # Dynamic Agent Behavior Evaluation Thresholds
     # Used by Reasoning Agent to classify incident urgency

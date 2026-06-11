@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
+import AddVideo from "@/components/AddVideo";
 import { StatCard } from "@/components/StatCard";
 import { RiskBadge } from "@/components/RiskBadge";
 import {
@@ -39,7 +40,7 @@ import {
   getCCTVSummary,
   getRecentIncidents,
 } from "@/lib/api/dashboard";
-import { getFeeds } from "@/lib/api/feeds";
+import { deleteFeed, getFeeds } from "@/lib/api/feeds";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — RailMind AI" }] }),
@@ -106,6 +107,8 @@ function DashboardPage() {
     isLoading: recentLoading,
     error: recentError,
   } = useQuery({ queryKey: ["recentIncidents"], queryFn: getRecentIncidents });
+
+  const queryClient = useQueryClient();
 
   /** BUG 12 FIX: fetch feeds so TopBar can show dynamic camera list */
   const { data: feedsData } = useQuery({ queryKey: ["liveFeeds"], queryFn: getFeeds });
@@ -178,6 +181,17 @@ function DashboardPage() {
     return feedsData.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
   }, [feedsData]);
 
+  const stopFeed = async (feedId: string) => {
+    try {
+      await deleteFeed(feedId);
+      await queryClient.invalidateQueries(["liveFeeds"]);
+      await queryClient.invalidateQueries(["cctvSummary"]);
+    } catch (err) {
+      console.error("Failed to stop feed", err);
+      // Optionally show a toast or inline error state here
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -206,15 +220,16 @@ function DashboardPage() {
   }
 
   return (
-    <div>
+    <div className="mx-auto max-w-screen-2xl space-y-6 p-6">
       <TopBar
         title="Dashboard"
         subtitle="Overview of all CCTV feeds and safety analytics"
         selectedFeed={feed}
         onFeedChange={setFeed}
         feeds={dynamicFeeds}
+        right={<AddVideo />}
       />
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
           <StatCard
@@ -254,75 +269,31 @@ function DashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Incidents by CCTV */}
+        <div className="grid gap-6 xl:grid-cols-[2.2fr_minmax(360px,1fr)]">
           <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold">Incidents by CCTV</h3>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="relative h-44 w-44 shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={byCctv}
-                      dataKey="value"
-                      innerRadius={50}
-                      outerRadius={75}
-                      stroke="none"
-                    >
-                      {byCctv.map((d) => (
-                        <Cell key={d.name} fill={d.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-2xl font-bold">{totalByCctv}</div>
-                  <div className="text-[11px] text-muted-foreground">Total</div>
-                </div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trend overview</p>
+                <h3 className="text-xl font-semibold">Incident Trend</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Rolling alert distribution across major incident categories.</p>
               </div>
-              <div className="flex-1 space-y-1.5 text-sm">
-                {byCctv.map((d) => (
-                  <div key={d.name} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
-                      <span>{d.name}</span>
-                    </div>
-                    <span className="tabular-nums text-muted-foreground">
-                      {d.value} ({Math.round(totalByCctv ? (d.value / totalByCctv) * 100 : 0)}%)
-                    </span>
-                  </div>
-                ))}
+              <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground">
+                <span>Window</span>
+                <select
+                  id="trend-period-select"
+                  value={trendDays}
+                  onChange={(e) => setTrendDays(Number(e.target.value) as 7 | 30)}
+                  className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground"
+                >
+                  <option value={7}>7 Days</option>
+                  <option value={30}>30 Days</option>
+                </select>
               </div>
             </div>
-            <Link
-              to="/live"
-              className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-border bg-secondary py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
-            >
-              View All Cameras
-            </Link>
-          </div>
 
-          {/* BUG 8 FIX: Trend with wired trendDays select */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
-                Incident Trend{" "}
-                <span className="text-muted-foreground">(Last {trendDays} Days)</span>
-              </h3>
-              <select
-                id="trend-period-select"
-                value={trendDays}
-                onChange={(e) => setTrendDays(Number(e.target.value) as 7 | 30)}
-                className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground"
-              >
-                <option value={7}>Last 7 Days</option>
-                <option value={30}>Last 30 Days</option>
-              </select>
-            </div>
-            <div className="mt-4 h-56">
+            <div className="mt-5 h-[340px] sm:h-[360px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend ?? []} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <LineChart data={trend ?? []} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
                   <CartesianGrid stroke="#1e1e2e" vertical={false} />
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
                   <YAxis stroke="#94a3b8" fontSize={11} />
@@ -357,42 +328,92 @@ function DashboardPage() {
             </div>
           </div>
 
-          {/* Risk distribution */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold">Risk Distribution</h3>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="relative h-44 w-44 shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dist ?? []}
-                      dataKey="value"
-                      innerRadius={50}
-                      outerRadius={75}
-                      stroke="none"
-                    >
-                      {(dist ?? []).map((d) => (
-                        <Cell key={d.name} fill={d.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-2xl font-bold">100%</div>
-                  <div className="text-[11px] text-muted-foreground">Coverage</div>
+          <div className="grid gap-6">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h3 className="text-sm font-semibold">Incidents by CCTV</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Camera-level alert volume for active stations.</p>
+              <div className="mt-5 flex items-center gap-4">
+                <div className="relative h-44 w-44 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={byCctv}
+                        dataKey="value"
+                        innerRadius={50}
+                        outerRadius={75}
+                        stroke="none"
+                      >
+                        {byCctv.map((d) => (
+                          <Cell key={d.name} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-2xl font-bold">{totalByCctv}</div>
+                    <div className="text-[11px] text-muted-foreground">Total</div>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2 text-sm">
+                  {byCctv.map((d) => (
+                    <div key={d.name} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                        <span>{d.name}</span>
+                      </div>
+                      <span className="tabular-nums text-muted-foreground">
+                        {d.value} ({Math.round(totalByCctv ? (d.value / totalByCctv) * 100 : 0)}%)
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex-1 space-y-2 text-sm">
-                {(dist ?? []).map((d) => (
-                  <div key={d.name}>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
-                      <span>{d.name}</span>
-                    </div>
-                    <div className="ml-4 text-xs text-muted-foreground">{d.value}%</div>
+              <Link
+                to="/live"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-lg border border-border bg-secondary py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+              >
+                View All Cameras
+              </Link>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h3 className="text-sm font-semibold">Risk Distribution</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Category share across current incidents.</p>
+              <div className="mt-5 flex items-center gap-4">
+                <div className="relative h-44 w-44 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dist ?? []}
+                        dataKey="value"
+                        innerRadius={50}
+                        outerRadius={75}
+                        stroke="none"
+                      >
+                        {(dist ?? []).map((d) => (
+                          <Cell key={d.name} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-2xl font-bold">100%</div>
+                    <div className="text-[11px] text-muted-foreground">Coverage</div>
                   </div>
-                ))}
+                </div>
+                <div className="flex-1 space-y-2 text-sm">
+                  {(dist ?? []).map((d) => (
+                    <div key={d.name}>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                        <span>{d.name}</span>
+                      </div>
+                      <div className="ml-4 text-xs text-muted-foreground">{d.value}%</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -531,6 +552,7 @@ function DashboardPage() {
                   <th className="px-4 py-3 font-medium">Active Alerts</th>
                   <th className="px-4 py-3 font-medium">Last Incident</th>
                   <th className="px-4 py-3 font-medium">Risk Level</th>
+                  <th className="px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -564,6 +586,15 @@ function DashboardPage() {
                         }
                         label={row.current_risk_level.toUpperCase()}
                       />
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => stopFeed(row.camera_id)}
+                        className="rounded-md border border-border bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive transition hover:bg-destructive/20"
+                      >
+                        Stop
+                      </button>
                     </td>
                   </tr>
                 ))}

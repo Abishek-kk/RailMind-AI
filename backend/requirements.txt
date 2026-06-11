@@ -5,7 +5,7 @@ python-multipart==0.0.6
 
 # Database
 sqlalchemy>=2.0.23,<3.0.0
-pydantic-settings==2.1.0
+pydantic-settings==2.1.0  # required by app/core/config.py
 pydantic>=2.7.4,<3.0.0
 
 # Computer Vision

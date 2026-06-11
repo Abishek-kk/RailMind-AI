@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import re
-from typing import List
+from typing import List, Optional
+import os
+from fastapi import UploadFile, File
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -9,6 +11,7 @@ from app.api.deps import get_db
 from app.models.feed import Feed
 from app.schemas.feed import FeedCreate, FeedRead
 from app.cv.video_processor import VideoProcessor
+from app.core.config import settings
 
 logger = logging.getLogger("railmind.feeds")
 router = APIRouter()
@@ -83,6 +86,57 @@ async def register_feed(feed: FeedCreate, db: Session = Depends(get_db)):
         # Don't fail the entire feed registration if processor startup fails
     
     return db_feed
+
+
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+async def upload_video(file: UploadFile = File(...), feed_id: Optional[str] = None, name: Optional[str] = None, db: Session = Depends(get_db)):
+    """Upload a video file and start processing it as a new feed.
+
+    The uploaded file is saved to `settings.MOCK_FEED_DIR` and a VideoProcessor
+    is started in the background to process the file.
+    """
+    # Ensure storage directory exists
+    storage_dir = settings.MOCK_FEED_DIR
+    os.makedirs(storage_dir, exist_ok=True)
+
+    # Derive filename and feed id
+    original_name = os.path.basename(file.filename)
+    if feed_id is None:
+        base_id = os.path.splitext(original_name)[0]
+        # Ensure unique feed id by appending a numeric suffix if necessary
+        candidate = base_id
+        suffix = 1
+        while db.query(Feed).filter(Feed.id == candidate).first():
+            candidate = f"{base_id}_{suffix}"
+            suffix += 1
+        feed_id = candidate
+    if name is None:
+        name = original_name
+
+    dest_path = os.path.join(storage_dir, original_name)
+    # Save uploaded file
+    with open(dest_path, "wb") as out_f:
+        content = await file.read()
+        out_f.write(content)
+
+    # Create DB record
+    db_feed = Feed(id=feed_id, name=name, status="active", fps=30.0)
+    db.add(db_feed)
+    db.commit()
+    db.refresh(db_feed)
+
+    platform = derive_platform_from_feed_id(feed_id)
+
+    # Start VideoProcessor
+    try:
+        processor = VideoProcessor(feed_source=dest_path, camera_id=feed_id, platform=platform)
+        task = asyncio.create_task(processor.start_processing_loop())
+        active_processors[feed_id] = {"processor": processor, "task": task}
+        logger.info("Started VideoProcessor for uploaded feed %s", feed_id)
+    except Exception as e:
+        logger.error(f"Failed to start VideoProcessor for uploaded feed {feed_id}: {e}")
+
+    return {"feed_id": feed_id, "name": name, "path": dest_path}
 
 
 @router.get("/{id}/stream")
