@@ -8,7 +8,7 @@ const navItems = [
   { to: "/alerts", label: "Alerts", icon: Bell },
 ] as const;
 
-const backendBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+const backendBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 /** Poll backend health endpoint every 30 seconds */
 async function checkBackendHealth(): Promise<boolean> {
