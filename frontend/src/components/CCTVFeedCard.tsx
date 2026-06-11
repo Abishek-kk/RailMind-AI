@@ -109,11 +109,17 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
             className="absolute bottom-3 left-3 rounded-md px-3 py-2 backdrop-blur"
             style={{ backgroundColor: `${alertColor}26`, border: `1px solid ${alertColor}66` }}
           >
-            <div className="flex items-center gap-1.5 text-xs font-bold" style={{ color: alertColor }}>
+            <div
+              className="flex items-center gap-1.5 text-xs font-bold"
+              style={{ color: alertColor }}
+            >
               ⚠ {feed.alertType}
             </div>
             <div className="text-[11px] text-white/90">
-              Risk Score: <span className="font-bold" style={{ color: alertColor }}>{feed.riskScore}%</span>
+              Risk Score:{" "}
+              <span className="font-bold" style={{ color: alertColor }}>
+                {feed.riskScore}%
+              </span>
             </div>
           </div>
         )}
@@ -162,7 +168,9 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
         <DialogContent className="max-w-5xl p-2">
           <div className="overflow-hidden rounded-lg bg-black">
             <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-sm font-semibold text-white">{feed.id} — {feed.platform}</span>
+              <span className="text-sm font-semibold text-white">
+                {feed.id} — {feed.platform}
+              </span>
               <span className="inline-flex items-center gap-1.5 rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-bold text-[#22c55e]">
                 <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-[#22c55e]" />
                 LIVE

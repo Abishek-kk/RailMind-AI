@@ -55,9 +55,7 @@ export function Sidebar() {
           <div className="text-lg font-bold leading-tight">
             RailMind <span className="text-[#22c55e]">AI</span>
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            AI-Powered Railway Safety System
-          </div>
+          <div className="text-[10px] text-muted-foreground">AI-Powered Railway Safety System</div>
         </div>
       </div>
       <nav className="flex-1 space-y-1 p-3">

@@ -7,12 +7,12 @@ export function RiskBadge({ level, label }: { level: RiskLevel | "very-high"; la
     (level === "high"
       ? "HIGH RISK"
       : level === "very-high"
-      ? "VERY HIGH"
-      : level === "medium"
-      ? "MEDIUM RISK"
-      : level === "suspicious"
-      ? "HIGH RISK"
-      : "SAFE");
+        ? "VERY HIGH"
+        : level === "medium"
+          ? "MEDIUM RISK"
+          : level === "suspicious"
+            ? "HIGH RISK"
+            : "SAFE");
   return (
     <span
       className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide"

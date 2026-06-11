@@ -59,7 +59,10 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
   const roundedRiskScore = Math.round(alert.risk_score);
   const clampedRiskScore = Math.min(100, Math.max(0, roundedRiskScore));
 
-  const alertId = alert.id !== undefined && alert.id !== null ? alert.id : Math.floor(Math.random() * 1000000) + 10000;
+  const alertId =
+    alert.id !== undefined && alert.id !== null
+      ? alert.id
+      : Math.floor(Math.random() * 1000000) + 10000;
 
   return {
     backendId: alertId,

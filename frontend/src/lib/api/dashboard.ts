@@ -18,7 +18,7 @@ export interface IncidentsByCCTVItem {
 export interface IncidentTrendItem {
   date: string;
   "Suicide Risk": number;
-  "Pickpocketing": number;
+  Pickpocketing: number;
   Loitering: number;
 }
 
@@ -115,7 +115,7 @@ export async function getIncidentTrend(days = 7): Promise<IncidentTrendItem[]> {
   return apiFetch<IncidentTrendItem[]>(`/dashboard/trend?days=${days}`);
 }
 
-function mapRiskDistributionColor(item: Omit<RiskDistributionItem, 'color'>): RiskDistributionItem {
+function mapRiskDistributionColor(item: Omit<RiskDistributionItem, "color">): RiskDistributionItem {
   const colorMap: Record<string, string> = {
     "Suicide Risk Detection": "#ef4444",
     "Pickpocketing Actions": "#f97316",
@@ -130,7 +130,9 @@ function mapRiskDistributionColor(item: Omit<RiskDistributionItem, 'color'>): Ri
 }
 
 export async function getRiskDistribution(): Promise<RiskDistributionItem[]> {
-  const distribution = await apiFetch<Omit<RiskDistributionItem, 'color'>[]>("/dashboard/risk-distribution");
+  const distribution = await apiFetch<Omit<RiskDistributionItem, "color">[]>(
+    "/dashboard/risk-distribution",
+  );
   return distribution.map(mapRiskDistributionColor);
 }
 

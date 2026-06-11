@@ -11,7 +11,16 @@ interface StatCardProps {
   sublabel?: string;
 }
 
-export function StatCard({ label, value, icon: Icon, iconColor = "#6366f1", iconBg = "rgba(99,102,241,0.15)", change, dir, sublabel }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  icon: Icon,
+  iconColor = "#6366f1",
+  iconBg = "rgba(99,102,241,0.15)",
+  change,
+  dir,
+  sublabel,
+}: StatCardProps) {
   const positive = dir === "up";
   return (
     <div className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
