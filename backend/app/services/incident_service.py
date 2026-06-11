@@ -13,7 +13,7 @@ class IncidentService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_incidents(self, filters: Optional[Dict[str, Any]] = None) -> List[Incident]:
+    def list_incidents(self, filters: Optional[Dict[str, Any]] = None, limit: Optional[int] = None) -> List[Incident]:
         query = self.db.query(Incident)
 
         if filters:
@@ -30,7 +30,10 @@ class IncidentService:
             if filters.get("date_to"):
                 query = query.filter(Incident.timestamp <= filters["date_to"])
 
-        return query.order_by(Incident.timestamp.desc()).all()
+        query = query.order_by(Incident.timestamp.desc())
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     def get_incident(self, incident_id: int) -> Optional[Incident]:
         return self.db.query(Incident).filter(Incident.id == incident_id).first()
