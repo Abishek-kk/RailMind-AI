@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Video, LayoutDashboard, Bell, Train } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 const navItems = [
   { to: "/live", label: "Live Monitoring", icon: Video },
@@ -10,7 +11,7 @@ const navItems = [
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
-/** BUG 11 FIX: poll backend health endpoint every 30 seconds */
+/** Poll backend health endpoint every 30 seconds */
 async function checkBackendHealth(): Promise<boolean> {
   const response = await fetch(`${backendBaseUrl}/health`);
   if (!response.ok) throw new Error("Backend unreachable");
@@ -18,7 +19,7 @@ async function checkBackendHealth(): Promise<boolean> {
 }
 
 export function Sidebar() {
-  const { isError, isPending } = useQuery({
+  const { isError: isHttpError, isPending: isHttpPending } = useQuery({
     queryKey: ["backendHealth"],
     queryFn: checkBackendHealth,
     refetchInterval: 30_000,
@@ -26,13 +27,35 @@ export function Sidebar() {
     retry: 1,
   });
 
-  const isHealthy = !isError;
-  const statusLabel = isError
-    ? "Backend Unreachable"
-    : isPending
-    ? "Checking..."
-    : "All Systems Operational";
-  const statusColor = isError ? "#ef4444" : isPending ? "#f97316" : "#22c55e";
+  const websocketBase = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
+  const { status: wsStatus } = useWebSocket(`${websocketBase}/ws/alerts`);
+
+  // Determine health states
+  const isHttpHealthy = !isHttpError && !isHttpPending;
+  const isWsHealthy = wsStatus === "connected";
+  const isHealthy = isHttpHealthy && isWsHealthy;
+  const isPulsing = isHealthy || wsStatus === "connecting" || (isHttpPending && !isHttpError);
+
+  // Set label and color based on combined state
+  let statusLabel = "Checking...";
+  let statusColor = "#f97316"; // orange
+
+  if (isHttpError) {
+    statusLabel = "Backend Unreachable";
+    statusColor = "#ef4444"; // red
+  } else if (wsStatus === "error") {
+    statusLabel = "Connection Error";
+    statusColor = "#ef4444"; // red
+  } else if (wsStatus === "disconnected") {
+    statusLabel = "Live Stream Offline";
+    statusColor = "#ef4444"; // red
+  } else if (wsStatus === "connecting" || isHttpPending) {
+    statusLabel = "Checking...";
+    statusColor = "#f97316"; // orange
+  } else if (isHealthy) {
+    statusLabel = "All Systems Operational";
+    statusColor = "#22c55e"; // green
+  }
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar">
@@ -66,7 +89,7 @@ export function Sidebar() {
         <div className="text-xs font-semibold text-muted-foreground">System Status</div>
         <div className="mt-2 flex items-center gap-2 text-sm">
           <span className="relative flex h-2.5 w-2.5">
-            {isHealthy && (
+            {isPulsing && (
               <span
                 className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
                 style={{ backgroundColor: statusColor }}

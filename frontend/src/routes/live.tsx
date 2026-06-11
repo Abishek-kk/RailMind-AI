@@ -6,7 +6,7 @@ import { StatCard } from "@/components/StatCard";
 import { CCTVFeedCard } from "@/components/CCTVFeedCard";
 import { RiskBadge } from "@/components/RiskBadge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Camera, Users, AlertTriangle, Activity, Plus, ArrowRight } from "lucide-react";
+import { Camera, Users, AlertTriangle, Activity, Plus, ArrowRight, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
 import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
 import { createFeed, getFeeds } from "@/lib/api/feeds";
@@ -71,6 +71,7 @@ function LivePage() {
   const [platformName, setPlatformName] = useState("");
   /** BUG 6 FIX: filter level state for Live Detections sidebar */
   const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   /** BUG 15 FIX: allow user to dismiss mock-data banner */
   const [mockBannerDismissed, setMockBannerDismissed] = useState(false);
 
@@ -446,18 +447,49 @@ function LivePage() {
           <aside className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 className="text-sm font-semibold">Live Detections</h3>
-              {/* BUG 6 FIX: working filter dropdown */}
-              <select
-                id="live-detections-filter"
-                value={filterLevel}
-                onChange={(e) => setFilterLevel(e.target.value as FilterLevel)}
-                className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-              >
-                <option value="all">All Alerts</option>
-                <option value="high">High Risk</option>
-                <option value="medium">Medium Risk</option>
-                <option value="low">Low Risk</option>
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  id="live-detections-filter"
+                  onClick={() => setFilterDropdownOpen((o) => !o)}
+                  className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  <span>{
+                    filterLevel === "all" ? "All Alerts" :
+                    filterLevel === "high" ? "High Risk" :
+                    filterLevel === "medium" ? "Medium Risk" : "Low Risk"
+                  }</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                {filterDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setFilterDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-1 z-50 w-32 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+                      {(["all", "high", "medium", "low"] as const).map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => {
+                            setFilterLevel(level);
+                            setFilterDropdownOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <span>{
+                            level === "all" ? "All Alerts" :
+                            level === "high" ? "High Risk" :
+                            level === "medium" ? "Medium Risk" : "Low Risk"
+                          }</span>
+                          {filterLevel === level && <Check className="h-3.5 w-3.5 text-[#22c55e]" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
             <div className="max-h-[640px] space-y-3 overflow-y-auto p-3">
               {filteredAlerts.slice(0, 6).map((a) => {

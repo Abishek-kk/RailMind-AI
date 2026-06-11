@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pause, Volume2, Maximize2, Expand } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Pause, Play, Volume2, VolumeX, Maximize2, Expand } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -10,14 +10,29 @@ function levelToColor(level: string) {
 
 export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?: BoundingBox[] }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
-  const boxes = detections ?? [];
-  /** BUG 5 FIX: state to open the fullscreen dialog */
+  
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
 
-  /** BUG 5 FIX: handler for Pause and Volume2 — no live stream URL available */
-  function handleUnsupportedControl() {
-    console.info("pause not supported — no live stream URL");
-    toast("Live stream controls are not yet connected.");
+  // Update frozen boxes when not paused
+  useEffect(() => {
+    if (!isPaused && detections) {
+      setFrozenBoxes(detections);
+    }
+  }, [detections, isPaused]);
+
+  const activeDetections = isPaused ? frozenBoxes : (detections ?? []);
+
+  function handlePlayPauseToggle() {
+    setIsPaused(!isPaused);
+    toast(isPaused ? "Live feed resumed." : "Live feed paused.");
+  }
+
+  function handleVolumeToggle() {
+    setIsMuted(!isMuted);
+    toast(isMuted ? "Feed volume unmuted." : "Feed volume muted.");
   }
 
   return (
@@ -28,17 +43,29 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           <div className="text-xs text-muted-foreground">{feed.platform}</div>
         </div>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${boxes.length > 0 ? "bg-[#ef4444]/15 text-[#ef4444]" : "bg-[#22c55e]/15 text-[#22c55e]"}`}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${activeDetections.length > 0 && !isPaused ? "bg-[#ef4444]/15 text-[#ef4444]" : "bg-[#22c55e]/15 text-[#22c55e]"}`}
         >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${boxes.length > 0 ? "animate-pulse bg-[#ef4444]" : "bg-[#22c55e]"}`}
+            className={`h-1.5 w-1.5 rounded-full ${activeDetections.length > 0 && !isPaused ? "animate-pulse bg-[#ef4444]" : "bg-[#22c55e]"}`}
           />
-          LIVE
+          {isPaused ? "PAUSED" : "LIVE"}
         </span>
       </div>
       <div className="relative aspect-video overflow-hidden bg-black">
-        <img src={feed.image} alt={feed.id} className="h-full w-full object-cover" loading="lazy" />
-        {boxes.map((b) => {
+        <img
+          src={feed.image}
+          alt={feed.id}
+          className={`h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
+          loading="lazy"
+        />
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="rounded bg-black/60 px-3 py-1.5 text-xs font-bold text-white tracking-wider animate-pulse">
+              PAUSED
+            </span>
+          </div>
+        )}
+        {activeDetections.map((b) => {
           const c = levelToColor(b.level);
           return (
             <div
@@ -79,27 +106,24 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
       </div>
       <div className="flex items-center justify-between border-t border-border px-3 py-2 text-muted-foreground">
         <div className="flex items-center gap-3">
-          {/* BUG 5 FIX: Pause button shows toast */}
           <button
             type="button"
-            onClick={handleUnsupportedControl}
-            title="Pause (not available — no live stream URL)"
+            onClick={handlePlayPauseToggle}
+            title={isPaused ? "Play" : "Pause"}
             className="rounded p-1 hover:bg-secondary hover:text-foreground"
           >
-            <Pause className="h-4 w-4" />
+            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
           </button>
-          {/* BUG 5 FIX: Volume2 button shows toast */}
           <button
             type="button"
-            onClick={handleUnsupportedControl}
-            title="Volume (not available — no live stream URL)"
+            onClick={handleVolumeToggle}
+            title={isMuted ? "Unmute" : "Mute"}
             className="rounded p-1 hover:bg-secondary hover:text-foreground"
           >
-            <Volume2 className="h-4 w-4" />
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
         </div>
         <div className="flex items-center gap-3">
-          {/* BUG 5 FIX: Maximize2 opens fullscreen Dialog */}
           <button
             type="button"
             onClick={() => setFullscreenOpen(true)}
@@ -108,7 +132,6 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           >
             <Maximize2 className="h-4 w-4" />
           </button>
-          {/* BUG 5 FIX: Expand also opens fullscreen Dialog */}
           <button
             type="button"
             onClick={() => setFullscreenOpen(true)}
@@ -120,7 +143,7 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
         </div>
       </div>
 
-      {/* BUG 5 FIX: Fullscreen Dialog */}
+      {/* Fullscreen Dialog */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
         <DialogContent className="max-w-5xl p-2">
           <div className="overflow-hidden rounded-lg bg-black">
