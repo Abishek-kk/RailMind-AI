@@ -35,7 +35,6 @@ function AlertsPage() {
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
-  const [feeds, setFeeds] = useState<Array<{ id: string; platform: string }>>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filterRisk, setFilterRisk] = useState<'any' | 'high' | 'medium' | 'low'>('any');
   const [filterStatus, setFilterStatus] = useState<'any' | AlertStatus>('any');
@@ -81,12 +80,6 @@ function AlertsPage() {
       setAlerts(data);
     }
   }, [data]);
-
-  useEffect(() => {
-    if (Array.isArray(feedsData)) {
-      setFeeds(feedsData.map((f) => ({ id: f.id, platform: f.platform })));
-    }
-  }, [feedsData]);
 
   const selected = selectedId ? alerts.find((a) => a.id === selectedId) ?? null : null;
 
@@ -134,9 +127,9 @@ function AlertsPage() {
   const cctvFiltered = feed === "all" ? alerts : alerts.filter((a) => a.cctv === feed);
 
   const dynamicFeeds = useMemo(() => {
-    if (feeds.length === 0) return undefined;
-    return feeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
-  }, [feeds]);
+    if (!Array.isArray(feedsData) || feedsData.length === 0) return undefined;
+    return feedsData.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
+  }, [feedsData]);
 
   const platformOptions = useMemo(() => {
     const setp = new Set<string>();
