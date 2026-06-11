@@ -1,13 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { QueryClient } from "@tanstack/react-query";
+import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import "../styles.css";
 import { reportAppError } from "../lib/error-reporting";
@@ -74,52 +67,18 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "RailMind AI" },
-      { name: "description", content: "RailMind AI dashboard and monitoring platform" },
-      { name: "author", content: "RailMind AI" },
-      { property: "og:title", content: "RailMind AI" },
-      { property: "og:description", content: "RailMind AI dashboard and monitoring platform" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@RailMindAI" },
-    ],
-    links: [],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
-
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-screen bg-background text-foreground">
-        <Sidebar />
-        <main className="flex-1 overflow-x-hidden">
-          <Outlet />
-        </main>
-      </div>
-    </QueryClientProvider>
+    <div className="flex min-h-screen bg-background text-foreground">
+      <Sidebar />
+      <main className="flex-1 overflow-x-hidden">
+        <Outlet />
+      </main>
+    </div>
   );
 }
