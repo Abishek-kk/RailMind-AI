@@ -67,12 +67,15 @@ async def register_feed(feed: FeedCreate, db: Session = Depends(get_db)):
         id=feed.id,
         name=feed.name,
         status="active",
-        fps=feed.fps or 30.0
+        fps=feed.fps or 30.0,
+        source_url=feed.source_url,
+        stream_url=None,
     )
+
     db.add(db_feed)
     db.commit()
     db.refresh(db_feed)
-    
+
     platform = derive_platform_from_feed_id(feed.id)
 
     # Start VideoProcessor via central manager (non-blocking)
@@ -111,14 +114,24 @@ async def upload_video(file: UploadFile = File(...), feed_id: Optional[str] = No
     if name is None:
         name = original_name
 
-    dest_path = os.path.join(storage_dir, original_name)
+    dest_filename = f"{feed_id}_{original_name}"
+    dest_path = os.path.join(storage_dir, dest_filename)
     # Save uploaded file
     with open(dest_path, "wb") as out_f:
         content = await file.read()
         out_f.write(content)
 
+    stream_url = f"/uploads/{dest_filename}"
+
     # Create DB record
-    db_feed = Feed(id=feed_id, name=name, status="active", fps=30.0)
+    db_feed = Feed(
+        id=feed_id,
+        name=name,
+        status="active",
+        fps=30.0,
+        source_url=dest_path,
+        stream_url=stream_url,
+    )
     db.add(db_feed)
     db.commit()
     db.refresh(db_feed)
