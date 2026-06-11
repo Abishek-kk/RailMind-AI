@@ -33,15 +33,13 @@ def build_agent_graph():
     # Compile the graph
     return workflow.compile()
 
-# Instantiate the compiled graph globally so it isn't rebuilt on every frame
-agent_pipeline = build_agent_graph()
-
 async def run_agent_pipeline(raw_cv_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Entry point to be called by the FastAPI/CV pipeline.
     Passes raw frame data into the LangGraph execution.
     """
     initial_state = {"raw_data": raw_cv_data}
+    agent_pipeline = build_agent_graph()
     
     # Invoke the LangGraph pipeline
     # LangGraph returns the final state object after traversing all nodes

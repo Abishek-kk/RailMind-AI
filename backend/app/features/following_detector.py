@@ -2,12 +2,18 @@
 
 import math
 
+from app.core.config import settings
+
 class FollowingDetector:
     """Detects suspicious following or stalking patterns"""
     
-    def __init__(self, distance_threshold=2.0):
+    def __init__(self, distance_threshold=None):
         """Initialize with distance threshold"""
-        self.distance_threshold = distance_threshold
+        self.distance_threshold = (
+            float(distance_threshold)
+            if distance_threshold is not None
+            else settings.BEHAVIOR_FOLLOWING_DISTANCE_METERS
+        )
     
     def detect(self, tracks):
         """Detect following patterns between tracked people"""
@@ -50,7 +56,7 @@ class FollowingDetector:
             if other_id == track_id:
                 continue
             distance = self.calculate_distance_between_tracks(tracks[track_id], other_data)
-            if distance is not None and distance <= self.distance_threshold * 10:
+            if distance is not None and distance <= self.distance_threshold:
                 count += 1
         return count
 
@@ -65,14 +71,20 @@ class FollowingDetector:
             return 0.0
         matches = 0
         for a, b in zip(trajectory1[-common_length:], trajectory2[-common_length:]):
-            if math.dist(a, b) < self.distance_threshold * 10:
+            if self._pixels_to_meters(math.dist(a, b)) < self.distance_threshold:
                 matches += 1
         return matches / common_length
     
     def calculate_distance_between_tracks(self, track1, track2):
-        """Calculate distance between two tracked persons"""
+        """Calculate distance between two tracked persons in meters."""
         p1 = track1.get("center") or track1.get("position")
         p2 = track2.get("center") or track2.get("position")
         if p1 is None or p2 is None:
             return None
-        return math.dist(p1, p2)
+        return self._pixels_to_meters(math.dist(p1, p2))
+
+    def _pixels_to_meters(self, pixel_distance):
+        """Convert image-space distance to configured real-world metres."""
+        if settings.PIXELS_PER_METER <= 0:
+            return float(pixel_distance)
+        return float(pixel_distance) / settings.PIXELS_PER_METER

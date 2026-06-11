@@ -73,21 +73,20 @@ function AlertsPage() {
   });
 
   const acknowledgeMutation = useMutation({
-    mutationFn: (backendId: number) => acknowledgeAlert(backendId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+    mutationFn: ({ backendId, operatorId }: { backendId: number; operatorId?: string | null }) =>
+      acknowledgeAlert(backendId, operatorId),
     onError: (error: Error) => {
       toast.error(error.message || "Failed to acknowledge alert. Please try again.");
-      queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 
   const resolveMutation = useMutation({
     mutationFn: (backendId: number) => resolveAlert(backendId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
     onError: (error: Error) => {
       toast.error(error.message || "Failed to resolve alert. Please try again.");
-      queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 
   useEffect(() => {
@@ -102,13 +101,13 @@ function AlertsPage() {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   };
 
-  const handleAcknowledge = async () => {
+  const handleAcknowledge = async (operatorId?: string | null) => {
     if (!selected) return;
     const previousStatus = selected.status;
     setStatus(selected.id, "acknowledged");
 
     try {
-      await acknowledgeMutation.mutateAsync(selected.backendId);
+      await acknowledgeMutation.mutateAsync({ backendId: selected.backendId, operatorId });
       toast.success("Alert acknowledged successfully.");
     } catch (error) {
       setStatus(selected.id, previousStatus);
@@ -300,47 +299,115 @@ function AlertsPage() {
                   );
                 })}
               </div>
-
-              {showFilters && (
-                <div className="border-b border-border p-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="w-44">
-                      <label className="block text-xs text-muted-foreground">Platform</label>
-                      <select
-                        value={filterPlatform}
-                        onChange={(e) => {
-                          setFilterPlatform(e.target.value);
-                          setPage(1);
-                        }}
-                        className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm"
-                      >
-                        <option value="any">Any</option>
-                        {platformOptions.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="ml-auto flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterRisk("any");
-                          setFilterStatus("any");
-                          setFilterPlatform("any");
-                          setPage(1);
-                        }}
-                        className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
-                      >
-                        Clear Filters
-                      </button>
-                    </div>
-                  </div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Search alerts"
+                    className="h-9 w-56 rounded-md border border-border bg-secondary pl-8 pr-8 text-sm outline-none transition focus:border-primary"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setPage(1);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      title="Clear search"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((value) => !value)}
+                  className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition ${
+                    showFilters
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </button>
+              </div>
             </div>
+
+            {showFilters && (
+              <div className="border-b border-border bg-secondary/20 p-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="w-40">
+                    <label className="block text-xs text-muted-foreground">Risk</label>
+                    <select
+                      value={filterRisk}
+                      onChange={(e) => {
+                        setFilterRisk(e.target.value as typeof filterRisk);
+                        setPage(1);
+                      }}
+                      className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
+                    >
+                      <option value="any">Any</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                  <div className="w-40">
+                    <label className="block text-xs text-muted-foreground">Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => {
+                        setFilterStatus(e.target.value as typeof filterStatus);
+                        setPage(1);
+                      }}
+                      className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
+                    >
+                      <option value="any">Any</option>
+                      <option value="active">Active</option>
+                      <option value="acknowledged">Acknowledged</option>
+                      <option value="resolved">Resolved</option>
+                    </select>
+                  </div>
+                  <div className="w-52">
+                    <label className="block text-xs text-muted-foreground">Platform</label>
+                    <select
+                      value={filterPlatform}
+                      onChange={(e) => {
+                        setFilterPlatform(e.target.value);
+                        setPage(1);
+                      }}
+                      className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
+                    >
+                      <option value="any">Any</option>
+                      {platformOptions.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterRisk("any");
+                      setFilterStatus("any");
+                      setFilterPlatform("any");
+                      setPage(1);
+                    }}
+                    className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -439,7 +506,10 @@ function AlertsPage() {
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setStatus(a.id, "acknowledged");
-                                      acknowledgeMutation.mutate(a.backendId);
+                                      acknowledgeMutation.mutate({
+                                        backendId: a.backendId,
+                                        operatorId: a.operator_assigned,
+                                      });
                                     }}
                                   >
                                     Acknowledge
@@ -555,7 +625,7 @@ function AlertDetails({
 }: {
   alert: ApiAlert;
   onClose: () => void;
-  onAcknowledge: () => void;
+  onAcknowledge: (operatorId?: string | null) => void;
   onResolve: () => void;
 }) {
   const c = riskColor(alert.riskLevel);
@@ -726,7 +796,9 @@ function AlertDetails({
         </DetailRow>
         <div className="flex gap-2 pt-2">
           <button
-            onClick={onAcknowledge}
+            onClick={() =>
+              onAcknowledge(assignee === "Not Assigned" ? undefined : assignee)
+            }
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <CheckCircle className="h-4 w-4" /> Acknowledge

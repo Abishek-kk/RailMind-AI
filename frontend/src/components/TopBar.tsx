@@ -73,21 +73,24 @@ export function TopBar({
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </button>
           {open && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
-              {feedOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => {
-                    onFeedChange(opt.id);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-secondary"
-                >
-                  <span>{opt.label}</span>
-                  {opt.id === selectedFeed && <Check className="h-4 w-4 text-[#22c55e]" />}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+                {feedOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => {
+                      onFeedChange(opt.id);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-secondary"
+                  >
+                    <span>{opt.label}</span>
+                    {opt.id === selectedFeed && <Check className="h-4 w-4 text-[#22c55e]" />}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
         {onSoundToggle ? (

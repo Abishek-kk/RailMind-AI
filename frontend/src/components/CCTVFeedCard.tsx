@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Pause, Play, Maximize2, Expand, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Maximize2, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -152,14 +152,6 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           >
             <Maximize2 className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setFullscreenOpen(true)}
-            title="Expand view"
-            className="rounded p-1 hover:bg-secondary hover:text-foreground"
-          >
-            <Expand className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -177,11 +169,22 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
               </span>
             </div>
             <div className="relative w-full bg-black max-h-[80vh] overflow-hidden">
-              <img
-                src={feed.image}
-                alt={`${feed.id} fullscreen`}
-                className="w-full object-contain"
-              />
+              {feed.streamUrl ? (
+                <video
+                  src={feed.streamUrl}
+                  autoPlay={!isPaused}
+                  muted={isMuted}
+                  controls
+                  className="w-full max-h-[80vh] object-contain"
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={feed.image}
+                  alt={`${feed.id} fullscreen`}
+                  className="w-full object-contain"
+                />
+              )}
               {/* Render bounding boxes on fullscreen image */}
               {activeDetections.map((b) => {
                 const c = levelToColor(b.level);

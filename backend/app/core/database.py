@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import create_engine
+from sqlalchemy import event
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -20,6 +21,16 @@ Engine = create_engine(
     connect_args=connect_args,
     pool_pre_ping=True  # Automatically checks and revives dead connection frames
 )
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    """Enable SQLite foreign-key enforcement for new DB connections."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 # Session Factory Configuration
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=Engine)

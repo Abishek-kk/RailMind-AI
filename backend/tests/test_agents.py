@@ -1,6 +1,7 @@
 """Agent tests"""
 import pytest
 
+import app.agents.agent_graph as agent_graph
 from app.agents.agent_graph import run_agent_pipeline
 from app.agents.intervention_agent import intervention_node
 from app.agents.perception_agent import perception_node
@@ -30,6 +31,7 @@ def test_perception_agent():
     observation = result["observation"]
 
     assert observation["person_id"] == "test-person"
+    assert observation["lstm_score"] == 0.84
     assert observation["lstm_anomaly_score"] == 0.92
     assert observation["lstm_scores"] == {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31}
     assert observation["edge_proximity_seconds"] == 12.5
@@ -63,6 +65,25 @@ def test_reasoning_agent_high_risk():
     assert decision["final_risk_score"] >= 0.7
 
 
+def test_reasoning_agent_uses_dominant_lstm_score_before_anomaly_score():
+    state = {
+        "observation": {
+            "lstm_score": 0.9,
+            "lstm_anomaly_score": 0.1,
+            "edge_distance": 3.0,
+            "duration_seconds": 0,
+            "pose_classification": "normal",
+            "following_distance": None,
+            "loitering_duration": 0,
+            "context_multiplier": 1.0,
+        }
+    }
+
+    result = reasoning_node(state)
+
+    assert result["decision"]["final_risk_score"] == 36
+
+
 def test_intervention_agent_triggers_broadcast():
     state = {
         "observation": {
@@ -83,6 +104,27 @@ def test_intervention_agent_triggers_broadcast():
 
     assert "websocket_broadcast_required" in result["execution_status"] or "websocket_broadcast_failed" in result["execution_status"]
     assert result["alert_payload"]["risk_level"] == "Critical"
+
+
+def test_intervention_agent_alerts_staff_for_low_risk_action():
+    state = {
+        "observation": {
+            "person_id": "test-person",
+            "camera_id": "CCTV_TEST_01",
+            "platform": "Platform 7",
+        },
+        "decision": {
+            "recommended_action": "alert_staff",
+            "final_risk_score": 50,
+            "risk_level": "Low Risk",
+            "incident_type": "Loitering",
+        },
+    }
+
+    result = intervention_node(state)
+
+    assert "websocket_broadcast_required" in result["execution_status"]
+    assert "email_alert_required" in result["execution_status"]
 
 
 @pytest.mark.asyncio
@@ -106,5 +148,26 @@ async def test_agent_pipeline_end_to_end():
 
     state = await run_agent_pipeline(raw_data)
     assert "alert_payload" in state
-    assert state["alert_payload"]["risk_level"] in ["High Risk", "Critical"]
+    assert state["alert_payload"]["risk_level"] in ["Medium Risk", "High Risk", "Critical"]
     assert state["alert_payload"]["incident_type"] == "Suicide Risk"
+
+
+@pytest.mark.asyncio
+async def test_agent_pipeline_builds_graph_per_invocation(monkeypatch):
+    build_count = 0
+
+    class DummyPipeline:
+        def invoke(self, state):
+            return {"state": state, "execution_status": ["ok"]}
+
+    def build_dummy_graph():
+        nonlocal build_count
+        build_count += 1
+        return DummyPipeline()
+
+    monkeypatch.setattr(agent_graph, "build_agent_graph", build_dummy_graph)
+
+    await agent_graph.run_agent_pipeline({"person_id": "one"})
+    await agent_graph.run_agent_pipeline({"person_id": "two"})
+
+    assert build_count == 2

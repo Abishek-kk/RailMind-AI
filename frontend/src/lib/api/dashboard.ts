@@ -141,7 +141,7 @@ export async function getPeakHours(): Promise<PeakHourItem[]> {
 }
 
 export async function getPlatformHeatmap(): Promise<HeatmapPoint[]> {
-  return apiFetch<HeatmapPoint[]>("/analytics/heatmap");
+  return apiFetch<HeatmapPoint[]>("/dashboard/heatmap");
 }
 
 export async function getCCTVSummary(): Promise<CCTVSummaryRow[]> {
@@ -149,9 +149,6 @@ export async function getCCTVSummary(): Promise<CCTVSummaryRow[]> {
 }
 
 export async function getRecentIncidents(): Promise<DashboardAlert[]> {
-  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active&limit=10");
-  return incidents
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 4)
-    .map(mapIncidentToAlert);
+  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active&limit=4");
+  return incidents.map(mapIncidentToAlert);
 }
