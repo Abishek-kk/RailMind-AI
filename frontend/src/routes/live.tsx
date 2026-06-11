@@ -104,8 +104,9 @@ function LivePage() {
     },
   });
 
-  const websocketBase = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
-  const { data: latestMessage, status: wsStatus, error: wsError } = useWebSocket<Record<string, any>>(`${websocketBase}/ws/alerts`);
+  const websocketBase = import.meta.env.VITE_WS_URL ?? "";
+  const websocketUrl = websocketBase ? `${websocketBase.replace(/\/+$|\s+$/g, "")}/ws/alerts` : "/ws/alerts";
+  const { data: latestMessage, status: wsStatus, error: wsError } = useWebSocket<Record<string, any>>(websocketUrl);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedDetections, setFeedDetections] = useState<Record<string, LiveBoundingBox[]>>({});
   const [soundEnabled, setSoundEnabled] = useState(true);
