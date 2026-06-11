@@ -49,7 +49,22 @@ def init_db() -> None:
     import app.models.feed
     
     Base.metadata.create_all(bind=Engine)
+    _ensure_feed_stream_url_column()
     _ensure_incident_platform_column()
+
+
+def _ensure_feed_stream_url_column() -> None:
+    """Add the stream_url column to the feeds table if it does not exist."""
+    inspector = inspect(Engine)
+    if "feeds" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("feeds")}
+    if "stream_url" in columns:
+        return
+
+    with Engine.begin() as connection:
+        connection.execute(text("ALTER TABLE feeds ADD COLUMN stream_url VARCHAR"))
 
 
 def _ensure_incident_platform_column() -> None:

@@ -16,6 +16,8 @@ class FeedRead(BaseModel):
     name: str
     status: str
     fps: float
+    source_url: Optional[str] = None
+    stream_url: Optional[str] = None
     created_at: datetime
 
     class Config:

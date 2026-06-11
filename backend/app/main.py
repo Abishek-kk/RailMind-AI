@@ -3,6 +3,7 @@ import glob
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.api.routes import api_router
 from app.core.config import settings
 from app.core.database import SessionLocal, init_db
@@ -18,6 +19,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+os.makedirs(settings.MOCK_FEED_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.MOCK_FEED_DIR), name="uploads")
 
 
 # Ensure the common frontend origins are allowed for CORS (helps HTTP requests).
@@ -118,6 +122,11 @@ def _ensure_default_station_feeds() -> None:
 
     with SessionLocal() as db:
         for idx, feed_info in enumerate(default_feeds):
+            video_path = video_paths[idx]
+            # Compute the browser-accessible URL for the uploaded video file.
+            # The file is served by FastAPI's StaticFiles mount at /uploads/<filename>.
+            stream_url = f"/uploads/{os.path.basename(video_path)}"
+
             feed = db.query(Feed).filter(Feed.id == feed_info["id"]).first()
             if feed is None:
                 feed = Feed(
@@ -125,12 +134,20 @@ def _ensure_default_station_feeds() -> None:
                     name=feed_info["name"],
                     status="active",
                     fps=30.0,
+                    source_url=video_path,
+                    stream_url=stream_url,
                 )
                 db.add(feed)
                 db.commit()
                 db.refresh(feed)
+            else:
+                # Backfill stream_url for existing records that were created without it.
+                if not feed.stream_url:
+                    feed.stream_url = stream_url
+                    feed.source_url = video_path
+                    db.commit()
             try:
-                start_processor(video_paths[idx], feed.id, feed_info["platform"])
+                start_processor(video_path, feed.id, feed_info["platform"])
             except Exception as e:
                 print(f"Failed to start default station processor for {feed.id}: {e}")
 
