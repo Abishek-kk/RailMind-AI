@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Pause, Play, Maximize2, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Maximize2, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ function levelToColor(level: string) {
   return riskColor(level as never);
 }
 
-export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?: BoundingBox[] }) {
+export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: CCTVFeed; detections?: BoundingBox[]; onRemove?: (feedId: string) => void; removing?: boolean }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -152,6 +152,17 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           >
             <Maximize2 className="h-4 w-4" />
           </button>
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={() => onRemove(feed.id)}
+              disabled={removing}
+              title="Remove feed"
+              className="rounded p-1 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
 
