@@ -185,20 +185,20 @@ function LivePage() {
   );
 
   const isMockData = useMemo(() => {
-    return Array.isArray(feeds) && feeds.length === 0 && import.meta.env.MODE === "development";
-  }, [feeds]);
+    return !!feedsError && import.meta.env.MODE === "development";
+  }, [feedsError]);
 
   const displayFeeds = useMemo(() => {
-    if (!Array.isArray(feeds)) {
+    if (feedsError && import.meta.env.MODE === "development") {
       return getLiveFeeds();
     }
 
-    if (feeds.length === 0 && import.meta.env.MODE === "development") {
-      return getLiveFeeds();
+    if (!Array.isArray(feeds)) {
+      return [];
     }
 
     return feeds;
-  }, [feeds]);
+  }, [feeds, feedsError]);
 
   const filteredFeeds = useMemo(() => {
     const list = displayFeeds;
@@ -329,7 +329,7 @@ function LivePage() {
           </div>
         ) : feedsError || alertsError ? (
           <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-destructive">
-            Unable to load live monitoring data. Please refresh the page.
+            Unable to load live monitoring data: {(feedsError || alertsError)?.message}
           </div>
         ) : (
           <>
