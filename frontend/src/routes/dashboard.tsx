@@ -382,7 +382,6 @@ function DashboardPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Total Incidents</th>
                   <th className="px-4 py-3 font-medium">Active Alerts</th>
-                  <th className="px-4 py-3 font-medium">Last Incident</th>
                   <th className="px-4 py-3 font-medium">Risk Level</th>
                 </tr>
               </thead>
@@ -396,7 +395,6 @@ function DashboardPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums">{row.total_incidents}</td>
                     <td className="px-4 py-3 tabular-nums">{row.active_alerts}</td>
-                    <td className="px-4 py-3 text-muted-foreground">—</td>
                     <td className="px-4 py-3">
                       <RiskBadge
                         level={
