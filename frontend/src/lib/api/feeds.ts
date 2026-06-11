@@ -32,7 +32,7 @@ function getImageForFeed(cameraId: string) {
 }
 
 export async function getFeeds(): Promise<CCTVFeed[]> {
-  const feeds = await apiFetch<BackendFeed[]>('/feeds');
+  const feeds = await apiFetch<BackendFeed[]>("/feeds");
   if (!Array.isArray(feeds) || feeds.length === 0) {
     return [];
   }

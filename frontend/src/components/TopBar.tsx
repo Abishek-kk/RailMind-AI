@@ -16,7 +16,16 @@ interface TopBarProps {
   feeds?: Array<{ id: string; label: string }>;
 }
 
-export function TopBar({ title, subtitle, selectedFeed, onFeedChange, soundEnabled = false, onSoundToggle, right, feeds }: TopBarProps) {
+export function TopBar({
+  title,
+  subtitle,
+  selectedFeed,
+  onFeedChange,
+  soundEnabled = false,
+  onSoundToggle,
+  right,
+  feeds,
+}: TopBarProps) {
   const [now, setNow] = useState(new Date());
   const [open, setOpen] = useState(false);
 

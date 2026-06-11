@@ -5,8 +5,21 @@ import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
 import { RiskBadge, ScorePill } from "@/components/RiskBadge";
 import {
-  AlertTriangle, AlertOctagon, UserCheck, Inbox, Search, Filter,
-  X, CheckCircle, MapPin, Clock, ChevronLeft, ChevronRight, Play, Volume2, Maximize2,
+  AlertTriangle,
+  AlertOctagon,
+  UserCheck,
+  Inbox,
+  Search,
+  Filter,
+  X,
+  CheckCircle,
+  MapPin,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Volume2,
+  Maximize2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -16,7 +29,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { getAlerts, acknowledgeAlert, resolveAlert, assignAlert, type ApiAlert } from "@/lib/api/alerts";
+import {
+  getAlerts,
+  acknowledgeAlert,
+  resolveAlert,
+  assignAlert,
+  type ApiAlert,
+} from "@/lib/api/alerts";
 import { getFeeds } from "@/lib/api/feeds";
 import { toast } from "sonner";
 import { riskColor, type Alert, type AlertStatus } from "@/lib/mock-data";
@@ -36,9 +55,9 @@ function AlertsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [filterRisk, setFilterRisk] = useState<'any' | 'high' | 'medium' | 'low'>('any');
-  const [filterStatus, setFilterStatus] = useState<'any' | AlertStatus>('any');
-  const [filterPlatform, setFilterPlatform] = useState<string>('any');
+  const [filterRisk, setFilterRisk] = useState<"any" | "high" | "medium" | "low">("any");
+  const [filterStatus, setFilterStatus] = useState<"any" | AlertStatus>("any");
+  const [filterPlatform, setFilterPlatform] = useState<string>("any");
 
   const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = useQuery<ApiAlert[]>({
@@ -57,9 +76,7 @@ function AlertsPage() {
     mutationFn: (backendId: number) => acknowledgeAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
     onError: (error: Error) => {
-      toast.error(
-        error.message || "Failed to acknowledge alert. Please try again."
-      );
+      toast.error(error.message || "Failed to acknowledge alert. Please try again.");
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
@@ -68,9 +85,7 @@ function AlertsPage() {
     mutationFn: (backendId: number) => resolveAlert(backendId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
     onError: (error: Error) => {
-      toast.error(
-        error.message || "Failed to resolve alert. Please try again."
-      );
+      toast.error(error.message || "Failed to resolve alert. Please try again.");
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
@@ -81,7 +96,7 @@ function AlertsPage() {
     }
   }, [data]);
 
-  const selected = selectedId ? alerts.find((a) => a.id === selectedId) ?? null : null;
+  const selected = selectedId ? (alerts.find((a) => a.id === selectedId) ?? null) : null;
 
   const setStatus = (id: string, status: AlertStatus) => {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
@@ -100,7 +115,7 @@ function AlertsPage() {
       toast.error(
         error instanceof Error
           ? `Failed to acknowledge alert: ${error.message}`
-          : "Failed to acknowledge alert."
+          : "Failed to acknowledge alert.",
       );
     }
   };
@@ -118,7 +133,7 @@ function AlertsPage() {
       toast.error(
         error instanceof Error
           ? `Failed to resolve alert: ${error.message}`
-          : "Failed to resolve alert."
+          : "Failed to resolve alert.",
       );
     }
   };
@@ -140,30 +155,36 @@ function AlertsPage() {
   const counts = {
     all: cctvFiltered.length,
     high: cctvFiltered.filter((a) => a.riskLevel === "high").length,
-    medium: cctvFiltered.filter((a) => a.riskLevel === "medium" || a.riskLevel === "suspicious").length,
+    medium: cctvFiltered.filter((a) => a.riskLevel === "medium" || a.riskLevel === "suspicious")
+      .length,
     low: cctvFiltered.filter((a) => a.riskLevel === "low" && a.status !== "resolved").length,
     resolved: cctvFiltered.filter((a) => a.status === "resolved").length,
   };
 
   const tabFiltered = useMemo(() => {
     switch (tab) {
-      case "high": return cctvFiltered.filter((a) => a.riskLevel === "high");
-      case "medium": return cctvFiltered.filter((a) => a.riskLevel === "medium" || a.riskLevel === "suspicious");
-      case "low": return cctvFiltered.filter((a) => a.riskLevel === "low" && a.status !== "resolved");
-      case "resolved": return cctvFiltered.filter((a) => a.status === "resolved");
-      default: return cctvFiltered;
+      case "high":
+        return cctvFiltered.filter((a) => a.riskLevel === "high");
+      case "medium":
+        return cctvFiltered.filter((a) => a.riskLevel === "medium" || a.riskLevel === "suspicious");
+      case "low":
+        return cctvFiltered.filter((a) => a.riskLevel === "low" && a.status !== "resolved");
+      case "resolved":
+        return cctvFiltered.filter((a) => a.status === "resolved");
+      default:
+        return cctvFiltered;
     }
   }, [tab, cctvFiltered]);
 
   const panelFiltered = useMemo(() => {
     let list = tabFiltered;
-    if (filterRisk !== 'any') {
+    if (filterRisk !== "any") {
       list = list.filter((a) => a.riskLevel === filterRisk);
     }
-    if (filterStatus !== 'any') {
+    if (filterStatus !== "any") {
       list = list.filter((a) => a.status === filterStatus);
     }
-    if (filterPlatform !== 'any') {
+    if (filterPlatform !== "any") {
       list = list.filter((a) => a.platform === filterPlatform);
     }
     return list;
@@ -180,15 +201,17 @@ function AlertsPage() {
   if (isError) {
     return (
       <div className="p-6 text-center text-sm text-destructive">
-        Unable to load alerts. {error instanceof Error ? error.message : "Check backend connection."}
+        Unable to load alerts.{" "}
+        {error instanceof Error ? error.message : "Check backend connection."}
       </div>
     );
   }
 
-
   const searched = search
     ? panelFiltered.filter((a) =>
-        [a.id, a.type, a.platform, a.cctv].some((v) => v.toLowerCase().includes(search.toLowerCase())),
+        [a.id, a.type, a.platform, a.cctv].some((v) =>
+          v.toLowerCase().includes(search.toLowerCase()),
+        ),
       )
     : panelFiltered;
 
@@ -208,11 +231,41 @@ function AlertsPage() {
       <div className="space-y-5 p-6">
         {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Total Alerts" value={counts.all} icon={AlertOctagon} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="High Risk" value={counts.high} icon={AlertTriangle} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />
-          <StatCard label="Medium Risk" value={counts.medium} icon={UserCheck} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
-          <StatCard label="Low Risk" value={counts.low} icon={UserCheck} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
-          <StatCard label="Resolved" value={counts.resolved} icon={Inbox} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard
+            label="Total Alerts"
+            value={counts.all}
+            icon={AlertOctagon}
+            iconColor="#ef4444"
+            iconBg="rgba(239,68,68,0.15)"
+          />
+          <StatCard
+            label="High Risk"
+            value={counts.high}
+            icon={AlertTriangle}
+            iconColor="#ef4444"
+            iconBg="rgba(239,68,68,0.15)"
+          />
+          <StatCard
+            label="Medium Risk"
+            value={counts.medium}
+            icon={UserCheck}
+            iconColor="#f97316"
+            iconBg="rgba(249,115,22,0.15)"
+          />
+          <StatCard
+            label="Low Risk"
+            value={counts.low}
+            icon={UserCheck}
+            iconColor="#22c55e"
+            iconBg="rgba(34,197,94,0.15)"
+          />
+          <StatCard
+            label="Resolved"
+            value={counts.resolved}
+            icon={Inbox}
+            iconColor="#3b82f6"
+            iconBg="rgba(59,130,246,0.15)"
+          />
         </div>
 
         <div className={selected ? "grid gap-5 xl:grid-cols-[1fr_360px]" : ""}>
@@ -220,85 +273,74 @@ function AlertsPage() {
             {/* Tabs + search */}
             <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
               <div className="flex flex-wrap items-center gap-1">
-                {([
-                  ["all", "All Alerts", counts.all],
-                  ["high", "High Risk", counts.high],
-                  ["medium", "Medium Risk", counts.medium],
-                  ["low", "Low Risk", counts.low],
-                  ["resolved", "Resolved", counts.resolved],
-                ] as const).map(([id, label, n]) => {
+                {(
+                  [
+                    ["all", "All Alerts", counts.all],
+                    ["high", "High Risk", counts.high],
+                    ["medium", "Medium Risk", counts.medium],
+                    ["low", "Low Risk", counts.low],
+                    ["resolved", "Resolved", counts.resolved],
+                  ] as const
+                ).map(([id, label, n]) => {
                   const active = tab === id;
                   return (
                     <button
                       key={id}
-                      onClick={() => { setTab(id); setPage(1); }}
+                      onClick={() => {
+                        setTab(id);
+                        setPage(1);
+                      }}
                       className={`relative px-3 py-2 text-sm transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       {label} ({n})
-                      {active && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
+                      {active && (
+                        <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+                      )}
                     </button>
                   );
                 })}
               </div>
-              <div className="ml-auto flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={search}
-                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                    placeholder="Search alerts..."
-                    className="w-48 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
+
+              {showFilters && (
+                <div className="border-b border-border p-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="w-44">
+                      <label className="block text-xs text-muted-foreground">Platform</label>
+                      <select
+                        value={filterPlatform}
+                        onChange={(e) => {
+                          setFilterPlatform(e.target.value);
+                          setPage(1);
+                        }}
+                        className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm"
+                      >
+                        <option value="any">Any</option>
+                        {platformOptions.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterRisk("any");
+                          setFilterStatus("any");
+                          setFilterPlatform("any");
+                          setPage(1);
+                        }}
+                        className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowFilters((s) => !s)}
-                  className={`flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm ${showFilters ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-                >
-                  <Filter className="h-4 w-4" /> Filters
-                </button>
-              </div>
+              )}
             </div>
-
-            {showFilters && (
-              <div className="border-b border-border p-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="w-40">
-                    <label className="block text-xs text-muted-foreground">Risk Level</label>
-                    <select value={filterRisk} onChange={(e) => { setFilterRisk(e.target.value as any); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
-                      <option value="any">Any</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-
-                  <div className="w-40">
-                    <label className="block text-xs text-muted-foreground">Status</label>
-                    <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as any); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
-                      <option value="any">Any</option>
-                      <option value="active">Active</option>
-                      <option value="acknowledged">Acknowledged</option>
-                      <option value="resolved">Resolved</option>
-                    </select>
-                  </div>
-
-                  <div className="w-44">
-                    <label className="block text-xs text-muted-foreground">Platform</label>
-                    <select value={filterPlatform} onChange={(e) => { setFilterPlatform(e.target.value); setPage(1); }} className="mt-1 w-full rounded-md border border-border bg-secondary px-2 py-1 text-sm">
-                      <option value="any">Any</option>
-                      {platformOptions.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="ml-auto flex items-center gap-2">
-                    <button type="button" onClick={() => { setFilterRisk('any'); setFilterStatus('any'); setFilterPlatform('any'); setPage(1); }} className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Clear Filters</button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -321,7 +363,9 @@ function AlertsPage() {
                       <tr
                         key={a.id}
                         className="border-t border-border transition-colors hover:bg-secondary/40"
-                        style={{ backgroundColor: a.status === "resolved" ? "transparent" : `${c}08` }}
+                        style={{
+                          backgroundColor: a.status === "resolved" ? "transparent" : `${c}08`,
+                        }}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -333,11 +377,18 @@ function AlertsPage() {
                         <td className="px-4 py-3 text-muted-foreground">{a.platform}</td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full" style={{ backgroundColor: `${c}33`, color: c }}>•</span>
+                            <span
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full"
+                              style={{ backgroundColor: `${c}33`, color: c }}
+                            >
+                              •
+                            </span>
                             {a.type}
                           </span>
                         </td>
-                        <td className="px-4 py-3"><ScorePill score={a.riskScore} level={a.riskLevel} /></td>
+                        <td className="px-4 py-3">
+                          <ScorePill score={a.riskScore} level={a.riskLevel} />
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           <div className="tabular-nums">{a.time}</div>
                           <div className="text-[11px]">{a.date}</div>
@@ -361,8 +412,20 @@ function AlertsPage() {
                                   aria-label="More actions"
                                 >
                                   {/* Using SVG inline to avoid extra import complexity */}
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <circle cx="12" cy="5" r="1" />
+                                    <circle cx="12" cy="12" r="1" />
+                                    <circle cx="12" cy="19" r="1" />
                                   </svg>
                                 </button>
                               </DropdownMenuTrigger>
@@ -401,7 +464,14 @@ function AlertsPage() {
                     );
                   })}
                   {paged.length === 0 && (
-                    <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">No alerts match your filters.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-10 text-center text-sm text-muted-foreground"
+                      >
+                        No alerts match your filters.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -415,7 +485,11 @@ function AlertsPage() {
                   : `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, searched.length)} of ${searched.length} alerts`}
               </span>
               <div className="flex items-center gap-1">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-border bg-secondary p-1.5 disabled:opacity-40">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-md border border-border bg-secondary p-1.5 disabled:opacity-40"
+                >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
                 {Array.from({ length: totalPages }).map((_, i) => {
@@ -431,7 +505,11 @@ function AlertsPage() {
                     </button>
                   );
                 })}
-                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-md border border-border bg-secondary p-1.5 disabled:opacity-40">
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-md border border-border bg-secondary p-1.5 disabled:opacity-40"
+                >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -460,16 +538,26 @@ function StatusPill({ status }: { status: AlertStatus }) {
   } as const;
   const m = map[status];
   return (
-    <span className="inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold"
-      style={{ backgroundColor: `${m.c}1f`, color: m.c, border: `1px solid ${m.c}40` }}>
+    <span
+      className="inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold"
+      style={{ backgroundColor: `${m.c}1f`, color: m.c, border: `1px solid ${m.c}40` }}
+    >
       {m.label}
     </span>
   );
 }
 
 function AlertDetails({
-  alert, onClose, onAcknowledge, onResolve,
-}: { alert: ApiAlert; onClose: () => void; onAcknowledge: () => void; onResolve: () => void; }) {
+  alert,
+  onClose,
+  onAcknowledge,
+  onResolve,
+}: {
+  alert: ApiAlert;
+  onClose: () => void;
+  onAcknowledge: () => void;
+  onResolve: () => void;
+}) {
   const c = riskColor(alert.riskLevel);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -479,27 +567,33 @@ function AlertDetails({
    * BUG 10 FIX: initialize assignee from alert.operator_assigned instead of
    * hardcoding "Not Assigned" regardless of the alert's actual state.
    */
-  const [assignee, setAssignee] = useState<string>(alert.operator_assigned || 'Not Assigned');
+  const [assignee, setAssignee] = useState<string>(alert.operator_assigned || "Not Assigned");
   const queryClient = useQueryClient();
-  const videoUrl = (alert as any).video || (alert as any).videoUrl || null;
+  const videoUrl =
+    (alert as ApiAlert & { video?: string; videoUrl?: string }).video ||
+    (alert as ApiAlert & { video?: string; videoUrl?: string }).videoUrl ||
+    null;
 
   /** BUG 10 FIX: reset assignee when the displayed alert changes */
   useEffect(() => {
-    setAssignee(alert.operator_assigned || 'Not Assigned');
+    setAssignee(alert.operator_assigned || "Not Assigned");
   }, [alert.backendId, alert.operator_assigned]);
 
   const assignMutation = useMutation({
     mutationFn: (name: string) => assignAlert(alert.backendId, name),
     onSuccess: () => {
-      toast.success('Assignment saved');
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      toast.success("Assignment saved");
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
   return (
     <aside className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border p-4">
         <h3 className="text-sm font-semibold">Alert Details</h3>
-        <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+        <button
+          onClick={onClose}
+          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -507,12 +601,18 @@ function AlertDetails({
         <RiskBadge level={alert.riskLevel} />
         <h2 className="text-lg font-bold">{alert.type}</h2>
         <div className="space-y-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {alert.cctv} | {alert.platform}</div>
-          <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {alert.time}, {alert.date}</div>
+          <div className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5" /> {alert.cctv} | {alert.platform}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" /> {alert.time}, {alert.date}
+          </div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Risk Score</div>
-          <div className="text-3xl font-bold" style={{ color: c }}>{alert.riskScore}%</div>
+          <div className="text-3xl font-bold" style={{ color: c }}>
+            {alert.riskScore}%
+          </div>
         </div>
         <div className="relative overflow-hidden rounded-lg bg-black">
           {videoUrl ? (
@@ -528,8 +628,15 @@ function AlertDetails({
             />
           ) : (
             <>
-              <img src={alert.image} alt="Snapshot" className="aspect-video w-full object-cover" loading="lazy" />
-              <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">Snapshot</div>
+              <img
+                src={alert.image}
+                alt="Snapshot"
+                className="aspect-video w-full object-cover"
+                loading="lazy"
+              />
+              <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
+                Snapshot
+              </div>
             </>
           )}
         </div>
@@ -546,7 +653,7 @@ function AlertDetails({
               }}
               className="rounded p-1 hover:bg-secondary hover:text-foreground"
               aria-pressed={isPlaying}
-              title={videoUrl ? (isPlaying ? 'Pause' : 'Play') : 'No video available'}
+              title={videoUrl ? (isPlaying ? "Pause" : "Play") : "No video available"}
             >
               <Play className="h-4 w-4" />
             </button>
@@ -558,8 +665,8 @@ function AlertDetails({
                 videoRef.current.muted = !videoRef.current.muted;
                 setIsMuted(videoRef.current.muted);
               }}
-              className={`rounded p-1 hover:bg-secondary hover:text-foreground ${!videoUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title={videoUrl ? (isMuted ? 'Unmute' : 'Mute') : 'No video available'}
+              className={`rounded p-1 hover:bg-secondary hover:text-foreground ${!videoUrl ? "opacity-50 cursor-not-allowed" : ""}`}
+              title={videoUrl ? (isMuted ? "Unmute" : "Mute") : "No video available"}
             >
               <Volume2 className="h-4 w-4" />
             </button>
@@ -579,14 +686,26 @@ function AlertDetails({
               {videoUrl ? (
                 <video src={videoUrl} controls autoPlay className="w-full max-h-[90vh] bg-black" />
               ) : (
-                <img src={alert.image} alt="Snapshot fullscreen" className="w-full object-contain max-h-[90vh]" />
+                <img
+                  src={alert.image}
+                  alt="Snapshot fullscreen"
+                  className="w-full object-contain max-h-[90vh]"
+                />
               )}
             </div>
           </DialogContent>
         </Dialog>
-        <DetailRow label="Event Type"><span className="font-semibold" style={{ color: c }}>{alert.type}</span></DetailRow>
-        <DetailRow label="Description"><p className="text-right text-xs text-muted-foreground">{alert.description}</p></DetailRow>
-        <DetailRow label="Status"><StatusPill status={alert.status} /></DetailRow>
+        <DetailRow label="Event Type">
+          <span className="font-semibold" style={{ color: c }}>
+            {alert.type}
+          </span>
+        </DetailRow>
+        <DetailRow label="Description">
+          <p className="text-right text-xs text-muted-foreground">{alert.description}</p>
+        </DetailRow>
+        <DetailRow label="Status">
+          <StatusPill status={alert.status} />
+        </DetailRow>
         <DetailRow label="Assigned To">
           <select
             value={assignee}
@@ -606,10 +725,16 @@ function AlertDetails({
           </select>
         </DetailRow>
         <div className="flex gap-2 pt-2">
-          <button onClick={onAcknowledge} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <button
+            onClick={onAcknowledge}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
             <CheckCircle className="h-4 w-4" /> Acknowledge
           </button>
-          <button onClick={onResolve} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold hover:bg-secondary/70">
+          <button
+            onClick={onResolve}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold hover:bg-secondary/70"
+          >
             <CheckCircle className="h-4 w-4" /> Mark Resolved
           </button>
         </div>

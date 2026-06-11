@@ -7,22 +7,18 @@ function buildUrl(path: string) {
 }
 
 export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}) {
-  try {
-    const response = await fetch(buildUrl(path), {
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers ?? {}),
-      },
-      ...options,
-    });
+  const response = await fetch(buildUrl(path), {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers ?? {}),
+    },
+    ...options,
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`API ${response.status}: ${body}`);
-    }
-
-    return (await response.json()) as T;
-  } catch (err) {
-    throw err;
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`API ${response.status}: ${body}`);
   }
+
+  return (await response.json()) as T;
 }

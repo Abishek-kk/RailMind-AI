@@ -30,29 +30,26 @@ export function useWebSocket<T>(url: string) {
     }
   }, []);
 
-  const scheduleReconnect = useCallback(
-    (connectFn: () => void) => {
-      if (isUnmounted.current) {
-        return;
-      }
+  const scheduleReconnect = useCallback((connectFn: () => void) => {
+    if (isUnmounted.current) {
+      return;
+    }
 
-      if (retryCount.current >= 5) {
-        setError("Unable to connect to real-time updates after several attempts.");
-        setStatus("error");
-        return;
-      }
+    if (retryCount.current >= 5) {
+      setError("Unable to connect to real-time updates after several attempts.");
+      setStatus("error");
+      return;
+    }
 
-      const delay = Math.min(30000, 1000 * 2 ** retryCount.current);
-      retryCount.current += 1;
-      reconnectTimeout.current = window.setTimeout(() => {
-        reconnectTimeout.current = null;
-        if (!isUnmounted.current) {
-          connectFn();
-        }
-      }, delay);
-    },
-    [],
-  );
+    const delay = Math.min(30000, 1000 * 2 ** retryCount.current);
+    retryCount.current += 1;
+    reconnectTimeout.current = window.setTimeout(() => {
+      reconnectTimeout.current = null;
+      if (!isUnmounted.current) {
+        connectFn();
+      }
+    }, delay);
+  }, []);
 
   const connect = useCallback(() => {
     if (typeof window === "undefined" || isUnmounted.current) {
