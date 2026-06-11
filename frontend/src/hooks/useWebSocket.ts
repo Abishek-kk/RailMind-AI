@@ -131,5 +131,16 @@ export function useWebSocket<T>(url: string) {
     };
   }, [connect, clearReconnect, closeSocket]);
 
-  return { data, status, error } as const;
+  const reconnect = useCallback(() => {
+    if (isUnmounted.current) {
+      return;
+    }
+    clearReconnect();
+    closeSocket();
+    setStatus("connecting");
+    setError(null);
+    connect();
+  }, [clearReconnect, closeSocket, connect]);
+
+  return { data, status, error, reconnect } as const;
 }

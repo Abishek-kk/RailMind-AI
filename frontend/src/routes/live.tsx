@@ -122,7 +122,7 @@ function LivePage() {
     },
   });
 
-  const websocketBase = import.meta.env.VITE_WS_URL ?? "";
+  const websocketBase = import.meta.env.VITE_WS_URL?.trim() ?? "";
   const websocketUrl = websocketBase
     ? `${websocketBase.replace(/\/+$|\s+$/g, "")}/ws/alerts`
     : "/ws/alerts";
@@ -130,6 +130,7 @@ function LivePage() {
     data: latestMessage,
     status: wsStatus,
     error: wsError,
+    reconnect: reconnectWebSocket,
   } = useWebSocket<Record<string, unknown>>(websocketUrl);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedAlerts, setFeedAlerts] = useState<
@@ -385,7 +386,16 @@ function LivePage() {
       <div className="p-6">
         {wsError ? (
           <div className="mb-6 rounded-xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Real-time updates are blocked. {wsError}
+            <div className="flex items-center justify-between gap-3">
+              <span>Real-time updates are blocked: {wsError}</span>
+              <button
+                type="button"
+                onClick={reconnectWebSocket}
+                className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive transition hover:bg-destructive/20"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         ) : null}
         {feedsLoading || alertsLoading ? (

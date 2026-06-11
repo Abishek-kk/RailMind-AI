@@ -12,13 +12,13 @@ from app.models.feed import Feed
 from app.schemas.feed import FeedCreate, FeedRead
 from app.cv.video_processor import VideoProcessor
 from app.core.config import settings
+from app.core.processor_manager import start_processor, stop_processor
 
 logger = logging.getLogger("railmind.feeds")
 router = APIRouter()
 
-# Global registry of active VideoProcessor instances
-# Key: feed_id, Value: VideoProcessor instance
-active_processors = {}
+
+# Processor lifecycle is managed centrally via `processor_manager`
 
 
 def derive_platform_from_feed_id(feed_id: str) -> str:
@@ -75,12 +75,10 @@ async def register_feed(feed: FeedCreate, db: Session = Depends(get_db)):
     
     platform = derive_platform_from_feed_id(feed.id)
 
-    # Start VideoProcessor as background task
+    # Start VideoProcessor via central manager (non-blocking)
     try:
-        processor = VideoProcessor(feed_source=feed.source_url, camera_id=feed.id, platform=platform)
-        task = asyncio.create_task(processor.start_processing_loop())
-        active_processors[feed.id] = {"processor": processor, "task": task}
-        logger.info("Started VideoProcessor for feed %s on %s", feed.id, platform)
+        start_processor(feed.source_url, feed.id, platform)
+        logger.info("Started VideoProcessor for feed %s on %s via processor_manager", feed.id, platform)
     except Exception as e:
         logger.error(f"Failed to start VideoProcessor for feed {feed.id}: {e}")
         # Don't fail the entire feed registration if processor startup fails
@@ -127,12 +125,10 @@ async def upload_video(file: UploadFile = File(...), feed_id: Optional[str] = No
 
     platform = derive_platform_from_feed_id(feed_id)
 
-    # Start VideoProcessor
+    # Start VideoProcessor via central manager
     try:
-        processor = VideoProcessor(feed_source=dest_path, camera_id=feed_id, platform=platform)
-        task = asyncio.create_task(processor.start_processing_loop())
-        active_processors[feed_id] = {"processor": processor, "task": task}
-        logger.info("Started VideoProcessor for uploaded feed %s", feed_id)
+        start_processor(dest_path, feed_id, platform)
+        logger.info("Started VideoProcessor for uploaded feed %s via processor_manager", feed_id)
     except Exception as e:
         logger.error(f"Failed to start VideoProcessor for uploaded feed {feed_id}: {e}")
 
@@ -168,27 +164,13 @@ async def remove_feed(id: str, db: Session = Depends(get_db)):
             detail=f"Feed with id '{id}' not found"
         )
     
-    # Stop and cleanup VideoProcessor
-    if id in active_processors:
-        try:
-            processor_info = active_processors[id]
-            processor = processor_info["processor"]
-            task = processor_info["task"]
-            
-            # Signal processor to stop
-            processor.stop_processing_loop()
-            
-            # Cancel the task
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                logger.info(f"VideoProcessor task for feed {id} cancelled")
-            
-            del active_processors[id]
-            logger.info(f"Stopped VideoProcessor for feed {id}")
-        except Exception as e:
-            logger.error(f"Error stopping VideoProcessor for feed {id}: {e}")
+    # Stop and cleanup VideoProcessor via central manager
+    try:
+        stopped = stop_processor(id)
+        if stopped:
+            logger.info(f"Stopped VideoProcessor for feed {id} via processor_manager")
+    except Exception as e:
+        logger.error(f"Error stopping VideoProcessor for feed {id}: {e}")
     
     # Delete from database
     db.delete(feed)
