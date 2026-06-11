@@ -31,8 +31,8 @@ function getDisplayCameraId(cameraId: string): string {
   return Number.isFinite(number) && number > 0 ? `CCTV-${number}` : cameraId;
 }
 
-function normalizeStatus(value: string): AlertStatus {
-  const lower = value.toLowerCase();
+function normalizeStatus(value?: string | null): AlertStatus {
+  const lower = String(value ?? "active").toLowerCase();
   if (lower === "acknowledged") return "acknowledged";
   if (lower === "resolved") return "resolved";
   return "active";
@@ -86,8 +86,14 @@ export async function getAlerts(): Promise<ApiAlert[]> {
   return (Array.isArray(alerts) ? alerts : []).map(mapBackendAlert);
 }
 
-export async function acknowledgeAlert(id: number): Promise<ApiAlert> {
-  const alert = await apiFetch<BackendAlert>(`/alerts/${id}/acknowledge`, { method: "PATCH" });
+export async function acknowledgeAlert(id: number, operatorId?: string | null): Promise<ApiAlert> {
+  const trimmedOperatorId = operatorId?.trim();
+  const query = trimmedOperatorId
+    ? `?operator_id=${encodeURIComponent(trimmedOperatorId)}`
+    : "";
+  const alert = await apiFetch<BackendAlert>(`/alerts/${id}/acknowledge${query}`, {
+    method: "PATCH",
+  });
   return mapBackendAlert(alert);
 }
 

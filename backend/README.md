@@ -78,7 +78,15 @@ backend/
    ```bash
    cp .env.example .env
    ```
-5. Run the application:
+5. Create LSTM model files for local inference:
+   ```bash
+   python -m app.lstm.generate_default_models
+   ```
+   Or train synthetic prototype classifiers:
+   ```bash
+   python -m app.lstm.train
+   ```
+6. Run the application:
    ```bash
    python app/main.py
    ```

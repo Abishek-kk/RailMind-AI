@@ -144,14 +144,11 @@ async def get_live_stream_metadata(id: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Feed with id '{id}' not found"
         )
-    
-    return {
-        "feed_id": id,
-        "stream_protocol": "HLS/WebRTC",
-        "endpoint_url": f"/api/v1/feeds/{id}/live.m3u8",
-        "inference_overlay": True,
-        "status": feed.status
-    }
+
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Browser-playable live streaming is not implemented for feeds yet.",
+    )
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

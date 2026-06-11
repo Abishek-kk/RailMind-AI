@@ -113,24 +113,16 @@ function DashboardPage() {
   /** BUG 12 FIX: fetch feeds so TopBar can show dynamic camera list */
   const { data: feedsData } = useQuery({ queryKey: ["liveFeeds"], queryFn: getFeeds });
 
-  const isLoading =
-    statsLoading ||
-    byCctvLoading ||
-    trendLoading ||
-    distLoading ||
-    peakLoading ||
-    heatmapLoading ||
-    summaryLoading ||
-    recentLoading;
-  const error =
-    statsError ||
-    byCctvError ||
-    trendError ||
-    distError ||
-    peakError ||
-    heatmapError ||
-    summaryError ||
-    recentError;
+  const queryErrors = [
+    statsError && "stats",
+    byCctvError && "incidents by CCTV",
+    trendError && "trend",
+    distError && "risk distribution",
+    peakError && "peak hours",
+    heatmapError && "heatmap",
+    summaryError && "CCTV summary",
+    recentError && "recent alerts",
+  ].filter(Boolean);
 
   const byCctv = useMemo(() => {
     return (byCctvData ?? []).map((item, index) => ({
@@ -192,33 +184,6 @@ function DashboardPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4 p-6">
-        <div className="h-6 w-1/3 rounded bg-muted/30 animate-pulse" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-24 rounded-xl bg-muted/20 p-4 animate-pulse" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-80 rounded-xl bg-muted/20 p-5 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 text-center text-sm text-destructive">
-        Unable to load dashboard data.{" "}
-        {error instanceof Error ? error.message : "Please try again later."}
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 p-6">
       <TopBar
@@ -230,6 +195,11 @@ function DashboardPage() {
         right={<AddVideo />}
       />
       <div className="space-y-6">
+        {queryErrors.length > 0 && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Some dashboard panels could not load: {queryErrors.join(", ")}.
+          </div>
+        )}
         {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
           <StatCard
@@ -292,8 +262,11 @@ function DashboardPage() {
             </div>
 
             <div className="mt-5 h-[340px] sm:h-[360px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend ?? []} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
+              {trendLoading ? (
+                <div className="h-full rounded-lg bg-muted/20 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trend ?? []} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
                   <CartesianGrid stroke="#1e1e2e" vertical={false} />
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
                   <YAxis stroke="#94a3b8" fontSize={11} />
@@ -323,8 +296,9 @@ function DashboardPage() {
                     strokeWidth={2}
                     dot={{ r: 3 }}
                   />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
@@ -399,8 +373,8 @@ function DashboardPage() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-2xl font-bold">100%</div>
-                    <div className="text-[11px] text-muted-foreground">Coverage</div>
+                    <div className="text-2xl font-bold">{stats?.total_incidents ?? 0}</div>
+                    <div className="text-[11px] text-muted-foreground">Total</div>
                   </div>
                 </div>
                 <div className="flex-1 space-y-2 text-sm">

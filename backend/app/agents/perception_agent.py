@@ -7,7 +7,11 @@ def perception_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     raw_data = state.get("raw_data", {})
     
-    lstm_score = raw_data.get("lstm_anomaly_score", 0.0)
+    lstm_scores = raw_data.get("lstm_scores", {})
+    lstm_score = raw_data.get("lstm_score")
+    if lstm_score is None:
+        lstm_score = max(lstm_scores.values()) if lstm_scores else raw_data.get("lstm_anomaly_score", 0.0)
+    lstm_anomaly_score = raw_data.get("lstm_anomaly_score", lstm_scores.get("anomaly", 0.0))
     edge_distance = raw_data.get("edge_distance_meters", 5.0)
     duration_seconds = raw_data.get("behavior_duration_seconds", 0)
     edge_proximity_seconds = raw_data.get("edge_proximity_seconds", raw_data.get("edge_time_seconds", 0.0))
@@ -19,8 +23,8 @@ def perception_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "camera_id": raw_data.get("camera_id", "unknown"),
         "platform": raw_data.get("platform", "unknown"),
         "lstm_score": lstm_score,
-        "lstm_anomaly_score": lstm_score,
-        "lstm_scores": raw_data.get("lstm_scores", {}),
+        "lstm_anomaly_score": lstm_anomaly_score,
+        "lstm_scores": lstm_scores,
         "edge_distance": edge_distance,
         "edge_distance_meters": edge_distance,
         "edge_proximity_seconds": edge_proximity_seconds,

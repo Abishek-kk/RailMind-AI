@@ -10,6 +10,8 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from app.cv import PoseEstimator, VideoProcessor
 from app.cv.lstm_behavior import BehaviorAnalyzer
 from app.core.config import settings
+from app.features.following_detector import FollowingDetector
+from app.features.pacing_detector import PacingDetector
 from app.lstm.predictor import LSTMPredictor
 
 
@@ -72,6 +74,50 @@ def test_behavior_label_thresholds_are_configurable(monkeypatch):
         )
         == "following"
     )
+
+
+def test_following_detector_returns_distance_in_meters(monkeypatch):
+    monkeypatch.setattr(settings, "PIXELS_PER_METER", 100.0)
+
+    detector = FollowingDetector(distance_threshold=1.2)
+    distance = detector.calculate_distance_between_tracks(
+        {"center": (0.0, 0.0)},
+        {"center": (120.0, 0.0)},
+    )
+
+    assert distance == 1.2
+
+
+def test_following_detector_uses_meter_threshold(monkeypatch):
+    monkeypatch.setattr(settings, "PIXELS_PER_METER", 100.0)
+
+    detector = FollowingDetector(distance_threshold=1.2)
+    tracks = {
+        1: {"center": (0.0, 0.0), "trajectory": [(0.0, 0.0), (10.0, 0.0)]},
+        2: {"center": (119.0, 0.0), "trajectory": [(100.0, 0.0), (119.0, 0.0)]},
+        3: {"center": (121.0, 0.0), "trajectory": [(100.0, 0.0), (121.0, 0.0)]},
+    }
+
+    assert detector.get_following_distance(1, tracks) == 1.19
+    assert detector.get_crowd_interaction_count(1, tracks) == 1
+
+
+def test_pacing_detector_returns_window_cycles_not_cumulative_count():
+    detector = PacingDetector(window_size=6, movement_threshold=1.0)
+    positions = [(0, 0), (10, 0), (20, 0), (10, 0), (0, 0), (10, 0)]
+
+    outputs = [detector.detect(1, {"center": position}) for position in positions]
+
+    assert outputs[-1] == 1
+    assert detector.detect(1, {"center": (20, 0)}) == 1
+
+
+def test_pacing_detector_does_not_count_stationary_person():
+    detector = PacingDetector(window_size=6, movement_threshold=1.0)
+
+    outputs = [detector.detect(1, {"center": (10, 10)}) for _ in range(20)]
+
+    assert outputs[-1] == 0
 
 
 def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):

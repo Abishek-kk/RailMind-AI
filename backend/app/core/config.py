@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # Platform Warning Metrics
     PLATFORM_EDGE_SAFETY_LIMIT_METERS: float = 1.5
     PIXELS_PER_METER: float = 100.0
+    WEBSOCKET_DETECTION_BROADCAST_INTERVAL_SECONDS: float = 0.25
     PLATFORM_CONTEXT_MULTIPLIERS: dict[str, float] = Field(
         default_factory=lambda: {"Platform 1": 1.25}
     )
@@ -75,13 +76,13 @@ class Settings(BaseSettings):
         default_factory=lambda: {
             "lstm": 0.4,
             "edge": 0.2,
-            "duration": 0.15,
+            "duration": 0.1,
             "loitering": 0.1,
             "following": 0.1,
             "pose": 0.1,
-            "context": 0.1,
         }
     )
+    RISK_CONTEXT_MULTIPLIER_WEIGHT: float = 0.1
 
     # Twilio Escalation Configuration
     TWILIO_ACCOUNT_SID: str = Field(default="")

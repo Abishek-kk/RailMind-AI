@@ -1,0 +1,640 @@
+
+
+--- PAGE 1 ---
+RailMind AI
+Intelligent Railway Safety & Security System
+Complete Technical Documentation (cid:127) v2.0
+FAR AWAY 2026 Hackathon (cid:127) Team Accelerate
+Transforming passive CCTV infrastructure into proactive, life-saving intelligence
+Domain Railway Safety & Public Security
+Scope Real-Time Behavioural AI Monitoring
+Stack Python · FastAPI · React · YOLOv8 · LSTM · LangGraph
+Team Team Accelerate — Backend & AI Lead
+Event FAR AWAY 2026 Hackathon
+Status Hackathon Prototype fi Production Roadmap
+
+--- PAGE 2 ---
+Table of Contents
+1. Executive Summary —
+2. Problem Statement —
+3. Project Overview —
+4. Key Features —
+5. System Architecture —
+6. Detailed Workflow —
+7. AI & Computer Vision Pipeline —
+8. LSTM Behaviour Classifier — Deep Dive —
+9. Agentic AI Framework —
+10. Tech Stack —
+11. Database Design —
+12. API Design —
+13. Real-Time Communication —
+14. Analytics & Dashboard —
+15. Privacy & Ethics Framework —
+16. Edge Deployment Strategy —
+17. False Positive Handling —
+18. Improvements & Recommendations —
+19. Future Roadmap —
+20. Conclusion —
+
+--- PAGE 3 ---
+1. Executive Summary
+RailMind AI is an agentic, AI-powered railway safety and security platform that converts existing passive
+CCTV infrastructure into an intelligent behavioural monitoring network. Using a multi-stage
+computer-vision pipeline combined with a three-tier agentic reasoning architecture, the system detects
+high-risk passenger behaviours in real time, calculates dynamic risk scores, and dispatches automated
+alerts to railway staff — all without installing any new hardware or performing facial recognition.
+The platform's core classifier is a bidirectional LSTM network trained on 30-second behavioural
+sequences, enabling it to capture temporal dependencies that static classifiers miss. This temporal
+awareness is central to distinguishing genuine distress from ordinary passenger behaviour, significantly
+reducing false positives.
+The platform addresses two critical challenges: suicide prevention and in-station crime (primarily
+pickpocketing). Designed for rapid deployment via a cloud-based SaaS model, RailMind AI is both
+scalable and cost-effective, requiring no additional hardware investment.
+Metric Target Value
+End-to-end alert latency < 500 ms
+LSTM classification accuracy > 92% on test set
+False positive rate target < 8%
+Hardware requirement Zero — uses existing CCTV
+Supported incident types Suicide risk, Pickpocketing, Security threats
+Deployment model Cloud SaaS — multi-station
+
+--- PAGE 4 ---
+2. Problem Statement
+Railway stations are high-density public spaces where critical incidents — suicide attempts, pickpocketing,
+harassment, and unauthorised track access — can occur with little warning. Despite extensive CCTV
+coverage, most surveillance systems are passive and rely entirely on human operators to monitor multiple
+video feeds simultaneously. This makes it extremely difficult to identify subtle behavioural warning signs
+and respond before an incident occurs.
+Core Limitations of Existing Systems
+(cid:127) Human attention fatigue — operators monitoring dozens of feeds simultaneously miss critical cues.
+(cid:127) Reactive posture — current systems record incidents rather than prevent them.
+(cid:127) Subtle signals overlooked — prolonged edge proximity, repetitive pacing, and social withdrawal go
+undetected.
+(cid:127) Delayed response — by the time an operator notices and dispatches staff, intervention windows are
+missed.
+(cid:127) Scalability gap — adding more cameras increases the monitoring burden without improving
+outcomes.
+Why This Problem Matters
+Impact Area Consequence
+Human Lives Preventable suicide attempts and assaults occur due to delayed or absent response.
+Passenger Safety Pickpocketing and harassment create unsafe, hostile station environments.
+Service Disruption Incidents cause platform closures, train delays, and cascading network disruptions.
+Financial Loss Emergency responses, legal liability, and disruptions cost railway operators millions annually.
+Staff Wellbeing Operators suffer psychological burden from witnessing preventable tragedies in real time.
+Public Trust Repeated safety failures erode passenger confidence in public rail infrastructure.
+The Opportunity
+Many incidents could be prevented if suspicious or high-risk behaviours were detected early enough for
+timely intervention. There is a clear and growing need for an intelligent, scalable, and privacy-preserving
+solution that can proactively analyse human behaviour, identify potential risks in real time, and assist
+railway staff before an incident occurs — not after.
+
+--- PAGE 5 ---
+3. Project Overview
+RailMind AI is an agentic AI-powered railway safety and security system that transforms existing CCTV
+cameras into intelligent behavioural monitoring agents. The system analyses human movement patterns
+and detects abnormal or high-risk behaviours in real time using a layered pipeline of computer vision, pose
+estimation, temporal deep learning, and multi-agent reasoning.
+The project addresses two critical railway challenges: suicide prevention and crime detection, particularly
+pickpocketing and other suspicious activities. Traditional surveillance systems rely on human operators
+monitoring numerous camera feeds — RailMind AI automates this vigilance, making it continuous,
+scalable, and consistent.
+The solution requires no additional hardware, preserves privacy by avoiding facial recognition entirely, and
+operates on existing CCTV infrastructure. The LSTM-based temporal classifier is the system's analytical
+core, enabling it to model behavioural sequences over time rather than evaluating isolated snapshots.
+Core Objectives
+(cid:127) Reduce preventable railway fatalities through early behavioural detection and proactive intervention.
+(cid:127) Decrease in-station theft and harassment through continuous, automated monitoring.
+(cid:127) Reduce cognitive load on human operators with AI-assisted triage and prioritisation.
+(cid:127) Provide station managers with actionable analytics, incident history, and hotspot intelligence.
+(cid:127) Enable rapid deployment across railway networks via a SaaS architecture with zero hardware
+upgrades.
+(cid:127) Maintain strict privacy standards: no facial recognition, no biometric storage, behaviour-only analysis.
+
+--- PAGE 6 ---
+4. Key Features
+Continuously monitors all detected passengers, extracting movement patterns
+1. Real-Time
+and behavioural features from every video frame with sub-second latency.
+Behavioural Analysis
+Processes up to 10 FPS per camera feed.
+Detects distress indicators including prolonged platform-edge proximity (>60s),
+2. Suicide Risk
+repetitive pacing cycles, sudden direction reversals, crouching postures, and
+Detection
+social withdrawal patterns.
+Identifies suspicious crowd-targeting behaviours: abnormal following distances,
+3. Pickpocketing
+repeated close-contact interactions, coordinated group movements near
+Detection
+high-density passenger zones.
+Three specialised agents — Perception, Reasoning, and Intervention — work in
+4. Multi-Agent AI
+sequence to detect, evaluate, and act upon identified risks with defined
+Architecture
+input/output contracts.
+Bidirectional LSTM network trained on 30-second behavioural sequences.
+5. LSTM Temporal
+Captures temporal patterns and trajectory evolution that static classifiers miss,
+Classifier
+enabling nuanced risk classification.
+Risk scores (0-100) computed by combining LSTM classification output,
+6. Dynamic Risk
+confidence score, behaviour duration, location zone, crowd density, and
+Scoring
+historical incident patterns.
+Real-time WebSocket notifications dispatched to the nearest available railway
+7. Automated Staff
+staff member, including platform number, risk category, confidence level, and
+Alerts
+recommended action.
+8. Alert Escalation Unacknowledged high-risk alerts automatically escalate to supervisors and
+System security personnel after configurable time thresholds (default: 60 seconds).
+Heatmaps and temporal analytics identify platforms, time windows, and spatial
+9. Predictive Hotspot
+zones with disproportionately high incident rates for proactive resource
+Analytics
+deployment.
+10. Privacy-Preserving No facial recognition, no biometric data storage. Track IDs are numeric and
+Design session-scoped. All analysis is behaviour-based, GDPR and PDPA compatible.
+11. Zero Additional Operates entirely on existing CCTV infrastructure. GPU inference handled
+Hardware server-side or on Jetson Orin edge devices. No camera upgrades required.
+12. Centralised React-based dashboard with live alert feed, platform grid, incident history,
+Monitoring Dashboard heatmaps, analytics charts, and staff response metrics in a single interface.
+13. Scalable SaaS Cloud-based subscription model enables rapid rollout across multiple stations
+Deployment with centralised management, per-station configuration, and usage-based billing.
+
+--- PAGE 7 ---
+5. System Architecture
+RailMind AI follows a layered pipeline architecture where each stage processes the output of the previous
+stage, progressively transforming raw video into actionable intelligence. The architecture is split into an
+Edge Tier (low-latency CV processing) and a Cloud Tier (reasoning, storage, and dashboard).
+Stage Component Tier Description
+Input CCTV Camera Feed Edge Existing cameras stream H.264/H.265 via RTSP/ONVIF.
+Stage 1 OpenCV Processing Edge Decode stream, normalise frames, apply preprocessing filters.
+Stage 2 YOLOv8 Detection Edge Detect all persons in frame with bounding boxes + confidence.
+Stage 3 ByteTrack Edge Assign persistent IDs, track individuals across frames.
+Stage 4 YOLOv8-Pose Edge Extract 17 body keypoints per person per frame.
+Stage 5 Feature Extraction Edge Compute 7 behavioural features per tracked individual.
+Stage 6 LSTM Classifier Edge Classify 30-second behavioural sequences into risk categories.
+Stage 7 Reasoning Agent Cloud LangGraph agent evaluates context, produces final risk score.
+Stage 8 Intervention Agent Cloud Determines and executes appropriate response actions.
+Stage 9 PostgreSQL/SQLite Cloud Store incident records, alerts, analytics data.
+Stage 10 React Dashboard Cloud Live alerts, incident history, heatmaps, analytics.
+
+--- PAGE 8 ---
+6. Detailed Workflow
+Step 1: Video Capture
+Existing CCTV cameras stream video via RTSP or ONVIF protocols. OpenCV captures and decodes
+each stream into individual frames for processing.
+(cid:127) Protocol: RTSP / ONVIF
+(cid:127) Processing rate: 10 FPS (configurable per camera)
+(cid:127) Resolution: 1920x1080 downscaled to 640x640 for inference
+(cid:127) Output: Normalised BGR frames
+Step 2: Person Detection
+YOLOv8n/s detects all persons present in each frame with high speed and accuracy, producing bounding
+boxes for tracking.
+(cid:127) Model: YOLOv8n (speed) or YOLOv8s (accuracy)
+(cid:127) Confidence threshold: 0.45 (configurable)
+(cid:127) Inference time: ~12ms per frame on GPU
+(cid:127) Output: Bounding boxes [x1, y1, x2, y2] + confidence score
+Step 3: Multi-Object Tracking
+ByteTrack assigns a persistent numeric ID to each detected person and maintains track continuity
+through occlusions and brief detection gaps.
+(cid:127) Algorithm: ByteTrack — byte-level detection association
+(cid:127) Occlusion handling: Kalman filter prediction during missed detections
+(cid:127) Max track age: 30 frames (3 seconds at 10 FPS)
+(cid:127) Output: Track ID + bounding box per frame
+Step 4: Pose Estimation
+YOLOv8-Pose extracts 17 COCO body keypoints per tracked individual — enabling analysis of posture,
+gestures, lean angle, and body orientation.
+(cid:127) Keypoints: Nose, eyes, ears, shoulders, elbows, wrists, hips, knees, ankles
+(cid:127) Output: 17 x [x, y, confidence] per person
+(cid:127) Applications: Head tilt, arm position, body lean, crouching detection, edge-facing orientation
+
+--- PAGE 9 ---
+Step 5: Behavioural Feature Extraction
+The Feature Extraction module aggregates raw tracking and pose data across a 30-second sliding
+window to compute a 7-dimensional behavioural feature vector per tracked individual.
+(cid:127) edge_proximity: Cumulative seconds within 0.5m of platform edge
+(cid:127) loitering_time: Stationary duration in a single spatial zone
+(cid:127) pacing_count: Number of back-and-forth movement cycles detected
+(cid:127) movement_speed: Average velocity (m/s) over the window
+(cid:127) direction_changes: Heading reversals per minute
+(cid:127) following_distance: Sustained proximity (metres) to a single other person
+(cid:127) crowd_interactions: Count of unique close-contact individuals
+Step 6: LSTM Temporal Classification
+A bidirectional LSTM network analyses the sequence of feature vectors over the 30-second window to
+classify behaviour into one of four risk categories. Unlike static classifiers, the LSTM models how
+behaviour evolves over time.
+(cid:127) Input: Sequence of 30 feature vectors (one per second) — shape [30, 7]
+(cid:127) Architecture: 2-layer Bidirectional LSTM + Dense + Softmax
+(cid:127) Output classes: Normal, Suicide Risk, Pickpocketing Risk, Security Threat
+(cid:127) Output: Class label + confidence score (0.0 - 1.0)
+(cid:127) Inference time: < 5ms on GPU
+Step 7: Reasoning Agent
+A LangGraph-based Reasoning Agent receives the LSTM classification and evaluates multi-factor
+context — beyond raw classification — to produce a nuanced final risk score.
+(cid:127) Inputs: LSTM label, confidence score, location zone, behaviour duration, crowd density, historical
+incident data
+(cid:127) Processing: LangGraph graph workflow with conditional branching
+(cid:127) Output: Risk Score (0-100) + Category + Recommended Action + Reasoning Summary
+(cid:127) Example output: Risk Score 88, Category: Suicide Risk, Action: Approach immediately and offer
+assistance
+
+--- PAGE 10 ---
+Step 8: Intervention Agent
+The Intervention Agent executes the appropriate response based on risk score thresholds and monitors
+acknowledgement to trigger escalation if needed.
+(cid:127) Score 0-39: Silent log only
+(cid:127) Score 40-69: Alert nearest available staff member via dashboard
+(cid:127) Score 70-89: Alert staff + security personnel simultaneously
+(cid:127) Score 90-100: Full emergency escalation + PA system trigger (future v2.0)
+(cid:127) Escalation: Unacknowledged alerts auto-escalate after 60 seconds
+
+--- PAGE 11 ---
+7. AI & Computer Vision Pipeline
+Model Specifications
+Model Task Architecture Input Latency
+YOLOv8n/s Person Detection CSPDarknet + PANet + YOLO He6a4d0x640 image ~12ms
+ByteTrack Multi-Object Tracking Kalman Filter + Hungarian AlgorithDmetections ~3ms
+YOLOv8-Pose Pose Estimation YOLOv8 backbone + Keypoint He6a4d0x640 image ~15ms
+BiLSTM Classifier Behaviour Classification 2-layer Bidirectional LSTM [30 x 7] seq. < 5ms
+LangGraph Agent Risk Reasoning LLM + Conditional Graph WorkflowStructured JSON ~200ms
+Feature Vector Definition
+Feature Description Unit Window
+edge_proximity Cumulative time within 0.5m of edge seconds 30s
+loitering_time Stationary duration in single zone seconds 30s
+pacing_count Back-and-forth movement cycles count 30s
+movement_speed Average movement velocity m/s 10s
+direction_changes Heading reversals per minute count/min 30s
+following_distance Sustained proximity to one individual metres 30s
+crowd_interactions Unique close-contact individuals count 30s
+
+--- PAGE 12 ---
+8. LSTM Behaviour Classifier — Deep Dive
+The LSTM classifier is the analytical heart of RailMind AI. Unlike static classifiers that evaluate a single
+snapshot of features, the LSTM processes a 30-second temporal sequence, allowing it to model how
+behaviour evolves over time — which is essential for detecting patterns like gradual edge approach,
+progressive pacing escalation, and sustained following behaviour.
+Why LSTM over Static Classifiers
+Criterion Static Classifier (e.g. XGBoostB)idirectional LSTM (RailMind AI)
+Input Single feature vector snapshot 30-second feature sequence [30 x 7]
+Temporal awareness None — no time context Full — models sequence evolution
+Behavioural trajectory Cannot model progression Detects gradual escalation patterns
+Ambiguous cases High false positive rate Context resolves ambiguity
+Inference time < 1ms < 5ms — still real-time capable
+Training complexity Low Moderate — requires sequence data
+Production suitability Hackathon prototype Production-grade
+Model Architecture
+Input fi BiLSTM Layer 1 (128 units) fi Dropout (0.3) fi BiLSTM Layer 2 (64 units) fi
+Dropout (0.3) fi Dense (32, ReLU) fi Dense (4, Softmax)
+(cid:127) Input shape: [batch, 30, 7] — 30 timesteps, 7 features
+(cid:127) Bidirectional: processes sequence forward and backward, capturing both historical build-up and
+future context within the window
+(cid:127) Layer 1 — 128 units: captures low-level temporal feature patterns
+(cid:127) Layer 2 — 64 units: captures higher-level behavioural abstractions
+(cid:127) Dropout 0.3: regularisation to prevent overfitting on limited training data
+(cid:127) Output: softmax probabilities over 4 classes [Normal, Suicide Risk, Pickpocketing, Security Threat]
+Training Strategy
+(cid:127) Loss function: Categorical cross-entropy with class weighting (Suicide Risk class weighted 3x due to
+imbalance)
+(cid:127) Optimiser: Adam (lr=0.001) with ReduceLROnPlateau scheduler
+(cid:127) Data augmentation: Gaussian noise injection on feature sequences to improve generalisation
+(cid:127) Validation: Stratified 80/10/10 train/validation/test split
+(cid:127) Hackathon phase: Trained on synthetic data generated from behavioural rule definitions
+(cid:127) Production phase: Retrain on real incident-labelled data collected from deployed stations
+(cid:127) Target accuracy: >92% on held-out test set
+Risk Class Definitions
+
+--- PAGE 13 ---
+Class Trigger Pattern Threshold
+Normal Typical passenger movement — no sustained anoCmoanlifeidsence > 0.6
+Suicide Risk Edge proximity >30s + pacing >3 cycles + low crowSdco inrete >ra 4c0tion
+Pickpocketing Risk Following distance <0.5m sustained + crowd interaScctoiorne >>4 4 +5 rapid contacts
+Security Threat High speed + aggressive posture + confrontationaSl pcroorxei m> i5ty0
+
+--- PAGE 14 ---
+9. Agentic AI Framework
+RailMind AI uses a three-tier agentic architecture built with LangGraph. Each agent has a defined role,
+strict input/output contract, and operates as a node in the LangGraph state graph — enabling conditional
+branching, parallel processing, and audit-friendly reasoning traces.
+Perception Receives raw detection and tracking data. Runs pose estimation and feature extraction.
+Agent Assembles the 30-second temporal feature sequence for the LSTM classifier.
+(cid:127) Input: Video frames, YOLOv8 bounding boxes, ByteTrack IDs
+(cid:127) Processing: Pose extraction fi per-frame feature computation fi 30s sequence
+assembly fi LSTM inference
+(cid:127) Output: {track_id, lstm_label, confidence, feature_sequence, timestamp,
+location_zone}
+Reasoning Receives the LSTM classification output. Evaluates multi-factor context — behaviour
+Agent type, confidence, duration, location zone, crowd density, historical patterns — to
+produce a final risk score with full reasoning trace.
+(cid:127) Input: LSTM label, confidence, feature_sequence summary, location, historical
+incident data
+(cid:127) Processing: LangGraph conditional graph — context evaluation fi score computation
+fi action determination
+(cid:127) Output: {risk_score: 0-100, category, confidence, recommended_action,
+reasoning_summary}
+Intervention Receives the risk score and recommended action. Executes the appropriate response,
+Agent creates the incident record, starts the acknowledgement timer, and handles escalation.
+(cid:127) Input: Risk score, category, location, recommended action, staff availability map
+(cid:127) Processing: Threshold evaluation fi action selection fi WebSocket dispatch fi
+incident creation fi escalation timer
+(cid:127) Output: Alert dispatched, incident record written, escalation timer active
+
+--- PAGE 15 ---
+10. Tech Stack
+Frontend
+Library / Tool Purpose
+React.js Component-based UI for the centralised monitoring dashboard
+Tailwind CSS Utility-first CSS for responsive, accessible design
+Recharts Composable charts for analytics, heatmaps, and trend visualisations
+Axios HTTP client for REST API communication
+Socket.io Client WebSocket client for real-time alert streaming
+Backend
+Library / Tool Purpose
+Python 3.11+ Core application language
+FastAPI High-performance async REST API framework
+Uvicorn ASGI server for FastAPI
+WebSockets Real-time bidirectional communication for live alerts
+Pydantic Data validation and serialisation for API contracts
+Computer Vision
+Library / Tool Purpose
+YOLOv8 (Ultralytics) Person detection — nano/small variant for speed-accuracy balance
+YOLOv8-Pose Human pose estimation — 17 COCO keypoints per person
+OpenCV Video stream capture, decoding, and frame preprocessing
+ByteTrack Multi-object tracking with persistent ID assignment
+Deep Learning / ML
+Library / Tool Purpose
+PyTorch LSTM model definition, training, and inference
+Bidirectional LSTM Core behaviour classification model — 30-second sequence analysis
+Scikit-learn Data preprocessing, evaluation metrics, pipeline utilities
+NumPy Numerical computing for feature vector operations
+
+--- PAGE 16 ---
+Pandas Tabular data handling for analytics and training data
+Agentic AI
+Library / Tool Purpose
+LangGraph Graph-based multi-agent orchestration framework
+Claude / GPT-4 LLM backbone for the Reasoning Agent (configurable)
+LangChain Prompt management and LLM integration utilities
+Database & Infrastructure
+Library / Tool Purpose
+SQLite Hackathon / development — zero-config, local storage
+PostgreSQL Production — robust relational database with full ACID compliance
+Redis Production — pub/sub for WebSocket alerts, caching, rate limiting
+Alembic Database schema versioning and migration management
+Communication & Alerts
+Library / Tool Purpose
+WebSockets Primary real-time alert delivery — sub-100ms latency
+Email (SMTP) Secondary alerts for escalated incidents (Level 2+)
+SMS (Twilio) Critical incident alerts for Level 3 escalations
+
+--- PAGE 17 ---
+11. Database Design
+Core Tables
+Table: incidents
+id, track_id, timestamp, platform_id, camera_id, risk_score, risk_category,
+lstm_confidence, status, resolved_at, resolution_notes
+Table: alerts
+id, incident_id, alert_type, sent_at, acknowledged_at, staff_id, escalation_level,
+channel
+Table: tracks
+id, track_id, camera_id, session_id, first_seen, last_seen, feature_sequence_json,
+lstm_label, confidence
+Table: analytics
+id, date, hour, platform_id, incident_count, avg_risk_score, peak_category,
+false_positive_count
+Table: staff
+id, name, platform_zone, contact_email, contact_phone, is_available,
+last_acknowledged_at
+Table: platforms
+id, station_id, platform_number, camera_ids_json, edge_zone_config_json,
+incident_count_30d
+Table: feedback
+id, alert_id, staff_id, is_false_positive, notes, submitted_at
+
+--- PAGE 18 ---
+12. API Design (FastAPI)
+Method Endpoint Description
+GET /api/incidents List incidents — filter by date, platform, status, category
+GET /api/incidents/{id} Full incident detail: timeline, features, LSTM output, agent reasoning
+POST /api/incidents/{id}/ack Staff acknowledges an alert — clears escalation timer
+POST /api/incidents/{id}/feedback Submit false positive flag or resolution notes
+GET /api/analytics/heatmap Spatial heatmap data for platform and date range
+GET /api/analytics/summary Aggregated statistics: daily / weekly / monthly
+GET /api/analytics/lstm-performance LSTM accuracy, false positive rate, confidence trends
+GET /api/alerts/active All currently active unacknowledged alerts
+POST /api/alerts/{id}/escalate Manually escalate an alert to next level
+GET /api/platforms All monitored platforms and camera status
+GET /api/staff/available Available staff by platform zone
+WS /ws/alerts WebSocket stream — real-time alert events
+WS /ws/feed/{camera_id} WebSocket stream — live annotated video feed
+
+--- PAGE 19 ---
+13. Real-Time Communication
+RailMind AI uses WebSockets for sub-100ms alert delivery from the Intervention Agent to the dashboard
+and staff devices. All connected clients receive alerts within one event loop cycle of the Intervention Agent
+firing.
+Alert Payload Structure
+{ "alert_id": "uuid-v4", "timestamp": "2026-01-15T14:32:07Z", "platform": "Platform
+3B", "camera_id": "CAM_003", "risk_score": 88, "risk_category": "Suicide Risk",
+"lstm_confidence": 0.91, "track_id": 142, "location": {"x": 0.72, "y": 0.41, "zone":
+"edge"}, "recommended_action": "Approach immediately and offer assistance",
+"reasoning_summary": "30s edge proximity + pacing x4 + social withdrawal",
+"escalation_level": 1, "escalate_at": "2026-01-15T14:33:07Z" }
+Notification Channels
+Channel Trigger Level Latency Description
+WebSocket Dashboard All alerts < 100ms Primary — real-time alert stream to monitoring dashboard
+Mobile Push Level 1+ < 500ms In-app notification to nearest available staff device
+Email (SMTP) Level 2+ < 30s Alert email to supervisor and shift manager
+SMS (Twilio) Level 3 < 60s Critical SMS to security personnel and station manager
+14. Analytics & Dashboard
+Dashboard Modules
+Live Alert Feed
+Real-time scrolling list of active alerts with risk scores, LSTM confidence, platform, and one-click
+acknowledgement.
+Platform Overview Grid
+Grid of all monitored platforms showing camera status, active incident count, and current risk level per
+platform.
+Incident History
+Searchable, filterable log of all past incidents with full timeline, LSTM output, agent reasoning, and staff
+response.
+Heatmap Visualisation
+Spatial heatmaps overlaid on platform diagrams showing incident density by location and time of day.
+Temporal Analytics
+Line charts of incident trends by hour, day, and week with automatic peak risk window identification.
+Risk Category Breakdown
+Pie and bar charts showing distribution across Suicide Risk, Pickpocketing, Security Threat categories.
+
+--- PAGE 20 ---
+LSTM Performance Panel
+Real-time LSTM accuracy, false positive rate, confidence distribution, and per-class precision/recall.
+Staff Response Metrics
+Average acknowledgement times, resolution rates, per-operator response trends, and false positive
+submission rates.
+
+--- PAGE 21 ---
+15. Privacy & Ethics Framework
+Privacy and ethics are foundational design constraints — every architectural decision was evaluated
+against them. RailMind AI is built to be deployable in any jurisdiction without requiring special biometric
+data processing exemptions.
+No Facial Recognition
+Face detection models are explicitly excluded. All analysis uses body movement, posture, and spatial
+behaviour only. The system cannot identify who a person is.
+No Biometric Storage
+Track IDs are numeric, session-scoped integers not linked to any identity database. A track ID expires
+when the session ends and cannot be correlated across sessions.
+Minimal Data Retention
+Raw video is retained for 72 hours by default. Only flagged incident clips are archived, configurable up to
+30 days. Routine footage is not stored.
+Behaviour-Only Analysis
+The LSTM feature vector contains only anonymised movement metrics. No appearance, demographic, or
+identity information is processed at any stage.
+Human-in-the-Loop
+All alerts require human staff confirmation before physical intervention. The AI recommends — humans
+decide. No automated physical interventions.
+Operator Accountability
+Every alert, dispatch, acknowledgement, and resolution is immutably logged with a timestamp and
+operator ID.
+Transparent Reasoning
+Every incident record includes the full LSTM confidence, risk score computation, and LangGraph
+reasoning trace for explainability and audit.
+Regulatory Alignment
+Architecture is designed for GDPR (EU), PDPA (India), and equivalent data protection frameworks. Legal
+review required per deployment region.
+Bias Monitoring
+Regular audits of alert rates by platform, time, and incident type to detect and correct potential algorithmic
+bias in the LSTM classifier.
+Public Disclosure
+RailMind AI deployment is recommended to be disclosed via station signage, consistent with standard
+CCTV notification requirements.
+
+--- PAGE 22 ---
+16. Edge Deployment Strategy
+For real-time railway safety, inference latency is critical. A cloud-only architecture introduces unacceptable
+network delays and creates single points of failure. RailMind AI uses an edge-cloud hybrid:
+computationally intensive, latency-sensitive CV stages run on edge devices; reasoning, storage, and
+dashboard run in the cloud.
+Component Deployment Location Rationale
+YOLOv8 Detection Edge (Jetson Orin Nano) Raw video stays local — no bandwidth cost
+ByteTrack Edge Per-frame continuity requires local state
+YOLOv8-Pose Edge Latency-sensitive; feeds into feature extraction
+Feature Extraction Edge Compact output: 7 floats/person vs full video
+LSTM Classifier Edge TensorRT-optimised; < 5ms inference on Jetson
+Reasoning Agent Cloud Requires LLM access + historical incident data
+Intervention Agent Cloud Needs staff DB, notification services, WebSocket hub
+Dashboard Cloud Multi-station aggregation; browser-accessible
+PostgreSQL Cloud Centralised storage for cross-station analytics
+Redis Cloud Pub/sub broker for WebSocket alert distribution
+Hardware Specification
+Parameter Specification
+Device NVIDIA Jetson Orin Nano
+Cost per unit ~$500 USD
+YOLOv8n FPS 30+ FPS with TensorRT FP16
+LSTM inference < 5ms per sequence
+Bandwidth saving ~99.9% vs raw video streaming
+Offline buffer 24 hours of local data if cloud connectivity lost
+Sync on reconnect Automatic — feature vectors and incident records only
+
+--- PAGE 23 ---
+17. False Positive Handling
+Alert fatigue is the leading cause of operator disengagement from AI safety systems. RailMind AI
+implements a five-layer strategy to keep false positive rates below 8%, preserving operator trust while
+maintaining high sensitivity for genuine risks.
+Layer 1 — LSTM Confidence Thresholding
+Alerts are only generated when LSTM confidence exceeds 0.75. Low-confidence predictions are silently
+logged for retraining data collection but never sent to operators.
+Layer 2 — Temporal Confirmation Window
+High-risk classification must be sustained for 15+ continuous seconds before triggering an alert. This
+eliminates single-frame anomalies and transient edge contacts caused by alighting passengers.
+Layer 3 — Contextual Suppression
+The system learns peak-density time windows (train arrivals, rush hour) from historical data and
+automatically raises alert thresholds during these periods to suppress expected edge-proximity spikes.
+Layer 4 — Operator Feedback Loop
+Staff can mark any alert as a False Positive via the dashboard in one click. Labelled false positives are
+accumulated for weekly LSTM retraining cycles, progressively improving model accuracy.
+Layer 5 — Station Performance Monitoring
+Automated system alerts flag any station where false positive rate exceeds 40% over a 7-day rolling
+window. This triggers model recalibration and a review of local edge zone configuration.
+
+--- PAGE 24 ---
+18. Improvements & Recommendations
+The following improvements are recommended for the production deployment path beyond the hackathon
+prototype.
+Multi-Camera Person Re-Identification
+The current system tracks individuals within a single camera's field of view. Production deployment
+requires re-identifying the same person across multiple camera feeds on a platform.
+(cid:127) Approach: Appearance-based re-ID using lightweight OSNet or FastReID at the cloud tier
+(cid:127) Benefit: Continuity of behavioural tracking across camera handoffs
+(cid:127) Privacy note: Re-ID features are session-scoped and never stored as identity signatures
+LSTM Continual Learning Pipeline
+The LSTM classifier should improve continuously as labelled incident data accumulates from deployed
+stations.
+(cid:127) Weekly retraining: Incorporate operator-labelled false positives and confirmed incidents
+(cid:127) A/B shadow testing: New model versions run in parallel with production before promotion
+(cid:127) Versioning: All model versions retained with performance metrics for rollback capability
+(cid:127) Target: 2-3% accuracy improvement per quarter in early deployment phase
+Automated PA System Integration
+For the highest-risk events (score 90+), an automated PA announcement can be triggered to alert the
+passenger directly — potentially the fastest intervention possible.
+(cid:127) Implementation: FastAPI endpoint triggers station PA controller via MQTT or REST
+(cid:127) Message: Pre-recorded, calm, non-alarming passenger assistance messages
+(cid:127) Human override: Staff can cancel within 10 seconds before PA fires
+(cid:127) Regulatory requirement: Approval from railway authority required per station
+Production Database Migration
+SQLite serves the hackathon phase well but has concurrency and scalability limits for multi-station
+production deployment.
+(cid:127) Phase 1 (Hackathon): SQLite — zero config, sufficient for demo
+(cid:127) Phase 2 (Staging): PostgreSQL + SQLAlchemy ORM — ACID compliant, same query interface
+(cid:127) Phase 3 (Production): PostgreSQL + Redis — Redis handles WebSocket pub/sub and caching
+(cid:127) Migration tool: Alembic for schema versioning and automated migration scripts
+(cid:127) Backup: Daily PostgreSQL dumps + continuous WAL archiving
+
+--- PAGE 25 ---
+19. Future Roadmap
+v1.0 — Hackathon MVP 3 Recorded video processing pipeline
+3 YOLOv8 + ByteTrack + Pose estimation
+3 Bidirectional LSTM behaviour classifier
+3 Basic LangGraph Perception + Reasoning agents
+3 SQLite storage
+3 React dashboard with live alerts
+v1.5 — Production 3 Live RTSP stream integration
+Alpha 3 PostgreSQL + Redis migration
+3 WebSocket real-time alert delivery
+3 Email + SMS notification channels
+3 Edge deployment on Jetson Orin Nano
+3 Operator false positive feedback system
+3 LSTM confidence thresholding + temporal confirmation
+v2.0 — Production 3 LSTM continual learning pipeline (weekly retraining)
+Release 3 Multi-camera person re-identification
+3 Automated PA system integration for critical alerts
+3 Mobile app for railway staff (React Native)
+3 Multi-station SaaS dashboard
+3 Compliance reporting and audit log exports
+3 Bias monitoring and periodic model audits
+v3.0 — Advanced 3 Predictive analytics — forecast high-risk time windows before they occur
+Intelligence 3 Crowd flow optimisation recommendations for platform managers
+3 Integration with emergency services dispatch systems
+3 Cross-network anonymised incident pattern sharing
+3 Video Swin Transformer for full spatio-temporal modelling
+3 Reinforcement learning for dynamic alert threshold optimisation
+
+--- PAGE 26 ---
+20. Conclusion
+RailMind AI represents a meaningful, technically grounded step forward in public safety technology —
+transforming the role of CCTV from passive recording to active, intelligent prevention. By combining
+state-of-the-art computer vision, a temporally-aware LSTM behaviour classifier, multi-agent reasoning, and
+a privacy-first design philosophy, the system addresses one of the most challenging problems in railway
+operations: detecting and preventing incidents before they occur.
+The LSTM-based temporal classifier is a deliberate architectural choice that distinguishes RailMind AI from
+simpler rule-based or static ML approaches. Modelling behavioural sequences over time — rather than
+isolated feature snapshots — is essential for reducing false positives and detecting the gradual escalation
+patterns that precede most critical incidents.
+The architecture is technically sound, the problem domain is genuine and underserved, and the
+privacy-preserving approach removes a significant barrier to institutional adoption. The improvements
+outlined — continual learning, multi-camera re-ID, edge deployment, and the ethical framework — provide
+a clear and credible path from hackathon prototype to production-grade deployment.
+With the right investment in data collection, model refinement, and regulatory engagement, RailMind AI
+has the potential to become a standard component of railway safety infrastructure — making stations safer
+for passengers, more manageable for operators, and more accountable for railway authorities worldwide.
+RailMind AI (cid:127) Technical Documentation v2.0 (cid:127) FAR AWAY 2026 Hackathon (cid:127) Team Accelerate (cid:127) Confidential

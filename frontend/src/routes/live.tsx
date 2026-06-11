@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
-import { createFeed, getFeeds } from "@/lib/api/feeds";
+import { createFeed, getFeeds, uploadVideo } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getLiveFeeds, riskColor, type BoundingBox, type RiskLevel } from "@/lib/mock-data";
 
@@ -67,6 +67,31 @@ function mapCameraIdToFeedId(cameraId: string) {
   return fallback ? `CCTV-${Number(fallback[0])}` : cameraId;
 }
 
+function buildWebSocketUrl(path: string) {
+  const configuredBase = import.meta.env.VITE_WS_URL?.trim();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (configuredBase) {
+    const base = configuredBase.replace(/\/+$/, "");
+    if (base.startsWith("ws://") || base.startsWith("wss://")) {
+      return `${base}${normalizedPath}`;
+    }
+    if (base.startsWith("http://")) {
+      return `ws://${base.slice("http://".length)}${normalizedPath}`;
+    }
+    if (base.startsWith("https://")) {
+      return `wss://${base.slice("https://".length)}${normalizedPath}`;
+    }
+  }
+
+  if (typeof window === "undefined") {
+    return `ws://localhost:8000${normalizedPath}`;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}${normalizedPath}`;
+}
+
 export const Route = createFileRoute("/live")({
   head: () => ({ meta: [{ title: "Live Monitoring — RailMind AI" }] }),
   component: LivePage,
@@ -87,6 +112,8 @@ function LivePage() {
   const [cameraId, setCameraId] = useState("");
   const [rtspUrl, setRtspUrl] = useState("");
   const [platformName, setPlatformName] = useState("");
+  const [uploadMode, setUploadMode] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   /** BUG 6 FIX: filter level state for Live Detections sidebar */
   const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -108,24 +135,27 @@ function LivePage() {
   } = useQuery({ queryKey: ["liveAlerts"], queryFn: getAlerts, refetchInterval: 30_000 });
 
   const addFeedMutation = useMutation({
-    mutationFn: (payload: CreateFeedRequest) => createFeed(payload),
+    mutationFn: uploadMode
+      ? (payload: { file: File; feedId: string; name: string }) =>
+          uploadVideo(payload.file, payload.feedId, payload.name)
+      : (payload: CreateFeedRequest) => createFeed(payload),
     onSuccess: () => {
       setIsDialogOpen(false);
       setCameraId("");
       setRtspUrl("");
       setPlatformName("");
+      setUploadedFile(null);
+      setUploadMode(false);
       queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
+      toast.success(uploadMode ? "Video uploaded successfully!" : "Feed added successfully!");
     },
     /** BUG 3 FIX: show error toast on failure; do NOT close dialog */
     onError: () => {
-      toast.error("Failed to add feed. Please check the camera ID and URL.");
+      toast.error(`Failed to add feed. ${uploadMode ? "Please check the video file." : "Please check the camera ID and URL."}`);
     },
   });
 
-  const websocketBase = import.meta.env.VITE_WS_URL?.trim() ?? "";
-  const websocketUrl = websocketBase
-    ? `${websocketBase.replace(/\/+$|\s+$/g, "")}/ws/alerts`
-    : "/ws/alerts";
+  const websocketUrl = useMemo(() => buildWebSocketUrl("/ws/alerts"), []);
   const {
     data: latestMessage,
     status: wsStatus,
@@ -222,6 +252,8 @@ function LivePage() {
       import.meta.env.MODE === "development"
     );
   }, [feeds, feedsError]);
+
+  const liveDataError = isMockData ? null : (feedsError ?? alertsError);
 
   const displayFeeds = useMemo(() => {
     if (feedsError && import.meta.env.MODE === "development") {
@@ -415,9 +447,9 @@ function LivePage() {
               <div className="h-[640px] rounded-xl bg-muted/20 p-4 animate-pulse" />
             </div>
           </div>
-        ) : feedsError || alertsError ? (
+        ) : liveDataError ? (
           <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-destructive">
-            Unable to load live monitoring data: {(feedsError || alertsError)?.message}
+            Unable to load live monitoring data: {liveDataError.message}
           </div>
         ) : (
           <>
@@ -432,6 +464,11 @@ function LivePage() {
                 >
                   Dismiss
                 </button>
+              </div>
+            )}
+            {isMockData && feedsError && !mockBannerDismissed && (
+              <div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                Backend feeds are unreachable in development; mock feeds are being shown.
               </div>
             )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -474,7 +511,13 @@ function LivePage() {
               >
                 <Plus className="h-4 w-4" /> Add CCTV Feed
               </button>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setUploadMode(false);
+                  setUploadedFile(null);
+                }
+              }}>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add CCTV Feed</DialogTitle>
@@ -482,15 +525,49 @@ function LivePage() {
                       Add a new camera stream so the live dashboard can monitor it in real time.
                     </DialogDescription>
                   </DialogHeader>
+                  
+                  {/* Mode Toggle */}
+                  <div className="flex gap-2 rounded-lg border border-input bg-muted/50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode(false)}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                        !uploadMode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      RTSP Stream
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode(true)}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                        uploadMode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Upload Video
+                    </button>
+                  </div>
+
                   <form
                     onSubmit={(event) => {
                       event.preventDefault();
-                      /** BUG 1 FIX: pass source_url instead of url */
-                      addFeedMutation.mutate({
-                        id: cameraId,
-                        name: platformName,
-                        source_url: rtspUrl,
-                      });
+                      if (uploadMode && uploadedFile) {
+                        addFeedMutation.mutate({
+                          file: uploadedFile,
+                          feedId: cameraId,
+                          name: platformName,
+                        });
+                      } else if (!uploadMode) {
+                        addFeedMutation.mutate({
+                          id: cameraId,
+                          name: platformName,
+                          source_url: rtspUrl,
+                        });
+                      }
                     }}
                     className="space-y-4"
                   >
@@ -504,16 +581,63 @@ function LivePage() {
                         required
                       />
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <label className="block font-medium">RTSP Stream URL</label>
-                      <input
-                        value={rtspUrl}
-                        onChange={(event) => setRtspUrl(event.target.value)}
-                        placeholder="rtsp://username:password@camera.local/stream"
-                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        required
-                      />
-                    </div>
+
+                    {!uploadMode ? (
+                      <>
+                        <div className="space-y-1 text-sm">
+                          <label className="block font-medium">RTSP Stream URL</label>
+                          <input
+                            value={rtspUrl}
+                            onChange={(event) => setRtspUrl(event.target.value)}
+                            placeholder="rtsp://username:password@camera.local/stream"
+                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                            required
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-2 text-sm">
+                          <label className="block font-medium">Select Video File</label>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted/50 px-4 py-6 cursor-pointer hover:border-primary hover:bg-muted/75 transition">
+                              <input
+                                type="file"
+                                accept="video/*"
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  if (file) {
+                                    setUploadedFile(file);
+                                  }
+                                }}
+                                className="hidden"
+                                required
+                              />
+                              <div className="text-center">
+                                <p className="font-medium text-sm">
+                                  {uploadedFile ? uploadedFile.name : "Click to select a video file"}
+                                </p>
+                                {!uploadedFile && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Supported formats: MP4, WebM, MOV, AVI, etc.
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                            {uploadedFile && (
+                              <button
+                                type="button"
+                                onClick={() => setUploadedFile(null)}
+                                className="text-xs text-destructive hover:text-destructive/80 font-medium"
+                              >
+                                Clear selection
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
                     <div className="space-y-1 text-sm">
                       <label className="block font-medium">Platform Name</label>
                       <input
@@ -524,6 +648,7 @@ function LivePage() {
                         required
                       />
                     </div>
+
                     <DialogFooter>
                       <button
                         type="button"
@@ -534,10 +659,16 @@ function LivePage() {
                       </button>
                       <button
                         type="submit"
-                        disabled={addFeedMutation.isPending}
+                        disabled={addFeedMutation.isPending || (uploadMode && !uploadedFile)}
                         className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {addFeedMutation.isPending ? "Adding..." : "Add Feed"}
+                        {addFeedMutation.isPending
+                          ? uploadMode
+                            ? "Uploading..."
+                            : "Adding..."
+                          : uploadMode
+                            ? "Upload Feed"
+                            : "Add Feed"}
                       </button>
                     </DialogFooter>
                   </form>

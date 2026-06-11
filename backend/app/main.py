@@ -6,7 +6,6 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core import websocket_manager
 from fastapi import WebSocket, WebSocketDisconnect
-import logging
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -16,24 +15,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-
-class ScopeLogger:
-    """ASGI wrapper to log incoming HTTP and WebSocket scopes for debugging."""
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        try:
-            if scope.get("type") in ("http", "websocket"):
-                headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
-                logging.getLogger("railmind").info(
-                    f"Incoming scope type={scope.get('type')} path={scope.get('path')} headers={headers}"
-                )
-        except Exception:
-            pass
-        await self.app(scope, receive, send)
-
-# Note: we'll wrap the FastAPI app with ScopeLogger below (after middleware setup)
 
 # Ensure the common frontend origins are allowed for CORS (helps HTTP requests).
 # Include Vite's default and the current dev port so the WebSocket origin check passes.
@@ -58,11 +39,13 @@ else:
         # If settings is immutable in the current environment, skip explicit mutation
         pass
 
-# In development allow all origins to avoid CORS/preflight and websocket handshake
-# issues from local dev servers (Vite). In production this should be tightened.
+cors_origins = [origin for origin in settings.BACKEND_CORS_ORIGINS if origin != "*"]
+if not cors_origins:
+    cors_origins = frontend_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,10 +78,6 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
         websocket_manager.manager.disconnect(websocket)
 
 
-# Keep the FastAPI app object intact so decorators and startup hooks work normally.
-# Wrap the app with ScopeLogger only for the ASGI server entry point.
-asgi_app = ScopeLogger(app)
-
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup."""
@@ -116,4 +95,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(asgi_app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

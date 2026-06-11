@@ -58,15 +58,16 @@ class VideoProcessor:
         self.notification_service = NotificationService()
         self.escalation_service = EscalationService()
 
-        self.db = SessionLocal()
-        self.incident_service = IncidentService(self.db)
-        self.alert_service = AlertService(self.db)
+        self.db = None
+        self.incident_service = None
+        self.alert_service = None
 
         self.previous_track_ids: set[int] = set()
         self.track_entry_times: dict[int, float] = {}
         self.is_running = False
         # Cooldown tracking for email alerts: {track_id: last_alert_timestamp}
         self.email_alert_cooldown: dict[int, float] = {}
+        self.last_detection_broadcast_time = 0.0
 
     def _get_context_multiplier(self) -> float:
         """Resolve platform-specific context multiplier from configuration."""
@@ -82,12 +83,17 @@ class VideoProcessor:
     async def start_processing_loop(self):
         """Asynchronously boots up and runs the camera feed frames processing thread."""
         self.is_running = True
-        cap = cv2.VideoCapture(self.feed_source)
+        cap = None
         try:
+            cap = cv2.VideoCapture(self.feed_source)
             if not cap.isOpened():
                 logger.error(f"Critical Ingestion Failure: Unable to parse stream {self.feed_source}")
                 self.is_running = False
                 return
+
+            self.db = SessionLocal()
+            self.incident_service = IncidentService(self.db)
+            self.alert_service = AlertService(self.db)
 
             frame_count = 0
             logger.info(f"CV Processing Pipeline active for channel {self.camera_id} on {self.platform}")
@@ -121,15 +127,17 @@ class VideoProcessor:
                 disappeared_tracks = self.previous_track_ids - current_track_ids
                 for track_id in disappeared_tracks:
                     self.behavior_analyzer.clear_track_history(track_id)
+                    self.loitering_detector.clear_track(track_id)
+                    self.pacing_detector.clear_track(track_id)
                     self.track_entry_times.pop(track_id, None)
                 self.previous_track_ids = current_track_ids
 
-                current_time = time.time()
+                frame_time = time.time()
                 matched_detections = self._match_tracker_results(tracked_objects, pose_detections)
                 current_tracks = {}
                 for track_id, person in matched_detections:
                     if track_id not in self.track_entry_times:
-                        self.track_entry_times[track_id] = current_time
+                        self.track_entry_times[track_id] = frame_time
                     bbox = person["bbox"]
                     center = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
                     person["center"] = center
@@ -167,7 +175,7 @@ class VideoProcessor:
                     direction_changes = self.movement_analyzer.get_direction_changes(track_id)
                     following_distance = self.following_detector.get_following_distance(track_id, current_tracks)
                     if following_distance == float("inf"):
-                        following_distance = float(max(height, width))
+                        following_distance = float(max(height, width)) / settings.PIXELS_PER_METER
                     crowd_interactions = self.following_detector.get_crowd_interaction_count(track_id, current_tracks)
 
                     feature_vector = [
@@ -187,7 +195,7 @@ class VideoProcessor:
                         following_distance=following_distance,
                     )
 
-                    duration_seconds = int(current_time - self.track_entry_times.get(track_id, current_time))
+                    duration_seconds = int(frame_time - self.track_entry_times.get(track_id, frame_time))
                     raw_cv_state = {
                         "person_id": track_id,
                         "camera_id": self.camera_id,
@@ -254,14 +262,14 @@ class VideoProcessor:
                         await manager.broadcast_detection(alert_payload)
                     if "email_alert_required" in execution_status:
                         # Check cooldown before sending email alert
-                        current_time = time.time()
+                        alert_time = time.time()
                         last_alert_time = self.email_alert_cooldown.get(track_id, 0)
-                        time_since_last_alert = current_time - last_alert_time
+                        time_since_last_alert = alert_time - last_alert_time
                         
                         if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
                             # Cooldown expired or first alert for this track - send email
                             await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
-                            self.email_alert_cooldown[track_id] = current_time
+                            self.email_alert_cooldown[track_id] = alert_time
                             logger.info(f"Email alert sent for track {track_id}")
                         else:
                             # Cooldown still active - skip email but log for debugging
@@ -284,7 +292,12 @@ class VideoProcessor:
                     })
 
                 # 7. Asynchronously broadcast frame telemetry data straight out to frontend components
-                if active_frame_detections:
+                detection_broadcast_interval = settings.WEBSOCKET_DETECTION_BROADCAST_INTERVAL_SECONDS
+                should_broadcast_detections = (
+                    active_frame_detections
+                    and frame_time - self.last_detection_broadcast_time >= detection_broadcast_interval
+                )
+                if should_broadcast_detections:
                     live_broadcast_packet = {
                         "camera_id": self.camera_id,
                         "platform": self.platform,
@@ -293,12 +306,18 @@ class VideoProcessor:
                         "detections": active_frame_detections
                     }
                     await manager.broadcast_detection(live_broadcast_packet)
+                    self.last_detection_broadcast_time = frame_time
 
                 # Control frequency to match expected video runtime speeds (~30 frames/sec execution)
                 await asyncio.sleep(0.033)
         finally:
-            cap.release()
-            self.db.close()
+            if cap is not None:
+                cap.release()
+            if self.db is not None:
+                self.db.close()
+                self.db = None
+                self.incident_service = None
+                self.alert_service = None
 
     def _extract_pose_detections(self, results) -> list[dict]:
         pose_detections = []

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Video, LayoutDashboard, Bell, Train } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api/client";
 
 const navItems = [
   { to: "/live", label: "Live Monitoring", icon: Video },
@@ -8,12 +9,9 @@ const navItems = [
   { to: "/alerts", label: "Alerts", icon: Bell },
 ] as const;
 
-const backendBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
 /** Poll backend health endpoint every 30 seconds */
 async function checkBackendHealth(): Promise<boolean> {
-  const response = await fetch(`${backendBaseUrl}/health`);
-  if (!response.ok) throw new Error("Backend unreachable");
+  await apiFetch("/health");
   return true;
 }
 

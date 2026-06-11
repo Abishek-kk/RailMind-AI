@@ -11,7 +11,21 @@ Prereqs: Python 3.11, Node 18, npm
 ```powershell
 # Activate your venv if you use one
 cd backend
-python -m uvicorn app.main:asgi_app --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Optional LSTM model setup:
+
+```powershell
+cd backend
+python -m app.lstm.generate_default_models
+```
+
+For trained synthetic prototype weights instead of neutral defaults:
+
+```powershell
+cd backend
+python -m app.lstm.train
 ```
 
 2. Start frontend dev server (from repo root):
