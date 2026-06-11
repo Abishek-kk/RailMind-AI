@@ -306,7 +306,7 @@ function DashboardPage() {
                       </div>
                     </div>
                     <div className="relative h-10 flex-1 overflow-hidden rounded-md border border-border bg-secondary/40">
-                      <Hotspots level={p.level} />
+                      <Hotspots point={p} />
                     </div>
                   </div>
                 ))
@@ -389,6 +389,7 @@ function DashboardPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Total Incidents</th>
                   <th className="px-4 py-3 font-medium">Active Alerts</th>
+                  <th className="px-4 py-3 font-medium">Last Incident</th>
                   <th className="px-4 py-3 font-medium">Risk Level</th>
                 </tr>
               </thead>
@@ -402,6 +403,7 @@ function DashboardPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums">{row.total_incidents}</td>
                     <td className="px-4 py-3 tabular-nums">{row.active_alerts}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{row.last_incident ?? "—"}</td>
                     <td className="px-4 py-3">
                       <RiskBadge
                         level={
@@ -435,23 +437,27 @@ const tooltipStyle = {
 };
 
 function Hotspots({ level }: { level: string }) {
-  const spots =
-    level === "very-high"
-      ? [{ x: 25, c: "#ef4444" }, { x: 45, c: "#f97316" }, { x: 60, c: "#ef4444" }, { x: 80, c: "#22c55e" }]
-      : level === "high"
-      ? [{ x: 30, c: "#f97316" }, { x: 55, c: "#22c55e" }, { x: 75, c: "#22c55e" }]
-      : level === "medium"
-      ? [{ x: 35, c: "#22c55e" }, { x: 70, c: "#22c55e" }]
-      : [{ x: 50, c: "#22c55e" }];
+  const normalizedLevel = point.level === "very-high" ? "high" : point.level;
+  const color = riskColor(normalizedLevel as any);
+  const zoneHash = Array.from(`${point.platform}:${point.zone}`).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const mainX = 10 + (zoneHash % 70);
+  const intensityX = 10 + Math.round(point.intensity * 80);
+  const size = 12 + Math.round(point.intensity * 18);
+
   return (
     <>
-      {spots.map((s, i) => (
-        <span
-          key={i}
-          className="absolute top-1/2 h-12 w-12 -translate-y-1/2 rounded-full blur-md opacity-70"
-          style={{ left: `${s.x}%`, backgroundColor: s.c }}
-        />
-      ))}
+      <span
+        className="absolute top-1/2 h-10 w-10 -translate-y-1/2 rounded-full blur-lg opacity-60"
+        style={{ left: `${mainX}%`, backgroundColor: color }}
+      />
+      <span
+        className="absolute top-1/2 h-8 w-8 -translate-y-1/2 rounded-full blur-md opacity-70"
+        style={{ left: `${intensityX}%`, backgroundColor: color }}
+      />
+      <span
+        className="absolute top-1/2 rounded-full opacity-80"
+        style={{ left: `${Math.min(95, Math.max(5, Math.round((mainX + intensityX) / 2)))}%`, width: `${size}px`, height: `${size}px`, backgroundColor: color }}
+      />
     </>
   );
 }

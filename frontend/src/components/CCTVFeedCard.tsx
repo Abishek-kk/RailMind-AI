@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pause, Play, Maximize2, Expand, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
@@ -10,9 +10,11 @@ function levelToColor(level: string) {
 
 export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?: BoundingBox[] }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
-  
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isActuallyLive = feed.status === "online" && !isPaused;
   const [isMuted, setIsMuted] = useState(false);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
 
@@ -43,21 +45,33 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
           <div className="text-xs text-muted-foreground">{feed.platform}</div>
         </div>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${activeDetections.length > 0 && !isPaused ? "bg-[#ef4444]/15 text-[#ef4444]" : "bg-[#22c55e]/15 text-[#22c55e]"}`}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${activeDetections.length > 0 && isActuallyLive ? "bg-[#ef4444]/15 text-[#ef4444]" : isActuallyLive ? "bg-[#22c55e]/15 text-[#22c55e]" : "bg-[#64748b]/15 text-[#64748b]"}`}
         >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${activeDetections.length > 0 && !isPaused ? "animate-pulse bg-[#ef4444]" : "bg-[#22c55e]"}`}
+            className={`h-1.5 w-1.5 rounded-full ${activeDetections.length > 0 && isActuallyLive ? "animate-pulse bg-[#ef4444]" : isActuallyLive ? "bg-[#22c55e]" : "bg-[#64748b]"}`}
           />
-          {isPaused ? "PAUSED" : "LIVE"}
+          {isActuallyLive ? "LIVE" : isPaused ? "PAUSED" : "OFFLINE"}
         </span>
       </div>
       <div className="relative aspect-video overflow-hidden bg-black">
-        <img
-          src={feed.image}
-          alt={feed.id}
-          className={`h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
-          loading="lazy"
-        />
+        {feed.streamUrl ? (
+          <video
+            ref={videoRef}
+            src={feed.streamUrl}
+            autoPlay={!isPaused}
+            muted={isMuted}
+            controls={false}
+            className="h-full w-full object-cover"
+            playsInline
+          />
+        ) : (
+          <img
+            src={feed.image}
+            alt={feed.id}
+            className={`h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
+            loading="lazy"
+          />
+        )}
         {isPaused && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
             <span className="rounded bg-black/60 px-3 py-1.5 text-xs font-bold text-white tracking-wider animate-pulse">

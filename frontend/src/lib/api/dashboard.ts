@@ -46,6 +46,7 @@ export interface CCTVSummaryRow {
   total_incidents: number;
   active_alerts: number;
   current_risk_level: string;
+  last_incident?: string;
 }
 
 export interface IncidentRead {

@@ -46,7 +46,7 @@ function mapCameraIdToFeedId(cameraId: string) {
     return `CCTV-${number}`;
   }
   const fallback = cameraId.match(/\d+/);
-  return fallback ? `CCTV-${fallback[0]}` : cameraId;
+  return fallback ? `CCTV-${Number(fallback[0])}` : cameraId;
 }
 
 export const Route = createFileRoute("/live")({
@@ -87,7 +87,7 @@ function LivePage() {
     data: alerts,
     isLoading: alertsLoading,
     error: alertsError,
-  } = useQuery({ queryKey: ["liveAlerts"], queryFn: getAlerts });
+  } = useQuery({ queryKey: ["liveAlerts"], queryFn: getAlerts, refetchInterval: 30_000 });
 
   const addFeedMutation = useMutation({
     mutationFn: (payload: CreateFeedRequest) => createFeed(payload),
@@ -108,7 +108,9 @@ function LivePage() {
   const websocketUrl = websocketBase ? `${websocketBase.replace(/\/+$|\s+$/g, "")}/ws/alerts` : "/ws/alerts";
   const { data: latestMessage, status: wsStatus, error: wsError } = useWebSocket<Record<string, any>>(websocketUrl);
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
+  const [feedAlerts, setFeedAlerts] = useState<Record<string, { alertType: string; riskScore: number; riskLevel: RiskLevel }>>({});
   const [feedDetections, setFeedDetections] = useState<Record<string, LiveBoundingBox[]>>({});
+  const [feedPeopleCount, setFeedPeopleCount] = useState<Record<string, number>>({});
   const [soundEnabled, setSoundEnabled] = useState(true);
   const shownToastIds = useRef<Set<number>>(new Set());
 
@@ -203,16 +205,42 @@ function LivePage() {
     return feeds;
   }, [feeds, feedsError]);
 
+  const enrichedDisplayFeeds = useMemo(() => {
+    return displayFeeds.map((f) => ({
+      ...f,
+      peopleDetected: feedPeopleCount[f.id] ?? f.peopleDetected,
+      ...(feedAlerts[f.id] ?? {}),
+    }));
+  }, [displayFeeds, feedPeopleCount, feedAlerts]);
+
   const filteredFeeds = useMemo(() => {
-    const list = displayFeeds;
+    const list = enrichedDisplayFeeds;
     return feed === "all" ? list : list.filter((f) => f.id === feed);
-  }, [displayFeeds, feed]);
+  }, [enrichedDisplayFeeds, feed]);
 
   useEffect(() => {
     if (alerts && alerts.length > 0) {
       setRealtimeAlerts(alerts);
     }
   }, [alerts]);
+
+  const resolveFeedId = useCallback(
+    (cameraId: string) => {
+      if (Array.isArray(feeds)) {
+        const exactMatch = feeds.find((f) => f.id === cameraId);
+        if (exactMatch) {
+          return cameraId;
+        }
+        const mapped = mapCameraIdToFeedId(cameraId);
+        const mappedMatch = feeds.find((f) => f.id === mapped);
+        if (mappedMatch) {
+          return mapped;
+        }
+      }
+      return cameraId;
+    },
+    [feeds],
+  );
 
   useEffect(() => {
     if (!latestMessage) {
@@ -225,7 +253,19 @@ function LivePage() {
      * which is only added after mapping.
      */
     if ("risk_score" in latestMessage && "incident_type" in latestMessage) {
-      const mappedAlert = mapBackendAlert(latestMessage as BackendAlert);
+      const backendAlert = latestMessage as BackendAlert;
+      const mappedAlert = mapBackendAlert(backendAlert);
+      const feedId = resolveFeedId(backendAlert.camera_id || mappedAlert.cctv);
+
+      setFeedAlerts((current) => ({
+        ...current,
+        [feedId]: {
+          alertType: mappedAlert.type,
+          riskScore: mappedAlert.riskScore,
+          riskLevel: mappedAlert.riskLevel,
+        },
+      }));
+
       setRealtimeAlerts((current) => {
         if (current.some((a) => a.backendId === mappedAlert.backendId)) {
           return current;
@@ -238,7 +278,7 @@ function LivePage() {
 
     if ("camera_id" in latestMessage && Array.isArray(latestMessage.detections)) {
       const latestDetection = latestMessage as LiveDetectionPayload;
-      const feedId = mapCameraIdToFeedId(latestDetection.camera_id);
+      const feedId = resolveFeedId(latestDetection.camera_id);
       const { width, height } = latestDetection.dimensions || {};
       const safeWidth = width || 1;
       const safeHeight = height || 1;
@@ -266,9 +306,13 @@ function LivePage() {
         ...current,
         [feedId]: boxes,
       }));
+      setFeedPeopleCount((current) => ({
+        ...current,
+        [feedId]: boxes.length,
+      }));
       return;
     }
-  }, [latestMessage, showAlertToast]);
+  }, [latestMessage, showAlertToast, resolveFeedId]);
 
   const filteredAlerts = useMemo(() => {
     let list = realtimeAlerts;
@@ -292,9 +336,9 @@ function LivePage() {
 
   /** Build dynamic feeds list for TopBar (BUG 12) */
   const dynamicFeeds = useMemo(() => {
-    if (!Array.isArray(displayFeeds) || displayFeeds.length === 0) return undefined;
-    return displayFeeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
-  }, [displayFeeds]);
+    if (!Array.isArray(enrichedDisplayFeeds) || enrichedDisplayFeeds.length === 0) return undefined;
+    return enrichedDisplayFeeds.map((f) => ({ id: f.id, label: `${f.id} (${f.platform})` }));
+  }, [enrichedDisplayFeeds]);
 
   return (
     <div>
@@ -350,7 +394,7 @@ function LivePage() {
               </div>
             )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Total CCTV Feeds" value={displayFeeds.length} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
+          <StatCard label="Total CCTV Feeds" value={enrichedDisplayFeeds.length} sublabel="Active Cameras" icon={Camera} iconColor="#3b82f6" iconBg="rgba(59,130,246,0.15)" />
           <StatCard label="People Detected" value={totalPeople} sublabel="Across All Feeds" icon={Users} iconColor="#22c55e" iconBg="rgba(34,197,94,0.15)" />
           <StatCard label="Active Alerts" value={active} sublabel="Across All Feeds" icon={AlertTriangle} iconColor="#f97316" iconBg="rgba(249,115,22,0.15)" />
           <StatCard label="High Risk Detected" value={highRisk} sublabel="Require Attention" icon={Activity} iconColor="#ef4444" iconBg="rgba(239,68,68,0.15)" />

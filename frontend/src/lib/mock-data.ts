@@ -5,6 +5,7 @@ export interface CCTVFeed {
   id: string;
   platform: string;
   image: string;
+  streamUrl?: string;
   status: "online" | "offline";
   peopleDetected: number;
   alertType?: string;
