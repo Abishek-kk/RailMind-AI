@@ -291,19 +291,27 @@ function DashboardPage() {
               Platform Heatmap <span className="text-muted-foreground">(Risk Intensity)</span>
             </h3>
             <div className="mt-4 space-y-4">
-              {heatmapRows.map((p) => (
-                <div key={p.name} className="flex items-center gap-3">
-                  <div className="w-24">
-                    <div className="text-xs font-medium">{p.name}</div>
-                    <div className="text-[11px]" style={{ color: riskColor(p.level === "very-high" ? "high" : p.level) }}>
-                      {p.risk}
-                    </div>
-                  </div>
-                  <div className="relative h-10 flex-1 overflow-hidden rounded-md border border-border bg-secondary/40">
-                    <Hotspots level={p.level} />
+              {heatmapRows.length === 0 ? (
+                <div className="rounded-lg border border-border/50 bg-secondary/20 px-4 py-6 text-center">
+                  <div className="text-sm text-muted-foreground">
+                    No heatmap data yet. Data appears once the CV pipeline processes feeds.
                   </div>
                 </div>
-              ))}
+              ) : (
+                heatmapRows.map((p) => (
+                  <div key={p.name} className="flex items-center gap-3">
+                    <div className="w-24">
+                      <div className="text-xs font-medium">{p.name}</div>
+                      <div className="text-[11px]" style={{ color: riskColor(p.level === "very-high" ? "high" : p.level) }}>
+                        {p.risk}
+                      </div>
+                    </div>
+                    <div className="relative h-10 flex-1 overflow-hidden rounded-md border border-border bg-secondary/40">
+                      <Hotspots level={p.level} />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
             <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>Low</span>
