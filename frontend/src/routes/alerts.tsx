@@ -118,22 +118,7 @@ function AlertsPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Loading alerts from backend...
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="p-6 text-center text-sm text-destructive">
-        Unable to load alerts. {error instanceof Error ? error.message : "Check backend connection."}
-      </div>
-    );
-  }
-
+  // BUG 4 FIX: move all useMemo hooks before early returns to comply with rules of hooks
   const cctvFiltered = feed === "all" ? alerts : alerts.filter((a) => a.cctv === feed);
 
   const dynamicFeeds = useMemo(() => {
@@ -178,6 +163,23 @@ function AlertsPage() {
     }
     return list;
   }, [tabFiltered, filterRisk, filterStatus, filterPlatform]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center text-sm text-muted-foreground">
+        Loading alerts from backend...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 text-center text-sm text-destructive">
+        Unable to load alerts. {error instanceof Error ? error.message : "Check backend connection."}
+      </div>
+    );
+  }
+
 
   const searched = search
     ? panelFiltered.filter((a) =>
