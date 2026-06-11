@@ -526,7 +526,6 @@ function LivePage() {
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
                 setIsDialogOpen(open);
                 if (!open) {
-                  setUploadMode(false);
                   setUploadedFile(null);
                 }
               }}>

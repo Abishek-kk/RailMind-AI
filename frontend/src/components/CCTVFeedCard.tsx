@@ -17,6 +17,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
   const isActuallyLive = feed.status === "online" && !isPaused;
   const [isMuted, setIsMuted] = useState(false);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
+  const [videoError, setVideoError] = useState(false);
 
   // Update frozen boxes when not paused
   useEffect(() => {
@@ -24,6 +25,26 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
       setFrozenBoxes(detections);
     }
   }, [detections, isPaused]);
+
+  // Imperatively control playback — autoPlay only fires once on mount.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPaused) {
+      video.pause();
+    } else {
+      video.play().catch(() => {
+        // Autoplay may be blocked by the browser; ignore silently.
+      });
+    }
+  }, [isPaused]);
+
+  // Sync muted state imperatively as well.
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
 
   const activeDetections = isPaused ? frozenBoxes : (detections ?? []);
 
@@ -54,15 +75,17 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
         </span>
       </div>
       <div className="relative aspect-video overflow-hidden bg-black">
-        {feed.streamUrl ? (
+        {feed.streamUrl && !videoError ? (
           <video
             ref={videoRef}
             src={feed.streamUrl}
             autoPlay={!isPaused}
             muted={isMuted}
+            loop
             controls={false}
             className="h-full w-full object-cover"
             playsInline
+            onError={() => setVideoError(true)}
           />
         ) : (
           <img
@@ -180,14 +203,16 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
               </span>
             </div>
             <div className="relative w-full bg-black max-h-[80vh] overflow-hidden">
-              {feed.streamUrl ? (
+              {feed.streamUrl && !videoError ? (
                 <video
                   src={feed.streamUrl}
                   autoPlay={!isPaused}
                   muted={isMuted}
+                  loop
                   controls
                   className="w-full max-h-[80vh] object-contain"
                   playsInline
+                  onError={() => setVideoError(true)}
                 />
               ) : (
                 <img
