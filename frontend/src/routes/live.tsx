@@ -566,8 +566,8 @@ function LivePage() {
                       <RiskBadge level={a.riskLevel} />
                     </div>
                   </div>
-                );
-              })}
+                })
+              )}
             </div>
             <div className="border-t border-border p-3 text-center">
               <Link to="/alerts" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
