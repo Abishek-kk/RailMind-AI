@@ -492,7 +492,7 @@ function LivePage() {
               </div>
             </div>
             <div className="max-h-[640px] space-y-3 overflow-y-auto p-3">
-              {filteredAlerts.slice(0, 6).map((a) => {
+              {filteredAlerts.map((a) => {
                 const c = riskColor(a.riskLevel);
                 return (
                   <div
