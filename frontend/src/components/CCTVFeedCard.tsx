@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pause, Play, Maximize2, Expand } from "lucide-react";
+import { Pause, Play, Maximize2, Expand, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
   
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
 
   // Update frozen boxes when not paused
@@ -27,6 +28,11 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
   function handlePlayPauseToggle() {
     setIsPaused(!isPaused);
     toast(isPaused ? "Live feed resumed." : "Live feed paused.");
+  }
+
+  function handleMuteToggle() {
+    setIsMuted((current) => !current);
+    toast(isMuted ? "Audio unmuted." : "Audio muted.");
   }
 
   return (
@@ -107,6 +113,14 @@ export function CCTVFeedCard({ feed, detections }: { feed: CCTVFeed; detections?
             className="rounded p-1 hover:bg-secondary hover:text-foreground"
           >
             {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={handleMuteToggle}
+            title={isMuted ? "Unmute" : "Mute"}
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
         </div>
         <div className="flex items-center gap-3">

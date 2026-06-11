@@ -185,8 +185,11 @@ function LivePage() {
   );
 
   const isMockData = useMemo(() => {
-    return !!feedsError && import.meta.env.MODE === "development";
-  }, [feedsError]);
+    return (
+      ((Array.isArray(feeds) && feeds.length === 0) || !!feedsError) &&
+      import.meta.env.MODE === "development"
+    );
+  }, [feeds, feedsError]);
 
   const displayFeeds = useMemo(() => {
     if (feedsError && import.meta.env.MODE === "development") {
@@ -493,14 +496,19 @@ function LivePage() {
               </div>
             </div>
             <div className="max-h-[640px] space-y-3 overflow-y-auto p-3">
-              {filteredAlerts.map((a) => {
-                const c = riskColor(a.riskLevel);
-                return (
-                  <div
-                    key={a.id}
-                    className="flex gap-3 rounded-lg border p-3 transition-colors hover:bg-secondary/40"
-                    style={{ borderColor: `${c}33`, backgroundColor: `${c}0a` }}
-                  >
+              {filteredAlerts.length === 0 ? (
+                <div className="rounded-xl border border-border bg-secondary/5 p-6 text-center text-sm text-muted-foreground">
+                  No active alerts.
+                </div>
+              ) : (
+                filteredAlerts.map((a) => {
+                  const c = riskColor(a.riskLevel);
+                  return (
+                    <div
+                      key={a.id}
+                      className="flex gap-3 rounded-lg border p-3 transition-colors hover:bg-secondary/40"
+                      style={{ borderColor: `${c}33`, backgroundColor: `${c}0a` }}
+                    >
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] text-muted-foreground">{a.time}</div>
                       <div className="text-[11px] text-muted-foreground">{a.cctv} / {a.platform}</div>
