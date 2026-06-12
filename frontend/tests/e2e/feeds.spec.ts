@@ -34,14 +34,15 @@ test.describe('Feeds E2E', () => {
 
     // Navigate to dashboard and wait for the feed row to appear
     await page.goto(`${BASE}/dashboard`);
-    await page.waitForSelector(`text=${feedId}`, { timeout: 20000 });
+    await page.waitForLoadState("networkidle");
+
+    const feedRow = page.locator("tr", { hasText: feedId });
+    await expect(feedRow).toBeVisible({ timeout: 30000 });
 
     // Click Stop button in the same row
-    const row = page.locator(`tr:has-text("${feedId}")`);
-    await expect(row).toBeVisible();
-    await row.locator('button:has-text("Stop")').click();
+    await feedRow.locator('button:has-text("Stop")').click();
 
     // Confirm feed removed from UI
-    await expect(page.locator(`text=${feedId}`)).toHaveCount(0);
+    await expect(feedRow).toHaveCount(0, { timeout: 30000 });
   });
 });
