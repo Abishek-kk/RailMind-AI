@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.alert import Alert
 from app.models.incident import Incident
 
 
@@ -37,7 +38,17 @@ class IncidentService:
 
     def get_incident(self, incident_id: int) -> Optional[Incident]:
         return self.db.query(Incident).filter(Incident.id == incident_id).first()
-
+    def is_track_acknowledged(self, person_id: str, camera_id: str) -> bool:
+        """Return True when a track has an acknowledged/resolved incident for the same camera."""
+        return (
+            self.db.query(Incident)
+            .join(Alert, Incident.alert_id == Alert.id)
+            .filter(Alert.person_id == person_id)
+            .filter(Alert.camera_id == camera_id)
+            .filter(Incident.status.in_(["acknowledged", "resolved", "false_positive"]))
+            .count()
+            > 0
+        )
     def create_incident(self, payload: Dict[str, Any]) -> Incident:
         incident = Incident(**payload)
         self.db.add(incident)

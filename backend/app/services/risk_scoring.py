@@ -80,5 +80,5 @@ class RiskScorer:
         if s < settings.MEDIUM_RISK_THRESHOLD:
             return "Low Risk", "alert_staff"
         if s < settings.HIGH_RISK_THRESHOLD:
-            return "Medium Risk", "urgent_alert"
+            return "Medium Risk", "alert_security"
         return "Critical", "emergency_escalation"

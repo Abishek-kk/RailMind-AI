@@ -67,6 +67,6 @@ def test_risk_classification_matches_documented_action_ranges():
     assert scorer.classify(39) == ("Safe", "log_only")
     assert scorer.classify(40) == ("Low Risk", "alert_staff")
     assert scorer.classify(69) == ("Low Risk", "alert_staff")
-    assert scorer.classify(70) == ("Medium Risk", "urgent_alert")
-    assert scorer.classify(89) == ("Medium Risk", "urgent_alert")
+    assert scorer.classify(70) == ("Medium Risk", "alert_security")
+    assert scorer.classify(89) == ("Medium Risk", "alert_security")
     assert scorer.classify(90) == ("Critical", "emergency_escalation")

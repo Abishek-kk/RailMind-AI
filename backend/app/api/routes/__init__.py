@@ -11,6 +11,7 @@ from .feeds import router as feeds_router
 from .health import router as health_router
 from .incidents import router as incidents_router
 from .staff import router as staff_router
+from .training import router as training_router
 
 # Initialize the main aggregator router
 api_router = APIRouter()
@@ -23,5 +24,6 @@ api_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboar
 api_router.include_router(incidents_router, prefix="/incidents", tags=["Incidents"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(staff_router, prefix="/staff", tags=["Staff"])
+api_router.include_router(training_router, prefix="", tags=["Training"])
 
 __all__ = ["api_router"]
