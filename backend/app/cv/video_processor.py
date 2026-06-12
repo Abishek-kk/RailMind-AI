@@ -5,7 +5,6 @@ import math
 import time
 from argparse import Namespace
 import numpy as np
-from ultralytics.trackers import BYTETracker
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.cv.pose_estimator import PoseEstimator
@@ -23,6 +22,14 @@ from app.agents.agent_graph import run_agent_pipeline
 from app.analytics.heatmap import update_live_heatmap
 from app.core.websocket_manager import manager
 
+try:
+    from ultralytics.trackers import BYTETracker
+except Exception as import_error:  # pragma: no cover - exercised by deployments without ultralytics
+    BYTETracker = None
+    BYTETRACK_IMPORT_ERROR = import_error
+else:
+    BYTETRACK_IMPORT_ERROR = None
+
 logger = logging.getLogger("railmind")
 
 # Alert cooldown configuration (in seconds)
@@ -37,17 +44,27 @@ class VideoProcessor:
         self.pose_estimator = PoseEstimator(model_path=settings.POSE_MODEL_PATH, device=settings.POSE_DEVICE)
         
         # Initialize BYTETracker with required configuration arguments
-        tracker_args = Namespace(
-            track_high_thresh=0.5,  # Confidence threshold for first association
-            track_low_thresh=0.1,   # Confidence threshold for second association
-            new_track_thresh=0.5,   # Confidence threshold for starting a new track
-            track_thresh=0.5,       # Backward-compatible alias used by older ByteTrack builds
-            track_buffer=30,        # Maximum number of frames to buffer before dropping track
-            match_thresh=0.8,       # Intersection-over-union threshold for matching
-            fuse_score=True,        # Combine confidence with IoU distance during matching
-            mot20=False             # Use MOT20 challenge format
-        )
-        self.tracker = BYTETracker(tracker_args)
+        self.tracker = None
+        if not self.pose_estimator.is_available:
+            logger.error("Skipping BYTETracker initialization because YOLOv8 pose estimation is unavailable.")
+        elif BYTETracker is None:
+            logger.error("BYTETracker unavailable because ultralytics could not be imported: %s", BYTETRACK_IMPORT_ERROR)
+        else:
+            tracker_args = Namespace(
+                track_high_thresh=0.5,  # Confidence threshold for first association
+                track_low_thresh=0.1,   # Confidence threshold for second association
+                new_track_thresh=0.5,   # Confidence threshold for starting a new track
+                track_thresh=0.5,       # Backward-compatible alias used by older ByteTrack builds
+                track_buffer=30,        # Maximum number of frames to buffer before dropping track
+                match_thresh=0.8,       # Intersection-over-union threshold for matching
+                fuse_score=True,        # Combine confidence with IoU distance during matching
+                mot20=False             # Use MOT20 challenge format
+            )
+            try:
+                self.tracker = BYTETracker(tracker_args)
+            except Exception as err:
+                logger.error("BYTETracker initialization failed: %s", err)
+        self.cv_available = self.pose_estimator.is_available and self.tracker is not None
         self.behavior_analyzer = BehaviorAnalyzer()
         self.edge_detector = EdgeProximityDetector()
         self.loitering_detector = LoiteringDetector()
@@ -85,6 +102,15 @@ class VideoProcessor:
         self.is_running = True
         cap = None
         try:
+            if not self.cv_available:
+                logger.error(
+                    "CV processing disabled for camera %s: %s",
+                    self.camera_id,
+                    self.pose_estimator.unavailable_reason or "BYTETracker is unavailable",
+                )
+                self.is_running = False
+                return
+
             cap = cv2.VideoCapture(self.feed_source)
             if not cap.isOpened():
                 logger.error(f"Critical Ingestion Failure: Unable to parse stream {self.feed_source}")

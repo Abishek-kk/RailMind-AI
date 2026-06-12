@@ -78,15 +78,18 @@ backend/
    ```bash
    cp .env.example .env
    ```
-5. Create LSTM model files for local inference:
-   ```bash
-   python -m app.lstm.generate_default_models
-   ```
-   Or train synthetic prototype classifiers:
+5. Provide trained LSTM model weights, or train synthetic prototype classifiers:
    ```bash
    python -m app.lstm.train
    ```
-6. Run the application:
+   If the expected `.pt` weights are missing, the backend disables LSTM inference and returns neutral LSTM scores. Do not use `app.lstm.generate_default_models` for real inference; it creates random-weight architecture placeholders only.
+6. Provide YOLOv8 pose weights for CV processing:
+   ```bash
+   # Example
+   export POSE_MODEL_PATH=/path/to/yolov8n-pose.pt
+   ```
+   The backend does not download pose weights at startup. If `POSE_MODEL_PATH` is missing or `ultralytics` is unavailable, CV feed processing is disabled and logged instead of crashing the app.
+7. Run the application:
    ```bash
    python app/main.py
    ```
@@ -144,6 +147,6 @@ f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/run_video_processors.
 ```
 
 Notes:
-- The runner uses the lightest pose model `yolov8n-pose.pt` by default (configured in `settings.POSE_MODEL_PATH`).
+- The runner uses the pose model configured in `settings.POSE_MODEL_PATH`.
 - Use `--device` to override the configured device at runtime.
 ```
