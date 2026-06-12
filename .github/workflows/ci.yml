@@ -48,20 +48,29 @@ jobs:
           npx playwright install --with-deps
 
       - name: Start backend server
+        working-directory: backend
         run: |
-          pushd backend
-          nohup python -m uvicorn app.main:asgi_app --host 127.0.0.1 --port 8000 &
-          popd
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend-server.log 2>&1 &
 
       - name: Serve frontend build
         working-directory: frontend
         run: |
           npx http-server dist -p 5173 &
 
-      - name: Wait for services
+      - name: Wait for backend API
         run: |
-          echo "Waiting for servers to start"
-          sleep 6
+          echo "Waiting for backend at http://127.0.0.1:8000/api/health"
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8000/api/health | grep -q '"status":"online"'; then
+              echo "Backend available"
+              exit 0
+            fi
+            echo "Backend not ready yet, retrying ($i/30)..."
+            sleep 2
+          done
+          echo "Backend failed to become ready"
+          cat backend/backend-server.log || true
+          exit 1
 
       - name: Run Playwright E2E
         working-directory: frontend
