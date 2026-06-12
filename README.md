@@ -915,8 +915,5 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 *Built with by Team Accelerate for FAR AWAY 2026*
 
-<<<<<<< HEAD
-</div>
-=======
-</div>
->>>>>>> c9f80055ddfbc127771a7e7610e59eca994c414a
+
+
