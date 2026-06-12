@@ -154,6 +154,11 @@ async def test_agent_pipeline_end_to_end():
 
 @pytest.mark.asyncio
 async def test_agent_pipeline_builds_graph_per_invocation(monkeypatch):
+    # With the pipeline compiled once at module import, run_agent_pipeline
+    # should NOT rebuild the graph on every invocation. To assert this,
+    # clear the compiled singleton and monkeypatch `build_agent_graph` to
+    # count how many times it is invoked. The lazy compile fallback should
+    # call the builder only once and reuse the compiled pipeline thereafter.
     build_count = 0
 
     class DummyPipeline:
@@ -165,9 +170,12 @@ async def test_agent_pipeline_builds_graph_per_invocation(monkeypatch):
         build_count += 1
         return DummyPipeline()
 
+    # Ensure we start with no compiled pipeline so the lazy compile path runs
+    monkeypatch.setattr(agent_graph, "_COMPILED_AGENT_PIPELINE", None)
     monkeypatch.setattr(agent_graph, "build_agent_graph", build_dummy_graph)
 
     await agent_graph.run_agent_pipeline({"person_id": "one"})
     await agent_graph.run_agent_pipeline({"person_id": "two"})
 
-    assert build_count == 2
+    # Should have built exactly once and reused thereafter
+    assert build_count == 1

@@ -2,6 +2,7 @@
 import glob
 import os
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import api_router
@@ -13,12 +14,40 @@ from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
 from app.lstm import generate_default_models
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler replacing deprecated on_event hooks.
+
+    Performs necessary startup initialization (database, LSTM models,
+    mock feed videos and default feeds). Shutdown cleanup can be added
+    here in the future.
+    """
+    # Startup
+    init_db()
+    try:
+        _ensure_lstm_models()
+    except Exception as e:
+        print(f"Error ensuring LSTM model bootstrap: {e}")
+
+    try:
+        _ensure_mock_feed_videos(settings.MOCK_FEED_DIR, required=2)
+    except Exception:
+        pass
+
+    _ensure_default_station_feeds()
+
+    yield
+
+    # Shutdown: placeholder for graceful cleanup if required later.
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 os.makedirs(settings.MOCK_FEED_DIR, exist_ok=True)
@@ -99,18 +128,6 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
         websocket_manager.manager.disconnect(websocket)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    init_db()
-
-    # Ensure default LSTM models exist so the LSTMPredictor can load placeholder
-    # models in environments where saved_models/ is empty (e.g., fresh clones).
-    try:
-        _ensure_lstm_models()
-    except Exception as e:
-        print(f"Error ensuring LSTM model bootstrap: {e}")
-
 
 def _ensure_lstm_models() -> None:
     """Ensure the configured LSTM model files exist at startup."""
@@ -165,11 +182,8 @@ def _ensure_lstm_models() -> None:
 
     _ensure_default_station_feeds()
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    # Add shutdown cleanup steps here if needed in the future.
-    return None
+# Previously startup/shutdown handlers used @app.on_event which is deprecated
+# in recent FastAPI versions; lifespan context manager above replaces them.
 
 
 def _ensure_default_station_feeds() -> None:
