@@ -4,7 +4,6 @@ import logging
 import math
 import time
 from argparse import Namespace
-from inspect import signature
 import numpy as np
 from ultralytics.trackers import BYTETracker
 from app.core.config import settings
@@ -68,6 +67,7 @@ class VideoProcessor:
         # Cooldown tracking for email alerts: {track_id: last_alert_timestamp}
         self.email_alert_cooldown: dict[int, float] = {}
         self.last_detection_broadcast_time = 0.0
+        self._tracker_api_version: str | None = None
 
     def _get_context_multiplier(self) -> float:
         """Resolve platform-specific context multiplier from configuration."""
@@ -343,20 +343,22 @@ class VideoProcessor:
         if boxes is None or len(boxes) == 0:
             return np.empty((0, 5), dtype=float)
 
-        update_params = signature(self.tracker.update).parameters
-        param_names = [name for name in update_params if name != "self"]
-
-        if "img" in update_params or "feats" in update_params:
-            return self.tracker.update(boxes, frame)
-
         detections = self._boxes_to_tracker_detections(boxes)
         img_size = frame.shape[:2]
 
-        # Older ByteTrack integrations commonly accept detections, img_size, orig_img_size.
-        if len(param_names) >= 3:
+        if self._tracker_api_version == "new":
+            return self.tracker.update(boxes, frame)
+        if self._tracker_api_version == "legacy":
             return self.tracker.update(detections, img_size, img_size)
 
-        return self.tracker.update(detections)
+        try:
+            tracked = self.tracker.update(boxes, frame)
+            self._tracker_api_version = "new"
+            return tracked
+        except TypeError:
+            tracked = self.tracker.update(detections, img_size, img_size)
+            self._tracker_api_version = "legacy"
+            return tracked
 
     def _boxes_to_tracker_detections(self, boxes) -> np.ndarray:
         xyxy = self._to_numpy(boxes.xyxy)
