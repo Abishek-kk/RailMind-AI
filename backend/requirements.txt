@@ -15,7 +15,7 @@ opencv-python>=4.10.0
 torch>=2.9.0
 
 # Computer vision helper
-ultralytics==8.4.63
+ultralytics==8.4.66
 
 # Data processing
 numpy>=2.0.0

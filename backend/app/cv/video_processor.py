@@ -133,7 +133,11 @@ class VideoProcessor:
                 self.previous_track_ids = current_track_ids
 
                 frame_time = time.time()
-                matched_detections = self._match_tracker_results(tracked_objects, pose_detections)
+                matched_detections = self._match_tracker_results(
+                    tracked_objects,
+                    pose_detections,
+                    frame_dimensions=(width, height),
+                )
                 current_tracks = {}
                 for track_id, person in matched_detections:
                     if track_id not in self.track_entry_times:
@@ -369,9 +373,22 @@ class VideoProcessor:
             return value.numpy()
         return np.asarray(value)
 
-    def _match_tracker_results(self, tracked_objects: np.ndarray, pose_detections: list[dict]) -> list[tuple[int, dict]]:
+    def _match_tracker_results(
+        self,
+        tracked_objects: np.ndarray,
+        pose_detections: list[dict],
+        frame_dimensions: tuple[int, int] | None = None,
+    ) -> list[tuple[int, dict]]:
         if tracked_objects is None or len(pose_detections) == 0:
             return []
+
+        width, height = frame_dimensions if frame_dimensions is not None else (0, 0)
+        real_world_threshold_meters = 0.5
+        pixel_threshold = real_world_threshold_meters * settings.PIXELS_PER_METER
+
+        # Ensure threshold scales with resolution when PIXELS_PER_METER is not available.
+        if pixel_threshold <= 0 and width and height:
+            pixel_threshold = min(width, height) * 0.05
 
         matches = []
         unmatched = set(range(len(pose_detections)))
@@ -391,7 +408,7 @@ class VideoProcessor:
                     best_distance = distance
                     best_idx = det_idx
 
-            if best_idx is not None and best_distance < 80:
+            if best_idx is not None and best_distance < pixel_threshold:
                 matches.append((track_id, pose_detections[best_idx]))
                 unmatched.remove(best_idx)
 

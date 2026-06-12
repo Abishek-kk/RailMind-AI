@@ -5,6 +5,8 @@ from typing import Dict, Any
 
 from twilio.rest import Client
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models.alert import Alert
 
 logger = logging.getLogger("railmind.escalation")
 
@@ -18,20 +20,62 @@ class EscalationService:
         self.to_numbers = settings.TWILIO_TO_NUMBERS
 
     def send_sms_alert(self, alert_payload: Dict[str, Any]) -> bool:
-        if not self.account_sid or not self.auth_token or not self.from_number:
-            logger.warning("Twilio configuration is incomplete; skipping SMS alert.")
-            return False
-        if not self.to_numbers:
-            logger.warning("No Twilio destination numbers configured; skipping SMS alert.")
-            return False
-
-        client = Client(self.account_sid, self.auth_token)
+        # If Twilio credentials are not configured, simulate the escalation so
+        # local development and CI can observe escalation behavior without
+        # sending real SMS messages.
         body = (
             f"RailMind Critical Alert: {alert_payload.get('incident_type', 'Unknown')} on {alert_payload.get('platform', 'Unknown')}\n"
             f"Risk Level: {alert_payload.get('risk_level', 'Unknown')}\n"
             f"Risk Score: {alert_payload.get('risk_score', 0.0):.2f}\n"
             f"Timestamp: {alert_payload.get('timestamp', 'N/A')}"
         )
+
+        if not self.account_sid or not self.auth_token or not self.from_number:
+            logger.warning("Twilio configuration is incomplete; simulating SMS alert. Content:\n%s", body)
+            # Write a simulated escalation event into the alerts table so the
+            # escalation is visible in the DB for testing and demos.
+            try:
+                with SessionLocal() as db:
+                    simulated_alert = Alert(
+                        person_id=alert_payload.get('person_id', 'SIMULATED_SMS'),
+                        camera_id=alert_payload.get('camera_id', alert_payload.get('camera', 'SIMULATED')),
+                        platform=alert_payload.get('platform', 'SIMULATED'),
+                        incident_type='sms_escalation_simulated',
+                        risk_score=float(alert_payload.get('risk_score', 0.0) or 0.0),
+                        risk_level=alert_payload.get('risk_level', 'Unknown'),
+                        status='escalated',
+                    )
+                    db.add(simulated_alert)
+                    db.commit()
+                    db.refresh(simulated_alert)
+                    logger.warning("Inserted simulated SMS escalation alert id=%s", simulated_alert.id)
+            except Exception as e:
+                logger.error("Failed to persist simulated SMS escalation: %s", e, exc_info=True)
+            return True
+
+        if not self.to_numbers:
+            logger.warning("No Twilio destination numbers configured; simulating SMS alert. Content:\n%s", body)
+            try:
+                with SessionLocal() as db:
+                    simulated_alert = Alert(
+                        person_id=alert_payload.get('person_id', 'SIMULATED_SMS'),
+                        camera_id=alert_payload.get('camera_id', alert_payload.get('camera', 'SIMULATED')),
+                        platform=alert_payload.get('platform', 'SIMULATED'),
+                        incident_type='sms_escalation_simulated',
+                        risk_score=float(alert_payload.get('risk_score', 0.0) or 0.0),
+                        risk_level=alert_payload.get('risk_level', 'Unknown'),
+                        status='escalated',
+                    )
+                    db.add(simulated_alert)
+                    db.commit()
+                    db.refresh(simulated_alert)
+                    logger.warning("Inserted simulated SMS escalation alert id=%s", simulated_alert.id)
+            except Exception as e:
+                logger.error("Failed to persist simulated SMS escalation: %s", e, exc_info=True)
+            return True
+
+        # Real Twilio send path
+        client = Client(self.account_sid, self.auth_token)
 
         success = True
         for to_number in self.to_numbers:

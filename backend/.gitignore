@@ -48,6 +48,9 @@ venv.bak/
 logs/
 *.log
 
+# Wheel archives
+*.whl
+
 # Database
 *.db
 *.sqlite

@@ -1,4 +1,4 @@
-﻿from typing import Dict, Any
+from typing import Dict, Any
 
 def perception_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
