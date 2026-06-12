@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -55,7 +58,7 @@ jobs:
       - name: Serve frontend build
         working-directory: frontend
         run: |
-          npx http-server dist -p 5173 &
+          npm run preview -- --host 127.0.0.1 --port 5173 &
 
       - name: Wait for backend and frontend services
         run: |
