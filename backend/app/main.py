@@ -11,6 +11,7 @@ from app.core import websocket_manager
 from app.core.processor_manager import start_processor
 from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
+from app.lstm import generate_default_models
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -102,6 +103,21 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 async def startup_event():
     """Initialize application on startup."""
     init_db()
+
+    # Ensure default LSTM models exist so the LSTMPredictor can load placeholder
+    # models in environments where saved_models/ is empty (e.g., fresh clones).
+    try:
+        model_dir = generate_default_models.MODEL_DIR
+        missing = [m for m in generate_default_models.MODEL_FILES if not os.path.exists(os.path.join(model_dir, m))]
+        if missing:
+            try:
+                generate_default_models.main()
+            except Exception as e:
+                # If model generation fails, log and continue; predictor will return 0.0.
+                print(f"Error generating default LSTM models: {e}")
+    except Exception:
+        # Non-fatal; continue startup even if model generation check fails.
+        pass
 
     _ensure_default_station_feeds()
 
