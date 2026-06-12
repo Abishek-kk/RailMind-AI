@@ -1,4 +1,5 @@
 """Computer vision tests"""
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -23,6 +24,17 @@ def test_pose_estimator_import():
 def test_video_processor_import():
     """Test that VideoProcessor is available"""
     assert VideoProcessor is not None
+
+
+def test_video_processor_missing_pose_model_degrades_cleanly(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "POSE_MODEL_PATH", str(tmp_path / "missing-yolov8n-pose.pt"))
+
+    processor = VideoProcessor(feed_source="missing.mp4", camera_id="CAM_MISSING_POSE", platform="Platform 1")
+
+    assert processor.pose_estimator.is_available is False
+    assert processor.cv_available is False
+    asyncio.run(processor.start_processing_loop())
+    assert processor.is_running is False
 
 
 def test_behavior_analyzer_maps_scores_to_pose_labels():

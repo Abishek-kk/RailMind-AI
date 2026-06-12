@@ -14,19 +14,18 @@ cd backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Optional LSTM model setup:
-
-```powershell
-cd backend
-python -m app.lstm.generate_default_models
-```
-
-For trained synthetic prototype weights instead of neutral defaults:
+Optional LSTM prototype training:
 
 ```powershell
 cd backend
 python -m app.lstm.train
 ```
+
+If the expected `.pt` LSTM weights are missing, the backend leaves LSTM inference disabled and returns neutral LSTM scores. Do not use `app.lstm.generate_default_models` for real inference; it creates random-weight architecture placeholders only.
+
+Pose model setup:
+
+Set `POSE_MODEL_PATH` to a local YOLOv8 pose weights file, such as `yolov8n-pose.pt`. The backend does not download pose weights at startup; if the file is missing or `ultralytics` is unavailable, CV feed processing is disabled and logged instead of crashing the app.
 
 2. Start frontend dev server (from repo root):
 

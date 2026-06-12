@@ -12,7 +12,6 @@ from app.core import websocket_manager
 from app.core.processor_manager import start_processor
 from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
-from app.lstm import generate_default_models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -130,7 +129,7 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 
 
 def _ensure_lstm_models() -> None:
-    """Ensure the configured LSTM model files exist at startup."""
+    """Report LSTM model availability without creating untrained placeholders."""
     model_dir = settings.MODEL_DIR
     required_files = [
         "suicide_classifier.pt",
@@ -141,35 +140,18 @@ def _ensure_lstm_models() -> None:
     if missing:
         print(
             f"Missing LSTM model files in {model_dir}: {missing}. "
-            "Generating untrained placeholder models for local development. "
-            "These models are not production-ready and must be retrained before use."
+            "LSTM inference will return neutral scores until trained model weights are provided. "
+            "Run `python -m app.lstm.train` or supply validated production weights before using LSTM risk signals."
         )
-        os.makedirs(model_dir, exist_ok=True)
-        generate_default_models.main(target_dir=model_dir)
 
-    # Ensure the pose model file exists. If not, attempt to trigger ultralytics
-    # to download it by instantiating `YOLO(model_path)`. This allows first-time
-    # setup on machines where the model isn't checked in.
+    # Report pose model availability without attempting network downloads during startup.
     try:
         pose_path = settings.POSE_MODEL_PATH
         if not os.path.exists(pose_path):
-            print(f"Pose model not found at {pose_path}. Attempting to download via ultralytics...")
-            try:
-                from ultralytics import YOLO
-
-                # Instantiating YOLO with the model filename will auto-download
-                # the weights to the given path if necessary.
-                try:
-                    YOLO(pose_path)
-                    print("Pose model download/initialization succeeded.")
-                except Exception as inner_e:
-                    print(f"Pose model initialization failed: {inner_e}")
-            except Exception as e:
-                print(
-                    "ultralytics not available or download failed:",
-                    e,
-                    "\nInstall ultralytics or place the pose model at the path specified by POSE_MODEL_PATH",
-                )
+            print(
+                f"Pose model not found at {pose_path}. "
+                "CV processing will stay disabled until POSE_MODEL_PATH points to valid YOLOv8 pose weights."
+            )
     except Exception:
         # Non-fatal; startup continues even if pose model check fails.
         pass

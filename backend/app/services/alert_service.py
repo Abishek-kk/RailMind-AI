@@ -4,10 +4,12 @@ import concurrent.futures
 import logging
 import threading
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Union
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.models.alert import Alert
 from app.services.escalation_service import EscalationService
 
@@ -61,6 +63,9 @@ class AlertService:
         self.db.refresh(alert)
         
         if start_escalation_timer and self.should_start_escalation_timer(alert):
+            alert.escalation_status = "pending_timeout"
+            self.db.commit()
+            self.db.refresh(alert)
             self._start_escalation_timer(alert)
         
         return alert
@@ -79,7 +84,7 @@ class AlertService:
     def _start_escalation_timer(self, alert: Alert, timeout_seconds: int = 60) -> None:
         """Start a background task that escalates alert after timeout if not acknowledged."""
         async def escalation_task():
-            await self.escalation_service.escalate_after_timeout(
+            result = await self.escalation_service.escalate_after_timeout(
                 alert.id,
                 timeout_seconds,
                 self._get_alert_async,
@@ -92,6 +97,8 @@ class AlertService:
                     "timestamp": alert.timestamp.isoformat() if alert.timestamp else None
                 }
             )
+            if result is not None:
+                self._record_escalation_result(alert.id, result)
             # Clean up timer reference after completion
             if alert.id in self.escalation_timers:
                 del self.escalation_timers[alert.id]
@@ -108,7 +115,28 @@ class AlertService:
 
     async def _get_alert_async(self, alert_id: int) -> Optional[Alert]:
         """Async wrapper to get alert status."""
-        return self.get_alert(alert_id)
+        with SessionLocal() as db:
+            alert = db.query(Alert).filter(Alert.id == alert_id).first()
+            if alert is None:
+                return None
+            return SimpleNamespace(status=alert.status)
+
+    def _record_escalation_result(self, alert_id: int, result: Any) -> None:
+        """Persist SMS escalation outcome on the original alert for operator visibility."""
+        success = bool(result)
+        status = getattr(result, "status", None) or ("sent" if success else "failed")
+        detail = getattr(result, "detail", "") or ""
+
+        with SessionLocal() as db:
+            alert = db.query(Alert).filter(Alert.id == alert_id).first()
+            if alert is None:
+                logger.warning("Unable to record escalation outcome; alert %s no longer exists", alert_id)
+                return
+            alert.escalation_level = (alert.escalation_level or 0) + 1
+            alert.escalation_triggered_at = datetime.utcnow()
+            alert.escalation_status = status
+            alert.escalation_error = "" if success else detail
+            db.commit()
 
     def get_alert(self, alert_id: int) -> Optional[Alert]:
         return self.db.query(Alert).filter(Alert.id == alert_id).first()

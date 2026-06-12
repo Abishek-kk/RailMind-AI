@@ -1,4 +1,5 @@
 """Notification service"""
+from dataclasses import dataclass
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -8,6 +9,17 @@ from typing import Dict, Any
 from app.core.config import settings
 
 logger = logging.getLogger("railmind.notifications")
+
+
+@dataclass
+class EmailDeliveryResult:
+    success: bool
+    status: str
+    detail: str = ""
+
+    def __bool__(self) -> bool:
+        return self.success
+
 
 class NotificationService:
     """Sends email alerts via SMTP."""
@@ -19,10 +31,10 @@ class NotificationService:
         self.smtp_password = settings.SMTP_PASSWORD
         self.recipients = settings.ALERT_EMAIL_RECIPIENTS
 
-    def send_email_alert(self, alert_payload: Dict[str, Any]) -> bool:
+    def send_email_alert(self, alert_payload: Dict[str, Any]) -> EmailDeliveryResult:
         if not self.recipients:
             logger.warning("No email recipients configured; skipping email alert.")
-            return False
+            return EmailDeliveryResult(False, "no_recipients", "No email recipients configured.")
 
         subject = f"[RailMind CRITICAL] {alert_payload.get('incident_type', 'Incident')} — {alert_payload.get('platform', 'Unknown Platform')}"
         body_html = f"""
@@ -45,17 +57,16 @@ class NotificationService:
         message["To"] = ", ".join(self.recipients)
         message.attach(MIMEText(body_html, "html"))
 
-        # Dry-run mode: treat localhost/empty SMTP host as development mode and
-        # log the full email content instead of attempting to send. Also fall
-        # back to this mode if an SMTP send attempt fails at runtime.
         is_local_host = not self.smtp_host or str(self.smtp_host).lower() in {"localhost", "127.0.0.1", ""}
         if is_local_host:
-            logger.info(
-                "SMTP host configured as localhost/empty; performing email dry-run. Subject: %s\nBody: %s",
+            detail = "SMTP host is localhost or empty; no real email was sent."
+            logger.warning(
+                "%s Subject: %s\nBody: %s",
+                detail,
                 subject,
                 body_html,
             )
-            return True
+            return EmailDeliveryResult(False, "not_configured", detail)
 
         try:
             if self.smtp_port == 465:
@@ -71,19 +82,16 @@ class NotificationService:
                 smtp.sendmail(message["From"], self.recipients, message.as_string())
 
             logger.info("Email alert sent to %s", self.recipients)
-            return True
+            return EmailDeliveryResult(True, "sent")
         except Exception as exc:
-            # Instead of treating SMTP failures as hard errors in local/dev,
-            # log the email contents and return True so downstream logic can
-            # continue as if the notification succeeded.
-            logger.info(
-                "SMTP send failed (%s); falling back to dry-run logging. Subject: %s\nBody: %s",
-                exc,
+            detail = f"SMTP send failed: {exc}"
+            logger.error(
+                "%s. Subject: %s",
+                detail,
                 subject,
-                body_html,
+                exc_info=True,
             )
-            logger.debug("SMTP exception details:", exc_info=True)
-            return True
+            return EmailDeliveryResult(False, "failed", detail)
 
     def send_notification(self, payload: Dict[str, Any]) -> bool:
         logger.info("Sending notification payload: %s", payload)

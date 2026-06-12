@@ -51,6 +51,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=Engine)
     _ensure_feed_stream_url_column()
     _ensure_incident_platform_column()
+    _ensure_alert_delivery_columns()
 
 
 def _ensure_feed_stream_url_column() -> None:
@@ -81,3 +82,23 @@ def _ensure_incident_platform_column() -> None:
         connection.execute(
             text("ALTER TABLE incidents ADD COLUMN platform VARCHAR NOT NULL DEFAULT 'Unknown Platform'")
         )
+
+
+def _ensure_alert_delivery_columns() -> None:
+    """Add notification/escalation visibility columns to existing alerts tables."""
+    inspector = inspect(Engine)
+    if "alerts" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("alerts")}
+    required_columns = {
+        "notification_status": "VARCHAR",
+        "notification_error": "VARCHAR",
+        "escalation_status": "VARCHAR",
+        "escalation_error": "VARCHAR",
+    }
+
+    with Engine.begin() as connection:
+        for column_name, column_type in required_columns.items():
+            if column_name not in columns:
+                connection.execute(text(f"ALTER TABLE alerts ADD COLUMN {column_name} {column_type}"))

@@ -26,6 +26,10 @@ class AlertRead(AlertBase):
     acknowledged_by: Optional[str] = None
     escalation_level: int = 0
     escalation_triggered_at: Optional[datetime] = None
+    escalation_status: Optional[str] = None
+    escalation_error: Optional[str] = None
+    notification_status: Optional[str] = None
+    notification_error: Optional[str] = None
     is_false_positive: bool = False
     lstm_confidence: Optional[float] = None
     resolved_at: Optional[datetime] = None
