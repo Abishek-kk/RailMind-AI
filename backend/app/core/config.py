@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     )
     LSTM_FEATURE_COUNT: int = 7
 
+    ANTHROPIC_API_KEY: str = Field(default="")
+    OPENAI_API_KEY: str = Field(default="")
+
     # LSTM behavior label thresholds
     BEHAVIOR_HIGH_SCORE_THRESHOLD: float = 0.65
     BEHAVIOR_ERRATIC_SCORE_THRESHOLD: float = 0.4
