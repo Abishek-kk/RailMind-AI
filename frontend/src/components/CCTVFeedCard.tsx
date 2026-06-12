@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Pause, Play, Maximize2, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
@@ -11,11 +11,12 @@ function levelToColor(level: string) {
 export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: CCTVFeed; detections?: BoundingBox[]; onRemove?: (feedId: string) => void; removing?: boolean }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const isActuallyLive = feed.status === "online" && !isPaused;
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
   const [videoError, setVideoError] = useState(false);
 
@@ -25,6 +26,10 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
       setFrozenBoxes(detections);
     }
   }, [detections, isPaused]);
+
+  useEffect(() => {
+    setVideoError(false);
+  }, [feed.streamUrl]);
 
   // Imperatively control playback — autoPlay only fires once on mount.
   useEffect(() => {
@@ -47,6 +52,29 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
   }, [isMuted]);
 
   const activeDetections = isPaused ? frozenBoxes : (detections ?? []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Prevent the page from scrolling when the pointer is over the CCTV card.
+    // Allow the container itself to scroll if it has overflow; otherwise just
+    // consume the wheel event so the outer page doesn't move.
+    const el = scrollRef.current;
+    if (!el) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    const canScrollVertically = el.scrollHeight > el.clientHeight;
+    if (canScrollVertically) {
+      // Scroll the container itself.
+      e.preventDefault();
+      el.scrollTop += e.deltaY;
+    } else {
+      // Consume the event so the page doesn't scroll.
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, []);
 
   function handlePlayPauseToggle() {
     setIsPaused(!isPaused);
@@ -74,7 +102,12 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
           {isActuallyLive ? "LIVE" : isPaused ? "PAUSED" : "OFFLINE"}
         </span>
       </div>
-      <div className="relative aspect-video overflow-hidden bg-black">
+      <div
+        ref={scrollRef}
+        onWheel={handleWheel}
+        className="relative aspect-video overflow-hidden bg-black"
+        style={{ overscrollBehavior: "contain" }}
+      >
         {feed.streamUrl && !videoError ? (
           <video
             ref={videoRef}
@@ -86,6 +119,18 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
             className="h-full w-full object-cover"
             playsInline
             onError={() => setVideoError(true)}
+            onCanPlay={() => {
+              setVideoError(false);
+              try {
+                videoRef.current?.play();
+              } catch {}
+            }}
+            onLoadedData={(e) => {
+              setVideoError(false);
+              try {
+                (e.currentTarget as HTMLVideoElement).play();
+              } catch {}
+            }}
           />
         ) : (
           <img
@@ -202,7 +247,14 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
                 LIVE
               </span>
             </div>
-            <div className="relative w-full bg-black max-h-[80vh] overflow-hidden">
+            <div
+              className="relative w-full bg-black max-h-[80vh] overflow-hidden"
+              onWheel={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              style={{ overscrollBehavior: "contain" }}
+            >
               {feed.streamUrl && !videoError ? (
                 <video
                   src={feed.streamUrl}
@@ -213,6 +265,24 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
                   className="w-full max-h-[80vh] object-contain"
                   playsInline
                   onError={() => setVideoError(true)}
+                  onCanPlay={() => {
+                    setVideoError(false);
+                    // attempt to play the fullscreen video element
+                    try {
+                      const els = document.getElementsByTagName('video');
+                      for (const el of Array.from(els)) {
+                        if (el.src === feed.streamUrl) {
+                          el.play().catch(() => {});
+                        }
+                      }
+                    } catch {}
+                  }}
+                  onLoadedData={(e) => {
+                    setVideoError(false);
+                    try {
+                      (e.currentTarget as HTMLVideoElement).play().catch(() => {});
+                    } catch {}
+                  }}
                 />
               ) : (
                 <img

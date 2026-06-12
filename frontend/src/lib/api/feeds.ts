@@ -28,17 +28,34 @@ function resolveStreamUrl(streamUrl: string | undefined): string | undefined {
   if (streamUrl.startsWith("http://") || streamUrl.startsWith("https://")) {
     return streamUrl;
   }
+
   // Derive the backend origin from VITE_API_BASE_URL env var, or fall back to
   // the default backend address used in development.
   const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+  const baseToUse = apiBase.startsWith("/") && typeof window !== "undefined"
+    ? `${window.location.origin}${apiBase}`
+    : apiBase;
+
+  if (apiBase.startsWith("/")) {
+    console.warn(
+      "VITE_API_BASE_URL is set to a relative path. Video stream URLs need the backend origin (e.g. http://localhost:8000/api)."
+    );
+  }
+
+  const encodedPath = streamUrl
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
   try {
-    const baseToUse = apiBase.startsWith("/") && typeof window !== "undefined"
-      ? `${window.location.origin}${apiBase}`
-      : apiBase;
-    const origin = new URL(baseToUse).origin;
-    return `${origin}${streamUrl.startsWith("/") ? "" : "/"}${streamUrl}`;
+    return new URL(streamUrl, baseToUse).href;
   } catch {
-    return streamUrl;
+    try {
+      const origin = new URL(baseToUse).origin;
+      return streamUrl.startsWith("/") ? `${origin}${encodedPath}` : `${origin}/${encodedPath}`;
+    } catch {
+      return streamUrl;
+    }
   }
 }
 

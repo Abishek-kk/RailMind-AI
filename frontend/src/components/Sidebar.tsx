@@ -44,7 +44,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar">
+    <aside className="flex sticky top-0 h-screen w-64 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-3 border-b border-border px-5 py-5">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-lg shadow-indigo-500/30">
           <Train className="h-6 w-6 text-white" />
