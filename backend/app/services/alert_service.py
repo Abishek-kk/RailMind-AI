@@ -54,7 +54,7 @@ class AlertService:
                 query = query.filter(Alert.platform == filters["platform"])
         return query.order_by(Alert.timestamp.desc()).all()
 
-    def create_alert(self, payload: Dict[str, any], start_escalation_timer: bool = True) -> Alert:
+    def create_alert(self, payload: Dict[str, Any], start_escalation_timer: bool = True) -> Alert:
         alert = Alert(**payload)
         self.db.add(alert)
         self.db.commit()

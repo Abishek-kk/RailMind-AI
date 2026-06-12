@@ -107,16 +107,60 @@ async def startup_event():
     # Ensure default LSTM models exist so the LSTMPredictor can load placeholder
     # models in environments where saved_models/ is empty (e.g., fresh clones).
     try:
-        model_dir = generate_default_models.MODEL_DIR
-        missing = [m for m in generate_default_models.MODEL_FILES if not os.path.exists(os.path.join(model_dir, m))]
-        if missing:
+        _ensure_lstm_models()
+    except Exception as e:
+        print(f"Error ensuring LSTM model bootstrap: {e}")
+
+
+def _ensure_lstm_models() -> None:
+    """Ensure the configured LSTM model files exist at startup."""
+    model_dir = settings.MODEL_DIR
+    required_files = [
+        "suicide_classifier.pt",
+        "pickpocket_classifier.pt",
+        "anomaly_classifier.pt",
+    ]
+    missing = [f for f in required_files if not os.path.exists(os.path.join(model_dir, f))]
+    if missing:
+        print(
+            f"Missing LSTM model files in {model_dir}: {missing}. "
+            "Generating untrained placeholder models for local development. "
+            "These models are not production-ready and must be retrained before use."
+        )
+        os.makedirs(model_dir, exist_ok=True)
+        generate_default_models.main(target_dir=model_dir)
+
+    # Ensure the pose model file exists. If not, attempt to trigger ultralytics
+    # to download it by instantiating `YOLO(model_path)`. This allows first-time
+    # setup on machines where the model isn't checked in.
+    try:
+        pose_path = settings.POSE_MODEL_PATH
+        if not os.path.exists(pose_path):
+            print(f"Pose model not found at {pose_path}. Attempting to download via ultralytics...")
             try:
-                generate_default_models.main()
+                from ultralytics import YOLO
+
+                # Instantiating YOLO with the model filename will auto-download
+                # the weights to the given path if necessary.
+                try:
+                    YOLO(pose_path)
+                    print("Pose model download/initialization succeeded.")
+                except Exception as inner_e:
+                    print(f"Pose model initialization failed: {inner_e}")
             except Exception as e:
-                # If model generation fails, log and continue; predictor will return 0.0.
-                print(f"Error generating default LSTM models: {e}")
+                print(
+                    "ultralytics not available or download failed:",
+                    e,
+                    "\nInstall ultralytics or place the pose model at the path specified by POSE_MODEL_PATH",
+                )
     except Exception:
-        # Non-fatal; continue startup even if model generation check fails.
+        # Non-fatal; startup continues even if pose model check fails.
+        pass
+
+    # Ensure there are mock feed videos available for the demo.
+    try:
+        _ensure_mock_feed_videos(settings.MOCK_FEED_DIR, required=2)
+    except Exception:
         pass
 
     _ensure_default_station_feeds()
@@ -178,6 +222,57 @@ def _ensure_default_station_feeds() -> None:
                 start_processor(video_path, feed.id, feed_info["platform"])
             except Exception as e:
                 print(f"Failed to start default station processor for {feed.id}: {e}")
+
+
+def _ensure_mock_feed_videos(video_dir: str, required: int = 2) -> None:
+    """Ensure there are at least `required` video files in `video_dir`.
+
+    If not present, attempt to generate simple synthetic MP4 files using OpenCV.
+    This allows the demo to run out-of-the-box without checked-in binaries.
+    """
+    try:
+        os.makedirs(video_dir, exist_ok=True)
+    except Exception:
+        return
+
+    existing = sorted(
+        glob.glob(os.path.join(video_dir, "*.mp4"))
+        + glob.glob(os.path.join(video_dir, "*.mov"))
+    )
+    if len(existing) >= required:
+        return
+
+    # Try to create synthetic videos if OpenCV is available.
+    try:
+        import cv2
+        import numpy as np
+
+        width, height = 640, 360
+        fps = 10
+        duration_seconds = 5
+        frames = fps * duration_seconds
+
+        for i in range(required - len(existing)):
+            filename = f"sample_station_{i+1}.mp4"
+            path = os.path.join(video_dir, filename)
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            out = cv2.VideoWriter(path, fourcc, float(fps), (width, height))
+            for f in range(frames):
+                img = 30 * np.ones((height, width, 3), dtype="uint8")
+                # moving rectangle
+                x = int((width - 100) * (f / frames))
+                y = int((height - 50) * (f / frames))
+                cv2.rectangle(img, (x, y), (x + 100, y + 50), (0, 200, 0), -1)
+                cv2.putText(img, f"Sample {i+1}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                out.write(img)
+            out.release()
+            print(f"Generated synthetic mock feed video: {path}")
+    except Exception as e:
+        # If generation fails (no cv2, no write permission, etc.), log and continue.
+        try:
+            print("Unable to generate synthetic mock videos (OpenCV missing or error):", e)
+        except Exception:
+            pass
 
 @app.get("/")
 async def root():

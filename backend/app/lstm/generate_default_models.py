@@ -4,6 +4,8 @@ import logging
 
 import torch
 
+from app.core.config import settings
+
 script_dir = os.path.dirname(__file__)
 sys.path.insert(0, script_dir)
 from model import build_lstm_model
@@ -29,10 +31,11 @@ def create_default_model(model_file_path: str):
     logger.info("Saved default LSTM model: %s", model_file_path)
 
 
-def main():
-    os.makedirs(MODEL_DIR, exist_ok=True)
+def main(target_dir: str | None = None):
+    model_dir = target_dir or MODEL_DIR
+    os.makedirs(model_dir, exist_ok=True)
     for model_file in MODEL_FILES:
-        model_file_path = os.path.join(MODEL_DIR, model_file)
+        model_file_path = os.path.join(model_dir, model_file)
         if os.path.exists(model_file_path):
             logger.info("Model already exists, skipping: %s", model_file_path)
             continue
