@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from threading import Lock
 from typing import Dict, Any, TypedDict, List
 from langgraph.graph import StateGraph, END
 from app.agents.perception_agent import perception_node
@@ -33,16 +35,43 @@ def build_agent_graph():
     # Compile the graph
     return workflow.compile()
 
+# Compile the LangGraph pipeline once at module import time and expose it
+# as a module-level singleton to avoid recompiling on every frame.
+_logger = logging.getLogger("app.agents.agent_graph")
+_COMPILED_AGENT_PIPELINE = None
+_COMPILED_AGENT_PIPELINE_LOCK = Lock()
+
+try:
+    _COMPILED_AGENT_PIPELINE = build_agent_graph()
+    _logger.info("Compiled LangGraph agent pipeline at module import")
+except Exception as _exc:  # pragma: no cover - defensive logging on import
+    _logger.exception("Failed to compile LangGraph pipeline at import: %s", _exc)
+    _COMPILED_AGENT_PIPELINE = None
+
 async def run_agent_pipeline(raw_cv_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Entry point to be called by the FastAPI/CV pipeline.
     Passes raw frame data into the LangGraph execution.
     """
     initial_state = {"raw_data": raw_cv_data}
-    agent_pipeline = build_agent_graph()
-    
-    # Invoke the LangGraph pipeline
-    # LangGraph returns the final state object after traversing all nodes
-    final_state = await asyncio.to_thread(agent_pipeline.invoke, initial_state)
-    
+
+    # Reuse the module-level compiled pipeline. If compilation failed at
+    # import time, attempt a lazy, thread-safe compile on first use.
+    pipeline = _COMPILED_AGENT_PIPELINE
+    if pipeline is None:
+        with _COMPILED_AGENT_PIPELINE_LOCK:
+            # Double-check inside the lock
+            if _COMPILED_AGENT_PIPELINE is None:
+                try:
+                    _logger.info("Lazy-compiling LangGraph pipeline on first use")
+                    globals()['_COMPILED_AGENT_PIPELINE'] = build_agent_graph()
+                except Exception as exc:  # pragma: no cover - runtime fallback
+                    _logger.exception("Failed to compile LangGraph pipeline on demand: %s", exc)
+                    raise
+            pipeline = _COMPILED_AGENT_PIPELINE
+
+    # Invoke the LangGraph pipeline on a worker thread; it is safe to call
+    # concurrently as the compiled pipeline instance is stateless per-invocation.
+    final_state = await asyncio.to_thread(pipeline.invoke, initial_state)
+
     return final_state
