@@ -1,4 +1,4 @@
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
 function buildUrl(path: string) {
   const normalizedBase = baseUrl.replace(/\/+$/, "");
