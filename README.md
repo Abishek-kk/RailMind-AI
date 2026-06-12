@@ -607,11 +607,7 @@ The React dashboard provides a centralised monitoring interface accessible from 
 
 Real-time view of all active CCTV feeds with AI-annotated bounding boxes, track IDs, and live risk classifications overlaid directly on the video stream.
 
-<<<<<<< HEAD
 ![Live Monitoring — Real-time CCTV feeds with AI-annotated detections](assets/live.png)
-=======
-![Live Monitoring — Real-time CCTV feeds with AI-annotated detections](live.png)
->>>>>>> c9f80055ddfbc127771a7e7610e59eca994c414a
 
 **Key features:**
 - 2×2 grid of simultaneous live feeds (expandable to full-screen per camera)
@@ -627,11 +623,7 @@ Real-time view of all active CCTV feeds with AI-annotated bounding boxes, track 
 
 Analytics overview aggregating incident data across all platforms and cameras.
 
-<<<<<<< HEAD
 ![Dashboard — Analytics overview with incident trends, heatmaps, and CCTV summary](assets/dashboard.png)
-=======
-![Dashboard — Analytics overview with incident trends, heatmaps, and CCTV summary](dashboard.png)
->>>>>>> c9f80055ddfbc127771a7e7610e59eca994c414a
 
 **Key features:**
 - KPI cards: Total Incidents · Active Alerts · Suicide Risk · Pickpocketing Risk · Security Threats (all with day-over-day delta)
@@ -649,11 +641,7 @@ Analytics overview aggregating incident data across all platforms and cameras.
 
 Centralised alert management interface for security staff to triage, acknowledge, and resolve incidents.
 
-<<<<<<< HEAD
 ![Alerts — Full alert list with risk scores, status tracking, and incident detail panel](assets/alerts.png)
-=======
-![Alerts — Full alert list with risk scores, status tracking, and incident detail panel](alearts.png)
->>>>>>> c9f80055ddfbc127771a7e7610e59eca994c414a
 
 **Key features:**
 - Tab navigation: All Alerts (28) · High Risk (8) · Medium Risk (13) · Low Risk (7) · Resolved (15)
@@ -670,11 +658,7 @@ Centralised alert management interface for security staff to triage, acknowledge
 
 Quick-access dropdown for filtering any view to a specific platform camera.
 
-<<<<<<< HEAD
 ![CCTV Feed Selector — Per-platform camera filter dropdown](assets/alt2.png)
-=======
-![CCTV Feed Selector — Per-platform camera filter dropdown](alt2.png)
->>>>>>> c9f80055ddfbc127771a7e7610e59eca994c414a
 
 Supports instant switching between CCTV-1 through CCTV-5 across all dashboard views.
 
