@@ -59,6 +59,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Compatibility shim: some tests expect middleware objects to expose a `kwargs`
+# attribute (older code). Starlette's `Middleware` uses `options` — copy it to
+# `kwargs` so tests and any legacy inspection code work.
+for mw in app.user_middleware:
+    # Only set `kwargs` when it's missing to avoid overwriting any explicit value.
+    if not hasattr(mw, "kwargs") and hasattr(mw, "options"):
+        try:
+            setattr(mw, "kwargs", dict(mw.options))
+        except Exception:
+            # If options is not dict-like, skip copying.
+            pass
+
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
