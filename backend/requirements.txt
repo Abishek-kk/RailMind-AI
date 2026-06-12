@@ -40,5 +40,8 @@ alembic>=1.13.0
 # Messaging
 twilio>=8.0.0
 
+# Background job scheduling
+apscheduler>=3.10.4
+
 # Logging and monitoring
 loguru==0.7.2

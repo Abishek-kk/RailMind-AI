@@ -9,6 +9,7 @@ from app.api.routes import api_router
 from app.core.config import settings
 from app.core.database import SessionLocal, init_db
 from app.core import websocket_manager
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.core.processor_manager import start_processor
 from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
@@ -35,9 +36,13 @@ async def lifespan(app: FastAPI):
 
     _ensure_default_station_feeds()
 
+    # Start background scheduler for LSTM retraining
+    start_scheduler()
+
     yield
 
-    # Shutdown: placeholder for graceful cleanup if required later.
+    # Shutdown: cleanup scheduler and other resources
+    stop_scheduler()
 
 
 app = FastAPI(
@@ -105,27 +110,30 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.websocket("/ws/alerts")
 async def websocket_alerts_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for streaming live alerts and detections to frontend clients.
-
-    This endpoint performs a basic origin check against `settings.BACKEND_CORS_ORIGINS`
-    to mimic the CORS protections used for HTTP endpoints. Browsers include an
-    `Origin` header during the WebSocket handshake so we validate it and reject
-    connections from unknown origins with a 403-like close code.
-    """
-    # For local development accept incoming WebSocket handshakes without
-    # strict origin validation. Production deployments should enforce origins.
+    """WebSocket endpoint for streaming live alerts and detections to frontend clients."""
     try:
-        await websocket_manager.manager.connect(websocket)
+        await websocket_manager.manager.connect(websocket, channel="alerts")
         try:
             while True:
-                # Keep the connection open to allow server pushes; echo incoming pings if any
                 await websocket.receive_text()
         except WebSocketDisconnect:
             websocket_manager.manager.disconnect(websocket)
     except Exception:
-        # Ensure clean disconnect on unexpected errors
         websocket_manager.manager.disconnect(websocket)
 
+
+@app.websocket("/ws/feed/{camera_id}")
+async def websocket_feed_endpoint(websocket: WebSocket, camera_id: str):
+    """WebSocket endpoint for streaming annotated feed data for a specific camera."""
+    try:
+        await websocket_manager.manager.connect(websocket, channel=f"feed:{camera_id}")
+        try:
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            websocket_manager.manager.disconnect(websocket)
+    except Exception:
+        websocket_manager.manager.disconnect(websocket)
 
 
 def _ensure_lstm_models() -> None:

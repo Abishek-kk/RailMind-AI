@@ -290,26 +290,36 @@ class VideoProcessor:
 
                     if "websocket_broadcast_required" in execution_status:
                         await manager.broadcast_detection(alert_payload)
-                    if "email_alert_required" in execution_status:
-                        # Check cooldown before sending email alert
-                        alert_time = time.time()
-                        last_alert_time = self.email_alert_cooldown.get(track_id, 0)
-                        time_since_last_alert = alert_time - last_alert_time
-                        
-                        if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
-                            # Cooldown expired or first alert for this track - send email
-                            await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
-                            self.email_alert_cooldown[track_id] = alert_time
-                            logger.info(f"Email alert sent for track {track_id}")
-                        else:
-                            # Cooldown still active - skip email but log for debugging
-                            remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
-                            logger.debug(
-                                f"Email alert skipped for track {track_id}: "
-                                f"cooldown active for {remaining_cooldown:.1f}s more"
-                            )
-                    if "sms_escalation_required" in execution_status:
-                        await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
+
+                    is_acknowledged = self.incident_service.is_track_acknowledged(
+                        person_id=str(track_id), camera_id=self.camera_id
+                    )
+
+                    if is_acknowledged:
+                        logger.info(
+                            f"Skipping notification for acknowledged track {track_id} on camera {self.camera_id}"
+                        )
+                    else:
+                        if "email_alert_required" in execution_status:
+                            # Check cooldown before sending email alert
+                            alert_time = time.time()
+                            last_alert_time = self.email_alert_cooldown.get(track_id, 0)
+                            time_since_last_alert = alert_time - last_alert_time
+                            
+                            if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
+                                # Cooldown expired or first alert for this track - send email
+                                await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
+                                self.email_alert_cooldown[track_id] = alert_time
+                                logger.info(f"Email alert sent for track {track_id}")
+                            else:
+                                # Cooldown still active - skip email but log for debugging
+                                remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
+                                logger.debug(
+                                    f"Email alert skipped for track {track_id}: "
+                                    f"cooldown active for {remaining_cooldown:.1f}s more"
+                                )
+                        if "sms_escalation_required" in execution_status:
+                            await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
 
                     # 6. Accumulate visual metadata overlay values
                     active_frame_detections.append({
