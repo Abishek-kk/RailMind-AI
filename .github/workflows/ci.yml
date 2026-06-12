@@ -57,18 +57,19 @@ jobs:
         run: |
           npx http-server dist -p 5173 &
 
-      - name: Wait for backend API
+      - name: Wait for backend and frontend services
         run: |
-          echo "Waiting for backend at http://127.0.0.1:8000/api/health"
+          echo "Waiting for backend docs and frontend build to become available"
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:8000/api/health | grep -q '"status":"online"'; then
-              echo "Backend available"
+            if curl --silent --fail http://127.0.0.1:8000/docs >/dev/null 2>&1 && curl --silent --fail http://127.0.0.1:5173 >/dev/null 2>&1; then
+              echo "Backend and frontend are available"
               exit 0
             fi
-            echo "Backend not ready yet, retrying ($i/30)..."
-            sleep 2
+            echo "Services not ready yet, retrying ($i/30)..."
+            sleep 1
           done
-          echo "Backend failed to become ready"
+          echo "Services failed to become ready"
+          echo "=== backend server log ==="
           cat backend/backend-server.log || true
           exit 1
 
