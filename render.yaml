@@ -18,10 +18,9 @@ services:
       - key: CORS_ORIGINS
         value: https://railmind-frontend.onrender.com
 
-  # Frontend - React/Vite
-  - type: web
+  # Frontend - React/Vite (Static Site)
+  - type: static
     name: railmind-frontend
-    runtime: node
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
