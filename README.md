@@ -913,7 +913,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 **RailMind AI** — Making railway stations safer, one frame at a time.
 
-*Built with by Team Accelerate for FAR AWAY 2026*
+*Built with by Team Accelerate for FAR AWAY Hackthon 2026*
 
 
 
