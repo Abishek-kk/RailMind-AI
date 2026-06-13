@@ -111,15 +111,12 @@ async def get_incident_trend(days: int = 7, db = Depends(get_db)):
     start_date = today - timedelta(days=days - 1)
     start_at = datetime.combine(start_date, time.min)
 
-    grouped_alerts = db.query(
-        cast(Alert.timestamp, Date).label("alert_date"),
+    # Fetch raw alerts and process in Python to avoid SQLAlchemy casting issues
+    alerts = db.query(
+        Alert.timestamp,
         Alert.incident_type,
-        func.count(Alert.id).label("count"),
     ).filter(
         Alert.timestamp >= start_at,
-    ).group_by(
-        cast(Alert.timestamp, Date),
-        Alert.incident_type,
     ).all()
 
     rows = {
@@ -130,13 +127,15 @@ async def get_incident_trend(days: int = 7, db = Depends(get_db)):
         for i in range(days)
     }
 
-    for alert_date, incident_type, count in grouped_alerts:
-        if alert_date not in rows:
+    # Process alerts in Python
+    for alert in alerts:
+        alert_date = alert.timestamp.date() if alert.timestamp else None
+        if not alert_date or alert_date not in rows:
             continue
 
-        bucket = get_trend_bucket(incident_type)
+        bucket = get_trend_bucket(alert.incident_type)
         if bucket:
-            rows[alert_date][bucket] += count
+            rows[alert_date][bucket] += 1
 
     return [rows[day] for day in sorted(rows)]
 
