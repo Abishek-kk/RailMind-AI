@@ -68,7 +68,7 @@ The platform addresses two critical railway challenges:
 
 ### Why RailMind AI?
 
-Railway stations are high-density public spaces where critical incidents can occur with little warning. Despite extensive CCTV coverage, most surveillance systems are **reactive** — they record incidents rather than prevent them. Human operators monitoring dozens of feeds simultaneously miss critical behavioural cues. **RailMind AI closes that gap.**
+Railway stations are high-density public spaces where critical incidents can occur with little warning. Despite extensive CCTV coverage, most surveillance systems are **reactive** — they record incidents rather than prevent them. Human operators monitoring dozens of feeds simultaneously miss critical behavioural cues. **<span style="color:#0A84FF">RailMind AI closes that gap.</span>**
 
 ---
 
@@ -913,7 +913,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 **RailMind AI** — Making railway stations safer, one frame at a time.
 
-*Built with by Team Accelerate for FAR AWAY Hackthon 2026*
+*Built with by Team Accelerate for FAR AWAY Hackathon 2026*
 
 
 
