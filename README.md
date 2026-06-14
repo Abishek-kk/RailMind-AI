@@ -46,6 +46,7 @@
 - [API Reference](#-api-reference)
 - [Dashboard & Screenshots](#-dashboard--screenshots)
 - [Edge Deployment](#-edge-deployment)
+- [Cloud Deployment (Railway)](#-cloud-deployment-railway)
 - [Privacy & Ethics](#-privacy--ethics)
 - [Testing](#-testing)
 - [Roadmap](#-roadmap)
@@ -701,6 +702,33 @@ For production deployment on **NVIDIA Jetson Orin Nano**:
 | LSTM inference | < 5ms per sequence |
 | Bandwidth saving | ~99.9% vs raw video streaming |
 | Offline buffer | 24 hours if cloud connectivity lost |
+
+---
+
+## Cloud Deployment (Railway)
+
+RailMind AI can be deployed on [Railway](https://railway.app) in a monorepo configuration using two separate services pointing to the same repository.
+
+### 1. Deploying the Backend Service (`/backend`)
+* Create a new service from your GitHub repository.
+* Go to the service **Settings** tab.
+* Under **General / Root Directory**, set it to `backend`.
+* In the **Variables** tab, add your environment variables:
+  * `POSE_DEVICE=cpu` (runs YOLO/LSTM inference on CPU)
+  * `POSE_MODEL_PATH=./yolov8n-pose.pt`
+  * `DATABASE_URL` (reference your Railway PostgreSQL database instance URL)
+  * `CORS_ORIGINS` (set this to your Frontend Service domain once deployed, e.g. `https://your-frontend.up.railway.app`)
+
+### 2. Deploying the Frontend Service (`/frontend`)
+* In the same project, add another service from the same GitHub repository.
+* Go to the service **Settings** tab.
+* Under **General / Root Directory**, set it to `frontend`.
+* Under **Build & Deploy** settings:
+  * **Build Command**: `npm run build`
+  * **Start Command**: `npm run preview -- --port $PORT --host 0.0.0.0`
+* In the **Variables** tab, add the environment variables:
+  * `VITE_API_BASE_URL`: Set this to your backend service's URL with `/api` appended (e.g., `https://your-backend-service.up.railway.app/api`).
+  * `VITE_WS_URL`: Set this to your backend service's WebSocket URL (e.g., `wss://your-backend-service.up.railway.app`).
 
 ---
 
