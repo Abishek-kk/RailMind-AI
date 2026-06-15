@@ -5,7 +5,7 @@
 # RailMind AI
 ### Intelligent Railway Safety & Security System
 
-**Transforming passive CCTV infrastructure into proactive, life-saving intelligence.**
+**Transforming passive CCTV infrastructure into proactive,life-saving intelligence.**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
