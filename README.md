@@ -871,44 +871,57 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 
 ```
 RailMind-AI/
- backend/
- app/
- agents/ # LangGraph multi-agent pipeline
- agent_graph.py
- perception_agent.py
- reasoning_agent.py
- intervention_agent.py
- cv/ # Computer vision pipeline
- video_processor.py
- pose_estimator.py
- lstm_behavior.py
- features/ # Behavioural feature detectors
- edge_proximity.py
- loitering_detector.py
- pacing_detector.py
- following_detector.py
- movement_analyzer.py
- lstm/ # LSTM model definition & training
- model.py
- trainer.py
- predictor.py
- cli.py
- api/routes/ # FastAPI route handlers
- services/ # Business logic services
- analytics/ # Dashboard metrics & heatmaps
- models/ # SQLAlchemy database models
- core/ # Config, database, WebSocket manager
- training/ # Training scripts & notebooks
- tests/ # Pytest test suite
- requirements.txt
- frontend/
- src/
- routes/ # Dashboard, alerts, live feed pages
- components/ # Reusable UI components
- lib/api/ # API client functions
- hooks/ # Custom React hooks
- tests/e2e/ # Playwright E2E tests
- README.md
+│
+├── backend/
+│   ├── app/
+│   │   ├── agents/                     # LangGraph multi-agent pipeline
+│   │   │   ├── agent_graph.py
+│   │   │   ├── perception_agent.py
+│   │   │   ├── reasoning_agent.py
+│   │   │   └── intervention_agent.py
+│   │   │
+│   │   ├── cv/                         # Computer Vision pipeline
+│   │   │   ├── video_processor.py
+│   │   │   ├── pose_estimator.py
+│   │   │   └── lstm_behavior.py
+│   │   │
+│   │   ├── features/                   # Behavioural feature detectors
+│   │   │   ├── edge_proximity.py
+│   │   │   ├── loitering_detector.py
+│   │   │   ├── pacing_detector.py
+│   │   │   ├── following_detector.py
+│   │   │   └── movement_analyzer.py
+│   │   │
+│   │   ├── lstm/                       # LSTM model definition & training
+│   │   │   ├── model.py
+│   │   │   ├── trainer.py
+│   │   │   └── predictor.py
+│   │   │
+│   │   ├── api/
+│   │   │   └── routes/                 # FastAPI route handlers
+│   │   │
+│   │   ├── services/                   # Business logic services
+│   │   ├── analytics/                  # Dashboard metrics & heatmaps
+│   │   ├── models/                     # SQLAlchemy database models
+│   │   └── core/                       # Config, database, WebSocket manager
+│   │
+│   ├── training/                       # Training scripts & notebooks
+│   ├── tests/                          # Pytest test suite
+│   ├── cli.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   │   ├── routes/                     # Dashboard, alerts, live feed pages
+│   │   ├── components/                 # Reusable UI components
+│   │   ├── lib/
+│   │   │   └── api/                    # API client functions
+│   │   └── hooks/                      # Custom React hooks
+│   │
+│   └── tests/
+│       └── e2e/                        # Playwright E2E tests
+│
+└── README.md
 ```
 
 ---
