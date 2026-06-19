@@ -6,6 +6,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  RAILMIND_E2E_API_KEY: ci-e2e-api-key
 
 jobs:
   test:
@@ -42,6 +43,10 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8000/api
+          VITE_RAILMIND_API_KEY: ${{ env.RAILMIND_E2E_API_KEY }}
+          VITE_WS_URL: ws://127.0.0.1:8000
         run: |
           npm run build
 
@@ -52,11 +57,17 @@ jobs:
 
       - name: Start backend server
         working-directory: backend
+        env:
+          RAILMIND_API_KEY: ${{ env.RAILMIND_E2E_API_KEY }}
         run: |
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend-server.log 2>&1 &
 
       - name: Serve frontend build
         working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8000/api
+          VITE_RAILMIND_API_KEY: ${{ env.RAILMIND_E2E_API_KEY }}
+          VITE_WS_URL: ws://127.0.0.1:8000
         run: |
           npm run preview -- --host 127.0.0.1 --port 5173 &
 
@@ -81,5 +92,6 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:5173
           E2E_API_BASE: http://127.0.0.1:8000/api
+          E2E_RAILMIND_API_KEY: ${{ env.RAILMIND_E2E_API_KEY }}
         run: |
           npx playwright test --reporter=github
