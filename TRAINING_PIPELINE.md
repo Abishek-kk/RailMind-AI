@@ -98,17 +98,15 @@ while True:
 
 ### 2. CLI Training (Development/Manual)
 
-**Train all models:**
+**Train the 4-class behavior classifier:**
 ```bash
 cd backend
 python -m app.lstm.cli train
 ```
 
-**Train specific model:**
+**Train the behavior classifier explicitly:**
 ```bash
-python -m app.lstm.cli train --type suicide_classifier
-python -m app.lstm.cli train --type pickpocket_classifier
-python -m app.lstm.cli train --type anomaly_classifier
+python -m app.lstm.cli train --type behavior_classifier
 ```
 
 **Custom training parameters:**
@@ -144,7 +142,7 @@ python run.py --mode train-cli --model-type all --epochs 30 --batch-size 32
 ### 4. Automatic Weekly Retraining
 
 The scheduler automatically runs every **Sunday at 2 AM UTC**:
-- Trains all three classifiers
+- Trains the 4-class behavior classifier
 - Stores results in database
 - Can be monitored via API
 
@@ -222,7 +220,7 @@ Each training run stores:
   "id": 1,
   "triggered_by": "manual|scheduled|api|cli",
   "status": "pending|running|completed|failed",
-  "model_type": "all|suicide_classifier|pickpocket_classifier|anomaly_classifier",
+  "model_type": "all|behavior_classifier",
   "epochs": 30,
   "batch_size": 32,
   "final_train_loss": 0.0123,
@@ -241,16 +239,14 @@ Each training run stores:
 ## Model Files
 
 Trained models are saved in the configured `MODEL_DIR` (default: `backend/lstm/saved_models/`):
-- `suicide_classifier.pt` - Binary classifier for suicide risk
-- `pickpocket_classifier.pt` - Binary classifier for pickpocketing
-- `anomaly_classifier.pt` - Binary classifier for security threats
-- `*_scaler.pkl` - StandardScaler objects for feature normalization
+- `behavior_classifier.pt` - 4-class classifier for normal, suicide risk, pickpocketing, and security threat behavior
+- `behavior_classifier_scaler.pkl` - StandardScaler object for feature normalization
 
 ## Production Readiness
 
 A training run is marked as `is_production_ready=true` when:
 - Training completes successfully
-- All models achieve ≥75% validation accuracy
+- The behavior classifier achieves >=75% validation accuracy
 - No errors during execution
 
 ## Monitoring & Debugging

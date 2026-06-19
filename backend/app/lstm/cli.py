@@ -18,7 +18,7 @@ def train_command(args):
     
     Examples:
         python -m app.lstm.cli train                     # Train all models
-        python -m app.lstm.cli train --type suicide_classifier   # Train specific model
+        python -m app.lstm.cli train --type behavior_classifier
         python -m app.lstm.cli train --epochs 50 --batch-size 16
     """
     db = SessionLocal()
@@ -149,7 +149,7 @@ def main():
     train_parser.add_argument(
         "--type",
         default="all",
-        choices=["all", "suicide_classifier", "pickpocket_classifier", "anomaly_classifier"],
+        choices=["all", "behavior_classifier"],
         help="Model type to train (default: all)",
     )
     train_parser.add_argument(

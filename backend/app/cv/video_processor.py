@@ -188,6 +188,7 @@ class VideoProcessor:
                         }
                         for _, person in matched_detections
                     ],
+                    db=self.db,
                 )
 
                 for track_id, person in matched_detections:

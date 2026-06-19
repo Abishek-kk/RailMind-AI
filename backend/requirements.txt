@@ -33,6 +33,8 @@ requests==2.31.0
 
 # Agent orchestration
 langgraph==0.5.4
+openai>=1.68.0,<2.0.0
+anthropic>=0.34.0,<1.0.0
 
 # Database migrations
 alembic>=1.13.0

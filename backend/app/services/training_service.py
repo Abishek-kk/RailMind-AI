@@ -13,8 +13,8 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.lstm.train import (
     SyntheticDataGenerator,
-    create_binary_dataset,
-    train_classifier,
+    create_multiclass_dataset,
+    train_behavior_classifier,
 )
 from app.models.training_run import TrainingRun
 
@@ -128,7 +128,7 @@ class TrainingService:
         
         Args:
             run_id: Training run ID to track this execution
-            model_type: "all", "suicide_classifier", "pickpocket_classifier", or "anomaly_classifier"
+            model_type: "all" or "behavior_classifier"
             epochs: Number of training epochs
             batch_size: Batch size for training
         """
@@ -150,58 +150,35 @@ class TrainingService:
             # Create model directory
             os.makedirs(settings.MODEL_DIR, exist_ok=True)
 
-            # Define training tasks
-            classifiers = [
-                ("Suicide Risk", "suicide_classifier.pt", data["normal"], data["suicide"]),
-                ("Pickpocket", "pickpocket_classifier.pt", data["normal"], data["pickpocket"]),
-                ("Security Threat/Anomaly", "anomaly_classifier.pt", data["normal"], data["security_threat"]),
-            ]
+            if model_type not in {"all", "behavior_classifier"}:
+                raise ValueError("Only the 4-class behavior_classifier model is supported")
 
-            # Filter based on model_type
-            if model_type != "all":
-                classifiers = [c for c in classifiers if c[1].replace("_classifier.pt", "") == model_type.replace("_classifier", "")]
+            logger.info(f"\n{'='*70}")
+            logger.info("Training 4-class Behavior classifier")
+            logger.info(f"{'='*70}")
 
-            all_histories = {}
-            final_accuracies = {}
+            X_train, y_train, X_val, y_val, scaler = create_multiclass_dataset(
+                data, val_split=0.2, seed=42
+            )
 
-            # Train each classifier
-            for display_name, filename, normal_seq, threat_seq in classifiers:
-                logger.info(f"\n{'='*70}")
-                logger.info(f"Training {display_name} classifier")
-                logger.info(f"{'='*70}")
+            history = train_behavior_classifier(
+                X_train,
+                y_train,
+                X_val,
+                y_val,
+                scaler,
+                output_filename="behavior_classifier.pt",
+                epochs=epochs,
+                batch_size=batch_size,
+            )
 
-                X_train, y_train, X_val, y_val, scaler = create_binary_dataset(
-                    normal_seq, threat_seq, val_split=0.2, seed=42
-                )
-
-                history = train_classifier(
-                    display_name,
-                    X_train,
-                    y_train,
-                    X_val,
-                    y_val,
-                    filename,
-                    scaler,
-                    epochs=epochs,
-                    batch_size=batch_size,
-                )
-
-                all_histories[filename] = history
-                # Store final validation accuracy
-                final_accuracies[filename] = history["val_accuracy"][-1] if history["val_accuracy"] else 0.0
-
-            # Get final metrics from the last classifier
-            if all_histories:
-                last_history = list(all_histories.values())[-1]
-                final_train_loss = last_history["train_loss"][-1] if last_history["train_loss"] else None
-                final_val_loss = last_history["val_loss"][-1] if last_history["val_loss"] else None
-                final_train_accuracy = last_history["train_accuracy"][-1] if last_history["train_accuracy"] else None
-                final_val_accuracy = last_history["val_accuracy"][-1] if last_history["val_accuracy"] else None
-            else:
-                final_train_loss = final_val_loss = final_train_accuracy = final_val_accuracy = None
+            final_train_loss = history["train_loss"][-1] if history["train_loss"] else None
+            final_val_loss = history["val_loss"][-1] if history["val_loss"] else None
+            final_train_accuracy = history["train_accuracy"][-1] if history["train_accuracy"] else None
+            final_val_accuracy = history["val_accuracy"][-1] if history["val_accuracy"] else None
 
             # Mark as production ready if all accuracies are above threshold
-            is_production_ready = all(acc >= 0.75 for acc in final_accuracies.values())
+            is_production_ready = bool(final_val_accuracy is not None and final_val_accuracy >= 0.75)
 
             # Update run with success
             self.update_training_run(
@@ -212,7 +189,7 @@ class TrainingService:
                 final_val_loss=final_val_loss,
                 final_train_accuracy=final_train_accuracy,
                 final_val_accuracy=final_val_accuracy,
-                training_history=all_histories,
+                training_history={"behavior_classifier.pt": history},
                 model_saved_path=settings.MODEL_DIR,
                 is_production_ready=is_production_ready,
             )

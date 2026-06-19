@@ -59,6 +59,20 @@ class RiskScorer:
         normalized = min(max(score, 0.0), 1.0)
         return int(round(normalized * 100))
 
+    @staticmethod
+    def _uses_normalized_scale(score, numeric_score):
+        if isinstance(score, bool):
+            return False
+        if isinstance(score, int):
+            return False
+        if isinstance(score, float):
+            return 0.0 <= numeric_score <= 1.0
+        if isinstance(score, str):
+            stripped = score.strip().lower()
+            looks_float_like = "." in stripped or "e" in stripped
+            return looks_float_like and 0.0 <= numeric_score <= 1.0
+        return 0.0 <= numeric_score <= 1.0
+
     def classify(self, score):
         """Classify a score (0-100) as a human-readable risk level and action.
 
@@ -70,7 +84,7 @@ class RiskScorer:
             s = float(score)
         except Exception:
             s = 0.0
-        if s <= 1.0:
+        if self._uses_normalized_scale(score, s):
             s = s * 100.0
 
         s = int(round(s))

@@ -144,9 +144,8 @@ def _ensure_lstm_models() -> None:
     """Report LSTM model availability without creating untrained placeholders."""
     model_dir = settings.MODEL_DIR
     required_files = [
-        "suicide_classifier.pt",
-        "pickpocket_classifier.pt",
-        "anomaly_classifier.pt",
+        "behavior_classifier.pt",
+        "behavior_classifier_scaler.pkl",
     ]
     missing = [f for f in required_files if not os.path.exists(os.path.join(model_dir, f))]
     if missing:

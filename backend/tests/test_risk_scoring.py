@@ -65,8 +65,18 @@ def test_risk_classification_matches_documented_action_ranges():
     scorer = RiskScorer()
 
     assert scorer.classify(39) == ("Safe", "log_only")
+    assert scorer.classify(1) == ("Safe", "log_only")
+    assert scorer.classify("1") == ("Safe", "log_only")
     assert scorer.classify(40) == ("Low Risk", "alert_staff")
     assert scorer.classify(69) == ("Low Risk", "alert_staff")
     assert scorer.classify(70) == ("Medium Risk", "alert_security")
     assert scorer.classify(89) == ("Medium Risk", "alert_security")
     assert scorer.classify(90) == ("Critical", "emergency_escalation")
+
+
+def test_risk_classification_still_accepts_normalized_float_scores():
+    scorer = RiskScorer()
+
+    assert scorer.classify(0.01) == ("Safe", "log_only")
+    assert scorer.classify("0.01") == ("Safe", "log_only")
+    assert scorer.classify(1.0) == ("Critical", "emergency_escalation")

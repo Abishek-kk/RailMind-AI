@@ -5,11 +5,15 @@ from contextlib import suppress
 
 import pytest
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, inspect
 
 import app.core.processor_manager as processor_manager
+import app.models
+from app.core.database import Base
 from app.features.loitering_detector import LoiteringDetector
 from app.core.config import settings
 from app.main import _ensure_lstm_models, app
+from app.models.feedback import Feedback
 from app.models.incident import Incident
 
 
@@ -18,6 +22,77 @@ def test_incident_alert_id_has_foreign_key():
 
     assert len(foreign_keys) == 1
     assert next(iter(foreign_keys)).target_fullname == "alerts.id"
+
+
+def test_documented_database_tables_are_registered():
+    expected_tables = {
+        "alerts",
+        "analytics",
+        "feedback",
+        "feeds",
+        "incidents",
+        "platforms",
+        "staff",
+        "tracks",
+        "training_runs",
+    }
+
+    assert expected_tables.issubset(Base.metadata.tables.keys())
+
+
+def test_documented_database_tables_create_on_fresh_sqlite():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    assert {
+        "tracks",
+        "analytics",
+        "platforms",
+        "feedback",
+    }.issubset(tables)
+
+    track_columns = {column["name"] for column in inspector.get_columns("tracks")}
+    assert {
+        "track_id",
+        "camera_id",
+        "session_id",
+        "feature_sequence_json",
+        "lstm_label",
+        "confidence",
+    }.issubset(track_columns)
+
+    analytics_columns = {column["name"] for column in inspector.get_columns("analytics")}
+    assert {
+        "date",
+        "hour",
+        "platform_id",
+        "camera_id",
+        "zone",
+        "incident_count",
+        "avg_risk_score",
+        "false_positive_count",
+        "hotspot_count",
+        "hotspot_intensity",
+    }.issubset(analytics_columns)
+
+    platform_columns = {column["name"] for column in inspector.get_columns("platforms")}
+    assert {"station_id", "platform_number", "camera_ids_json", "edge_zone_config_json"}.issubset(platform_columns)
+
+    feedback_columns = {column["name"] for column in inspector.get_columns("feedback")}
+    assert {"alert_id", "staff_id", "is_false_positive", "notes", "submitted_at"}.issubset(feedback_columns)
+
+
+def test_feedback_links_alerts_staff_and_training_runs():
+    foreign_key_targets = {
+        foreign_key.target_fullname
+        for column in Feedback.__table__.columns
+        for foreign_key in column.foreign_keys
+    }
+
+    assert {"alerts.id", "staff.id", "training_runs.id"}.issubset(foreign_key_targets)
 
 
 def test_cors_does_not_use_wildcard_with_credentials():

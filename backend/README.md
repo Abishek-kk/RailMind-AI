@@ -78,17 +78,18 @@ backend/
    ```bash
    cp .env.example .env
    ```
-5. Provide trained LSTM model weights, or train synthetic prototype classifiers:
+   Set `RAILMIND_API_KEY` to a non-empty value before exposing the API. All `/api/*` routes require clients to send the same value in the `X-API-Key` header.
+5. Provide trained LSTM model weights, or train the synthetic prototype classifier:
    ```bash
    python -m app.lstm.train
    ```
    If the expected `.pt` weights are missing, the backend disables LSTM inference and returns neutral LSTM scores. Do not use `app.lstm.generate_default_models` for real inference; it creates random-weight architecture placeholders only.
-6. Provide YOLOv8 pose weights for CV processing:
+6. Use the packaged YOLOv8 pose weights, or override them if needed:
    ```bash
-   # Example
+   # Optional override
    export POSE_MODEL_PATH=/path/to/yolov8n-pose.pt
    ```
-   The backend does not download pose weights at startup. If `POSE_MODEL_PATH` is missing or `ultralytics` is unavailable, CV feed processing is disabled and logged instead of crashing the app.
+   The default `backend/yolov8n-pose.pt` file is included for local CV processing. If `POSE_MODEL_PATH` is changed to a missing file or `ultralytics` is unavailable, CV feed processing is disabled and logged instead of crashing the app.
 7. Run the application:
    ```bash
    python app/main.py
@@ -96,11 +97,13 @@ backend/
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `GET /alerts` - Get all alerts
-- `POST /alerts` - Create new alert
-- `GET /feeds` - Get all feeds
-- `GET /dashboard` - Dashboard data
+All API endpoints below are mounted under `/api` and require `X-API-Key`.
+
+- `GET /api/health` - Health check
+- `GET /api/alerts` - Get all alerts
+- `POST /api/alerts` - Create new alert
+- `GET /api/feeds` - Get all feeds
+- `GET /api/dashboard` - Dashboard data
 
 ## Testing
 

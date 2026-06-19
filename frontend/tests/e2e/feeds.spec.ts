@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 const API_BASE = process.env.E2E_API_BASE || 'http://localhost:8000/api';
+const API_KEY = process.env.E2E_RAILMIND_API_KEY;
 
 test.describe('Feeds E2E', () => {
   test('upload -> appears on dashboard -> stop removes feed', async ({ page, request }) => {
@@ -18,6 +19,7 @@ test.describe('Feeds E2E', () => {
 
     // Upload via backend API
     const uploadRes = await request.post(`${API_BASE}/feeds/upload`, {
+      headers: API_KEY ? { 'X-API-Key': API_KEY } : undefined,
       multipart: {
         file: {
           name: 'testvideo.mp4',

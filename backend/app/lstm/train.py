@@ -7,7 +7,7 @@ Generates synthetic behavioral sequences for 4 behavior classes:
 3. Pickpocketing
 4. Security Threat
 
-Trains separate binary classifiers for each threat type vs. normal activity.
+Trains one 4-class classifier with a softmax output.
 """
 
 import os
@@ -23,6 +23,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from app.core.config import settings
 from app.lstm.model import LSTMBehaviorModel
 
+BEHAVIOR_LABELS = ("normal", "suicide", "pickpocket", "security_threat")
+
 logger = logging.getLogger("railmind")
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +38,7 @@ class SyntheticDataGenerator:
     def __init__(self, sequence_length: int = 30, num_features: int = 7, seed: int = 42):
         self.sequence_length = sequence_length
         self.num_features = num_features
+        self.seed = seed
         np.random.seed(seed)
 
     def _augment_sequence(self, sequence: np.ndarray) -> np.ndarray:
@@ -112,14 +115,19 @@ class SyntheticDataGenerator:
         return data
 
 
-def create_binary_dataset(
-    normal_sequences: np.ndarray,
-    threat_sequences: np.ndarray,
+def create_multiclass_dataset(
+    data: dict[str, np.ndarray],
     val_split: float = 0.2,
     seed: int = 42,
 ):
-    X = np.vstack([normal_sequences, threat_sequences])
-    y = np.hstack([np.zeros(len(normal_sequences)), np.ones(len(threat_sequences))])
+    """Create a normalized 4-class dataset from synthetic behavior sequences."""
+    X = np.vstack([data[label] for label in BEHAVIOR_LABELS])
+    y = np.concatenate(
+        [
+            np.full(len(data[label]), class_index, dtype=np.int64)
+            for class_index, label in enumerate(BEHAVIOR_LABELS)
+        ]
+    )
 
     rng = np.random.RandomState(seed)
     indices = rng.permutation(len(X))
@@ -141,7 +149,7 @@ def create_binary_dataset(
     X_train = scaler.transform(X_train_flat).reshape(X_train.shape)
     X_val = scaler.transform(X_val.reshape(-1, X_val.shape[-1])).reshape(X_val.shape)
 
-    logger.info(f"Dataset split: Train={len(X_train)}, Val={len(X_val)}")
+    logger.info(f"Multiclass dataset split: Train={len(X_train)}, Val={len(X_val)}")
     return X_train, y_train, X_val, y_val, scaler
 
 
@@ -156,23 +164,44 @@ def train_classifier(
     epochs: int = 30,
     batch_size: int = 32,
 ):
+    raise RuntimeError(
+        "Per-threat LSTM training has been replaced by the 4-class "
+        "train_behavior_classifier pipeline."
+    )
+
+
+
+def train_behavior_classifier(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    scaler: StandardScaler,
+    output_filename: str = "behavior_classifier.pt",
+    epochs: int = 30,
+    batch_size: int = 32,
+):
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = LSTMBehaviorModel(
         sequence_length=settings.LSTM_SEQUENCE_LENGTH,
         num_features=settings.LSTM_FEATURE_COUNT,
-        num_classes=1,
+        num_classes=len(BEHAVIOR_LABELS),
     ).to(device)
 
-    criterion = torch.nn.BCELoss()
+    criterion = torch.nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     train_dataset = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
-        torch.tensor(y_train, dtype=torch.float32).unsqueeze(1),
+        torch.tensor(y_train, dtype=torch.long),
     )
     val_dataset = TensorDataset(
         torch.tensor(X_val, dtype=torch.float32),
-        torch.tensor(y_val, dtype=torch.float32).unsqueeze(1),
+        torch.tensor(y_val, dtype=torch.long),
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -197,12 +226,12 @@ def train_classifier(
 
             optimizer.zero_grad()
             outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
+            loss = criterion(torch.log(outputs.clamp_min(1e-8)), batch_y)
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item() * batch_X.size(0)
-            predictions = (outputs > 0.5).float()
+            predictions = torch.argmax(outputs, dim=1)
             train_correct += (predictions == batch_y).sum().item()
             train_total += batch_X.size(0)
 
@@ -220,10 +249,10 @@ def train_classifier(
                 batch_y = batch_y.to(device)
 
                 outputs = model(batch_X)
-                loss = criterion(outputs, batch_y)
+                loss = criterion(torch.log(outputs.clamp_min(1e-8)), batch_y)
 
                 val_loss += loss.item() * batch_X.size(0)
-                predictions = (outputs > 0.5).float()
+                predictions = torch.argmax(outputs, dim=1)
                 val_correct += (predictions == batch_y).sum().item()
                 val_total += batch_X.size(0)
 
@@ -242,16 +271,17 @@ def train_classifier(
         )
 
     model_path = Path(settings.MODEL_DIR) / output_filename
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), model_path)
-    logger.info(f"✓ Saved {target_name} model to {model_path}")
+    logger.info(f"Saved 4-class behavior model to {model_path}")
 
-    scaler_path = model_path.with_suffix("_scaler.pkl")
+    scaler_path = model_path.with_name(f"{model_path.stem}_scaler.pkl")
     with open(scaler_path, "wb") as f:
         pickle.dump(scaler, f)
-    logger.info(f"✓ Saved scaler to {scaler_path}")
+    logger.info(f"Saved scaler to {scaler_path}")
 
     logger.info(
-        f"Final {target_name} Accuracy -> Train: {history['train_accuracy'][-1]:.4f}, "
+        f"Final 4-class Behavior Accuracy -> Train: {history['train_accuracy'][-1]:.4f}, "
         f"Val: {history['val_accuracy'][-1]:.4f}"
     )
 
@@ -272,41 +302,32 @@ def main():
     os.makedirs(settings.MODEL_DIR, exist_ok=True)
     logger.info(f"Model directory: {settings.MODEL_DIR}")
 
-    classifiers = [
-        ("Suicide Risk", "suicide_classifier.pt", data["normal"], data["suicide"]),
-        ("Pickpocket", "pickpocket_classifier.pt", data["normal"], data["pickpocket"]),
-        ("Security Threat/Anomaly", "anomaly_classifier.pt", data["normal"], data["security_threat"]),
-    ]
+    logger.info("\n" + "=" * 70)
+    logger.info("Training 4-class Behavior classifier")
+    logger.info("=" * 70)
 
-    for display_name, filename, normal_seq, threat_seq in classifiers:
-        logger.info("\n" + "=" * 70)
-        logger.info(f"Training {display_name} classifier")
-        logger.info("=" * 70)
+    X_train, y_train, X_val, y_val, scaler = create_multiclass_dataset(
+        data, val_split=0.2, seed=42
+    )
 
-        X_train, y_train, X_val, y_val, scaler = create_binary_dataset(
-            normal_seq, threat_seq, val_split=0.2, seed=42
-        )
-
-        train_classifier(
-            display_name,
-            X_train,
-            y_train,
-            X_val,
-            y_val,
-            filename,
-            scaler,
-            epochs=30,
-            batch_size=32,
-        )
+    train_behavior_classifier(
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        scaler,
+        output_filename="behavior_classifier.pt",
+        epochs=30,
+        batch_size=32,
+    )
 
     logger.info("\n" + "=" * 70)
     logger.info("✓ All models trained and saved successfully!")
     logger.info("=" * 70)
     logger.info(f"Models saved in: {settings.MODEL_DIR}")
-    logger.info("Generated models:")
-    logger.info("  - suicide_classifier.pt")
-    logger.info("  - pickpocket_classifier.pt")
-    logger.info("  - anomaly_classifier.pt")
+    logger.info("Generated model:")
+    logger.info("  - behavior_classifier.pt")
+    logger.info("  - behavior_classifier_scaler.pkl")
 
 
 if __name__ == "__main__":

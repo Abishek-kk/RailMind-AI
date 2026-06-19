@@ -321,9 +321,8 @@ source venv/bin/activate # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 
-# 3. Provide YOLOv8 pose weights
-# Download yolov8n-pose.pt from https://github.com/ultralytics/assets
-# Set POSE_MODEL_PATH in .env
+# 3. YOLOv8 pose weights are packaged at backend/yolov8n-pose.pt
+# Optional: set POSE_MODEL_PATH in .env to use different weights
 
 # 4. Train LSTM models
 python -m app.lstm.cli train
@@ -377,17 +376,7 @@ npm install
 
 ### YOLOv8 Pose Model
 
-Download `yolov8n-pose.pt` (speed) or `yolov8s-pose.pt` (accuracy):
-
-```bash
-# Via Python
-python -c "from ultralytics import YOLO; YOLO('yolov8n-pose.pt')"
-
-# Or download manually from:
-# https://github.com/ultralytics/assets/releases
-```
-
-Set `POSE_MODEL_PATH=/path/to/yolov8n-pose.pt` in your `.env`.
+The local prototype ships with `backend/yolov8n-pose.pt` so CV processing can start out of the box. Set `POSE_MODEL_PATH=/path/to/your-pose-weights.pt` in `.env` only when you want to use different YOLOv8 pose weights.
 
 ---
 
@@ -400,6 +389,7 @@ All configuration is managed via environment variables in `backend/.env`:
 DEBUG=True
 DATABASE_URL=sqlite:///./railmind.db # Use PostgreSQL in production
 SECRET_KEY=your-secret-key-change-in-production
+RAILMIND_API_KEY=change-this-admin-api-key
 LOG_LEVEL=INFO
 
 # CV Models 
@@ -419,8 +409,10 @@ BEHAVIOR_ERRATIC_SCORE_THRESHOLD=0.4
 BEHAVIOR_FOLLOWING_DISTANCE_METERS=1.2
 
 # LLM (Optional) 
-OPENAI_API_KEY=sk-... # For GPT-4 reasoning
-ANTHROPIC_API_KEY=sk-ant-... # For Claude reasoning
+OPENAI_API_KEY=sk-... # Optional OpenAI reasoning
+OPENAI_REASONING_MODEL=gpt-5.5
+ANTHROPIC_API_KEY=sk-ant-... # Optional Claude reasoning
+ANTHROPIC_REASONING_MODEL=claude-haiku-4-5-20251001
 
 # Notifications 
 SMTP_HOST=smtp.example.com
@@ -437,6 +429,8 @@ TWILIO_TO_NUMBERS=+19876543210
 # CORS 
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
+
+REST API routes under `/api/*` require `X-API-Key: <RAILMIND_API_KEY>`. For the local browser demo, set the same prototype value in `frontend/.env` as `VITE_RAILMIND_API_KEY`; this value is public in browser builds and should not be treated as a production identity system.
 
 ### Production Database (PostgreSQL)
 
@@ -503,13 +497,11 @@ RailMind AI includes a complete LSTM training pipeline with API-based, CLI, and 
 ```bash
 cd backend
 
-# Train all three classifiers
+# Train the 4-class behavior classifier
 python -m app.lstm.cli train
 
-# Train specific model
-python -m app.lstm.cli train --type suicide_classifier
-python -m app.lstm.cli train --type pickpocket_classifier
-python -m app.lstm.cli train --type anomaly_classifier
+# Train the behavior classifier explicitly
+python -m app.lstm.cli train --type behavior_classifier
 
 # Custom parameters
 python -m app.lstm.cli train --epochs 50 --batch-size 16
@@ -536,7 +528,7 @@ curl http://localhost:8000/api/training/status
 
 ### Automated Weekly Retraining
 
-The scheduler automatically retrains all models **every Sunday at 2 AM UTC** using operator-labelled false positives accumulated during the week. Target: 2–3% accuracy improvement per quarter.
+The scheduler automatically retrains the behavior classifier **every Sunday at 2 AM UTC** using operator-labelled false positives accumulated during the week. Target: 2-3% accuracy improvement per quarter.
 
 ### Trained Model Files
 
@@ -544,12 +536,8 @@ Models are saved to `backend/lstm/saved_models/`:
 
 ```
 lstm/saved_models/
- suicide_classifier.pt
- pickpocket_classifier.pt
- anomaly_classifier.pt
- suicide_classifier_scaler.pkl
- pickpocket_classifier_scaler.pkl
- anomaly_classifier_scaler.pkl
+ behavior_classifier.pt
+ behavior_classifier_scaler.pkl
 ```
 
 ---
@@ -557,6 +545,7 @@ lstm/saved_models/
 ## API Reference
 
 Full interactive docs available at `http://localhost:8000/docs` (Swagger UI) and `/redoc` (ReDoc).
+All REST endpoints under `/api/*` require the `X-API-Key` header configured by `RAILMIND_API_KEY`.
 
 ### Core Endpoints
 
@@ -728,6 +717,7 @@ RailMind AI can be deployed on [Railway](https://railway.app) in a monorepo conf
   * **Start Command**: `npm run preview -- --port $PORT --host 0.0.0.0`
 * In the **Variables** tab, add the environment variables:
   * `VITE_API_BASE_URL`: Set this to your backend service's URL with `/api` appended (e.g., `https://your-backend-service.up.railway.app/api`).
+  * `VITE_RAILMIND_API_KEY`: Set this to the backend `RAILMIND_API_KEY` for the prototype dashboard.
   * `VITE_WS_URL`: Set this to your backend service's WebSocket URL (e.g., `wss://your-backend-service.up.railway.app`).
 
 ---

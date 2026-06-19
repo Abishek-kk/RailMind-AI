@@ -43,15 +43,22 @@ def init_db() -> None:
     Initializes database tables based on system specifications.
     Imports models internally inside the function context to break circular dependencies.
     """
-    # Import all models explicitly before creating tables
+    # Import all models explicitly before creating tables.
     import app.models.alert
-    import app.models.incident
+    import app.models.analytics
+    import app.models.feedback
     import app.models.feed
+    import app.models.incident
+    import app.models.platform
+    import app.models.staff
+    import app.models.track
+    import app.models.training_run
     
     Base.metadata.create_all(bind=Engine)
     _ensure_feed_stream_url_column()
     _ensure_incident_platform_column()
     _ensure_alert_delivery_columns()
+    _ensure_analytics_hotspot_columns()
 
 
 def _ensure_feed_stream_url_column() -> None:
@@ -102,3 +109,24 @@ def _ensure_alert_delivery_columns() -> None:
         for column_name, column_type in required_columns.items():
             if column_name not in columns:
                 connection.execute(text(f"ALTER TABLE alerts ADD COLUMN {column_name} {column_type}"))
+
+
+def _ensure_analytics_hotspot_columns() -> None:
+    """Add persistent heatmap columns to existing analytics tables."""
+    inspector = inspect(Engine)
+    if "analytics" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("analytics")}
+    required_columns = {
+        "camera_id": "VARCHAR",
+        "zone": "VARCHAR",
+        "hotspot_count": "INTEGER NOT NULL DEFAULT 0",
+        "hotspot_intensity": "FLOAT NOT NULL DEFAULT 0.0",
+        "updated_at": "DATETIME",
+    }
+
+    with Engine.begin() as connection:
+        for column_name, column_type in required_columns.items():
+            if column_name not in columns:
+                connection.execute(text(f"ALTER TABLE analytics ADD COLUMN {column_name} {column_type}"))

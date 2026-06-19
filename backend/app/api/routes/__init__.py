@@ -3,7 +3,8 @@ API Routes Package Aggregator
 Combines individual sub-routers (alerts, dashboard, feeds, health) into a unified API router.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.api.deps import require_api_key
 from .alerts import router as alerts_router
 from .analytics import router as analytics_router
 from .dashboard import router as dashboard_router
@@ -14,7 +15,7 @@ from .staff import router as staff_router
 from .training import router as training_router
 
 # Initialize the main aggregator router
-api_router = APIRouter()
+api_router = APIRouter(dependencies=[Depends(require_api_key)])
 
 # Mount sub-routers with corresponding endpoint prefixes and Swagger UI tags
 api_router.include_router(health_router, prefix="/health", tags=["Health"])

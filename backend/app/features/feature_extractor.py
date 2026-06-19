@@ -11,7 +11,7 @@ Architecture:
 - Offline training now uses SYNTHETIC data (app/lstm/train.py):
   Generates realistic 7-feature behavioral sequences for 4 classes:
   * Normal, Suicide Risk, Pickpocketing, Security Threat
-  Trains 3 binary classifiers without needing pose-geometric features.
+  Trains one 4-class classifier without needing pose-geometric features.
 
 This file previously extracted geometric pose features (mean/std, distances, angles)
 for offline training, but that approach has been replaced by synthetic data generation.

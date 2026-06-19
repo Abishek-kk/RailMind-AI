@@ -16,7 +16,7 @@ class TrainingRun(Base):
     status = Column(String, nullable=False, default="pending")  # pending, running, completed, failed
     
     # Model targets
-    model_type = Column(String, nullable=False)  # "suicide_classifier", "pickpocket_classifier", "anomaly_classifier", "all"
+    model_type = Column(String, nullable=False)  # "behavior_classifier" or "all"
     
     # Training parameters
     epochs = Column(Integer, nullable=False, default=30)

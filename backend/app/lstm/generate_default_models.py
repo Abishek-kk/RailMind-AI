@@ -14,11 +14,7 @@ logger = logging.getLogger("railmind")
 logging.basicConfig(level=logging.INFO)
 
 MODEL_DIR = os.path.join(script_dir, "saved_models")
-MODEL_FILES = [
-    "suicide_classifier.pt",
-    "pickpocket_classifier.pt",
-    "anomaly_classifier.pt",
-]
+MODEL_FILES = ["behavior_classifier.pt"]
 
 SEQUENCE_LENGTH = 30
 NUM_FEATURES = 7

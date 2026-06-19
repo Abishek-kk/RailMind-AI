@@ -1,11 +1,16 @@
 """Agent tests"""
+import sys
+import types
+
 import pytest
 
 import app.agents.agent_graph as agent_graph
+import app.agents.reasoning_agent as reasoning_agent
 from app.agents.agent_graph import run_agent_pipeline
 from app.agents.intervention_agent import intervention_node
 from app.agents.perception_agent import perception_node
 from app.agents.reasoning_agent import reasoning_node
+from app.core.config import settings
 
 
 def test_perception_agent():
@@ -82,6 +87,99 @@ def test_reasoning_agent_uses_dominant_lstm_score_before_anomaly_score():
     result = reasoning_node(state)
 
     assert result["decision"]["final_risk_score"] == 36
+
+
+def test_openai_reasoning_uses_current_responses_client(monkeypatch):
+    calls = {}
+
+    class DummyResponses:
+        def create(self, **kwargs):
+            calls.update(kwargs)
+            return types.SimpleNamespace(
+                output_text='{"reasoning_summary":"ok","risk_adjustment":5,"recommended_action_override":"dispatch_staff"}'
+            )
+
+    class DummyOpenAI:
+        def __init__(self, api_key):
+            calls["api_key"] = api_key
+            self.responses = DummyResponses()
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=DummyOpenAI))
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "openai-test-key")
+    monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_REASONING_MODEL", "gpt-test-model")
+
+    result = reasoning_agent._get_llm_reasoning({"pose_classification": "normal"}, 40, "monitor")
+
+    assert result["risk_adjustment"] == 5
+    assert calls["api_key"] == "openai-test-key"
+    assert calls["model"] == "gpt-test-model"
+    assert isinstance(calls["input"], list)
+    assert calls["input"][0]["role"] == "system"
+
+
+def test_anthropic_reasoning_uses_current_messages_client(monkeypatch):
+    calls = {}
+
+    class DummyMessages:
+        def create(self, **kwargs):
+            calls.update(kwargs)
+            return types.SimpleNamespace(
+                content=[
+                    types.SimpleNamespace(
+                        text='{"reasoning_summary":"ok","risk_adjustment":-3,"recommended_action_override":null}'
+                    )
+                ]
+            )
+
+    class DummyAnthropic:
+        def __init__(self, api_key):
+            calls["api_key"] = api_key
+            self.messages = DummyMessages()
+
+    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=DummyAnthropic))
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "anthropic-test-key")
+    monkeypatch.setattr(settings, "ANTHROPIC_REASONING_MODEL", "claude-test-model")
+
+    result = reasoning_agent._get_llm_reasoning({"pose_classification": "normal"}, 40, "monitor")
+
+    assert result["risk_adjustment"] == -3
+    assert calls["api_key"] == "anthropic-test-key"
+    assert calls["model"] == "claude-test-model"
+    assert calls["messages"][0]["role"] == "user"
+    assert "system" in calls
+
+
+def test_llm_reasoning_failure_falls_back_to_rule_based(monkeypatch):
+    class ExplodingResponses:
+        def create(self, **kwargs):
+            raise RuntimeError("network unavailable")
+
+    class DummyOpenAI:
+        def __init__(self, api_key):
+            self.responses = ExplodingResponses()
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=DummyOpenAI))
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "openai-test-key")
+    monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "")
+
+    state = {
+        "observation": {
+            "lstm_score": 0.9,
+            "edge_distance": 3.0,
+            "duration_seconds": 0,
+            "pose_classification": "normal",
+            "following_distance": None,
+            "loitering_duration": 0,
+            "context_multiplier": 1.0,
+        }
+    }
+
+    result = reasoning_node(state)
+
+    assert result["decision"]["final_risk_score"] == 36
+    assert result["decision"]["reasoning_summary"] is None
 
 
 def test_intervention_agent_triggers_broadcast():

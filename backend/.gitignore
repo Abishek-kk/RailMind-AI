@@ -61,6 +61,9 @@ logs/
 *.pkl
 *.pth
 *.pt
+!yolov8n-pose.pt
+!lstm/saved_models/behavior_classifier.pt
+!lstm/saved_models/behavior_classifier_scaler.pkl
 
 # Videos
 *.mp4

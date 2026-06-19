@@ -10,8 +10,10 @@ class LSTMBehaviorModel(nn.Module):
     Input Shape: (Batch_Size, Sequence_Length, Num_Features) -> e.g., (32, 30, 7)
     """
 
-    def __init__(self, sequence_length: int = 30, num_features: int = 7, num_classes: int = 1):
+    def __init__(self, sequence_length: int = 30, num_features: int = 7, num_classes: int = 4):
         super().__init__()
+        if num_classes < 2:
+            raise ValueError("LSTMBehaviorModel is a multiclass classifier and requires at least 2 classes")
         self.sequence_length = sequence_length
         self.num_features = num_features
         self.num_classes = num_classes
@@ -28,9 +30,9 @@ class LSTMBehaviorModel(nn.Module):
         self.fc1 = nn.Linear(32 * 2, 16)
         self.relu = nn.ReLU()
 
-        # Classification Output Layer (Sigmoid output boundary for binary anomaly risk probabilities)
+        # Classification output layer for multiclass behavior probabilities.
         self.fc2 = nn.Linear(16, num_classes)
-        self.activation = nn.Sigmoid() if num_classes == 1 else nn.Softmax(dim=1)
+        self.activation = nn.Softmax(dim=1)
 
     def forward(self, x):
         """
@@ -57,7 +59,7 @@ class LSTMBehaviorModel(nn.Module):
         return x
 
 
-def build_lstm_model(sequence_length: int = 30, num_features: int = 7, num_classes: int = 1) -> LSTMBehaviorModel:
+def build_lstm_model(sequence_length: int = 30, num_features: int = 7, num_classes: int = 4) -> LSTMBehaviorModel:
     """
     Factory function to build and return an LSTM model.
     """

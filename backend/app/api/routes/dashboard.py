@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from datetime import datetime, time, timedelta
 from sqlalchemy import func, cast, Date, case
 from app.api.deps import get_db
-from app.analytics.heatmap import get_live_platform_heatmap
+from app.analytics.heatmap import get_live_platform_heatmap, get_persistent_platform_heatmap
 from app.models.alert import Alert
 from app.models.incident import Incident
 from app.models.feed import Feed
@@ -175,6 +175,14 @@ async def get_risk_distribution(db = Depends(get_db)):
 @router.get("/heatmap")
 async def get_platform_heatmap_intensity(db = Depends(get_db)):
     """Returns relative density indicators across spatial station grid segments."""
+    persistent_rows = get_persistent_platform_heatmap(db)
+    if persistent_rows:
+        return persistent_rows
+
+    live_rows = get_live_platform_heatmap()
+    if live_rows:
+        return live_rows
+
     from app.analytics.heatmap import HeatmapGenerator
     
     # Get all recent alerts with bounding box data (last 1000 for performance)

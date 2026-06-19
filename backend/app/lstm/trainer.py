@@ -40,9 +40,9 @@ class LSTMTrainer:
 
         # Convert numpy arrays to torch tensors
         X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-        y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+        y_train_tensor = torch.tensor(y_train, dtype=torch.long)
         X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
-        y_val_tensor = torch.tensor(y_val, dtype=torch.float32)
+        y_val_tensor = torch.tensor(y_val, dtype=torch.long)
 
         # Create dataloaders
         train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
@@ -52,7 +52,7 @@ class LSTMTrainer:
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         # Setup training
-        criterion = nn.BCELoss()  # Binary cross-entropy for binary classification
+        criterion = nn.NLLLoss()
         optimizer = optim.Adam(self.model.parameters(), lr=0.001)
 
         best_val_loss = float("inf")
@@ -75,18 +75,18 @@ class LSTMTrainer:
 
             for batch_X, batch_y in train_loader:
                 batch_X = batch_X.to(self.device)
-                batch_y = batch_y.to(self.device).unsqueeze(1)  # Reshape for BCELoss
+                batch_y = batch_y.to(self.device)
 
                 optimizer.zero_grad()
                 outputs = self.model(batch_X)
-                loss = criterion(outputs, batch_y)
+                loss = criterion(torch.log(outputs.clamp_min(1e-8)), batch_y)
                 loss.backward()
                 optimizer.step()
 
                 train_loss += loss.item()
 
                 # Calculate accuracy
-                predictions = (outputs > 0.5).float()
+                predictions = torch.argmax(outputs, dim=1)
                 train_correct += (predictions == batch_y).sum().item()
                 train_total += batch_y.size(0)
 
@@ -102,13 +102,13 @@ class LSTMTrainer:
             with torch.no_grad():
                 for batch_X, batch_y in val_loader:
                     batch_X = batch_X.to(self.device)
-                    batch_y = batch_y.to(self.device).unsqueeze(1)
+                    batch_y = batch_y.to(self.device)
 
                     outputs = self.model(batch_X)
-                    loss = criterion(outputs, batch_y)
+                    loss = criterion(torch.log(outputs.clamp_min(1e-8)), batch_y)
                     val_loss += loss.item()
 
-                    predictions = (outputs > 0.5).float()
+                    predictions = torch.argmax(outputs, dim=1)
                     val_correct += (predictions == batch_y).sum().item()
                     val_total += batch_y.size(0)
 

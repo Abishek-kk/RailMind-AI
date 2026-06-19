@@ -6,6 +6,7 @@ from sqlalchemy import func
 
 from app.api.deps import get_db
 from app.api.routes.dashboard import get_incident_trend
+from app.analytics.heatmap import get_persistent_platform_heatmap
 from app.models.incident import Incident
 from app.models.alert import Alert
 
@@ -36,6 +37,9 @@ async def analytics_heatmap(
     avg_risk_score. `x` and `y` are the average centers of associated alert
     bounding boxes when available, otherwise null.
     """
+    persisted_hotspots = get_persistent_platform_heatmap(db, platform=platform)
+    if persisted_hotspots and not camera_id and not date_from and not date_to:
+        return persisted_hotspots
 
     # Build base query for incidents joined with alerts (alert may be null)
     q = db.query(Incident, Alert).outerjoin(Alert, Incident.alert_id == Alert.id)

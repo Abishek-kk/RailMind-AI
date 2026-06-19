@@ -37,6 +37,25 @@ def test_video_processor_missing_pose_model_degrades_cleanly(tmp_path, monkeypat
     assert processor.is_running is False
 
 
+def test_default_pose_model_weights_are_packaged():
+    pose_model = Path(settings.POSE_MODEL_PATH)
+
+    assert pose_model.exists(), f"Missing default YOLOv8 pose weights: {pose_model}"
+    assert pose_model.stat().st_size > 0
+
+    estimator = PoseEstimator(device="cpu")
+    assert estimator.is_available is True
+    assert estimator.unavailable_reason == ""
+
+
+def test_video_processor_cv_available_with_packaged_pose_model():
+    processor = VideoProcessor(feed_source="missing.mp4", camera_id="CAM_PACKAGED_POSE", platform="Platform 1")
+
+    assert processor.pose_estimator.is_available is True
+    assert processor.tracker is not None
+    assert processor.cv_available is True
+
+
 def test_behavior_analyzer_maps_scores_to_pose_labels():
     analyzer = BehaviorAnalyzer()
     # high suicide score should map to distress
@@ -138,6 +157,6 @@ def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):
     predictor = LSTMPredictor(device="cpu")
 
     assert predictor.models == {}
-    assert predictor.unavailable_models == {"suicide", "pickpocket", "anomaly"}
+    assert predictor.unavailable_models == {"normal", "suicide", "pickpocket", "anomaly"}
     assert predictor.run_inference("anomaly", np.zeros((1, 30, 7), dtype=np.float32)) == 0.0
     assert list(tmp_path.glob("*.pt")) == []

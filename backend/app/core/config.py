@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(default="sqlite:///./data/railmind.db", validation_alias="DATABASE_URL")
     DEBUG: bool = False
     SECRET_KEY: str = Field(default="")
+    RAILMIND_API_KEY: str = Field(default="", validation_alias="RAILMIND_API_KEY")
     LOG_LEVEL: str = Field(default="INFO")
     
     # Computer Vision Directories
@@ -68,6 +69,8 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str = Field(default="")
     OPENAI_API_KEY: str = Field(default="")
+    OPENAI_REASONING_MODEL: str = Field(default="gpt-5.5")
+    ANTHROPIC_REASONING_MODEL: str = Field(default="claude-haiku-4-5-20251001")
 
     # LSTM behavior label thresholds
     BEHAVIOR_HIGH_SCORE_THRESHOLD: float = 0.65

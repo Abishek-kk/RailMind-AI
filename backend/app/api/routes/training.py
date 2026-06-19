@@ -40,7 +40,7 @@ class TrainingRunSchema(BaseModel):
 
 
 class TrainRequest(BaseModel):
-    model_type: str = "all"  # "all", "suicide_classifier", "pickpocket_classifier", "anomaly_classifier"
+    model_type: str = "all"  # "all" or "behavior_classifier"
     epochs: int = 30
     batch_size: int = 32
 
@@ -61,7 +61,7 @@ async def trigger_training(request: TrainRequest = Body(...)) -> TrainingStatusR
     - Returns immediately with the run ID for status tracking
     
     Args:
-        model_type: Which model(s) to train ("all", "suicide_classifier", "pickpocket_classifier", "anomaly_classifier")
+        model_type: Which model to train ("all" or "behavior_classifier")
         epochs: Number of training epochs (default: 30)
         batch_size: Batch size for training (default: 32)
     

@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiHeaders } from "./client";
 import { cctvImages, type CCTVFeed } from "@/lib/mock-data";
 
 interface BackendFeed {
@@ -96,6 +96,7 @@ export async function uploadVideo(file: File, feed_id?: string, name?: string) {
   const url = (import.meta.env.VITE_API_BASE_URL ?? "/api") + "/feeds/upload";
   const resp = await fetch(url, {
     method: "POST",
+    headers: apiHeaders(),
     body: form,
   });
   if (!resp.ok) {
@@ -107,7 +108,7 @@ export async function uploadVideo(file: File, feed_id?: string, name?: string) {
 
 export async function deleteFeed(id: string): Promise<void> {
   const url = (import.meta.env.VITE_API_BASE_URL ?? "/api") + `/feeds/${encodeURIComponent(id)}`;
-  const resp = await fetch(url, { method: "DELETE" });
+  const resp = await fetch(url, { method: "DELETE", headers: apiHeaders() });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`Delete failed: ${resp.status} ${text}`);

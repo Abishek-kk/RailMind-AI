@@ -61,45 +61,72 @@ def reasoning_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _get_llm_reasoning(observation: Dict[str, Any], score: float, action: str) -> Dict[str, Any]:
-    api_key = settings.OPENAI_API_KEY.strip() or settings.ANTHROPIC_API_KEY.strip()
-    if not api_key:
+    openai_api_key = settings.OPENAI_API_KEY.strip()
+    anthropic_api_key = settings.ANTHROPIC_API_KEY.strip()
+    if not openai_api_key and not anthropic_api_key:
         return {}
 
     prompt = _build_llm_prompt(observation, score, action)
-    response_text = ""
 
-    if settings.OPENAI_API_KEY.strip():
-        try:
-            import openai
-            openai.api_key = settings.OPENAI_API_KEY
-            completion = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a security reasoning assistant that returns valid JSON only."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.0,
-            )
-            response_text = completion.choices[0].message.content
-        except Exception as exc:
-            logger.warning("OpenAI reasoning failed, falling back to rule-based behavior: %s", exc)
-            return {}
-    elif settings.ANTHROPIC_API_KEY.strip():
-        try:
-            import anthropic
-            client = anthropic.Client(settings.ANTHROPIC_API_KEY)
-            response = client.complete(
-                prompt=anthropic.HUMAN_PROMPT + prompt + anthropic.AI_PROMPT,
-                model="claude-3.5-mini",
-                max_tokens_to_sample=512,
-                temperature=0.0,
-            )
-            response_text = response.completion
-        except Exception as exc:
-            logger.warning("Anthropic reasoning failed, falling back to rule-based behavior: %s", exc)
-            return {}
+    if openai_api_key:
+        response_text = _call_openai_reasoning(prompt, openai_api_key)
+    else:
+        response_text = _call_anthropic_reasoning(prompt, anthropic_api_key)
+
+    if not response_text:
+        return {}
 
     return _parse_llm_json(response_text)
+
+
+def _call_openai_reasoning(prompt: str, api_key: str) -> str:
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key)
+        response = client.responses.create(
+            model=settings.OPENAI_REASONING_MODEL,
+            input=[
+                {
+                    "role": "system",
+                    "content": "You are a security reasoning assistant that returns valid JSON only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_output_tokens=512,
+        )
+        return getattr(response, "output_text", "") or ""
+    except Exception as exc:
+        logger.warning("OpenAI reasoning failed, falling back to rule-based behavior: %s", exc)
+        return ""
+
+
+def _call_anthropic_reasoning(prompt: str, api_key: str) -> str:
+    try:
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=settings.ANTHROPIC_REASONING_MODEL,
+            max_tokens=512,
+            temperature=0.0,
+            system="You are a security reasoning assistant that returns valid JSON only.",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return _extract_anthropic_text(response)
+    except Exception as exc:
+        logger.warning("Anthropic reasoning failed, falling back to rule-based behavior: %s", exc)
+        return ""
+
+
+def _extract_anthropic_text(response: Any) -> str:
+    chunks = []
+    for block in getattr(response, "content", []) or []:
+        text = getattr(block, "text", None)
+        if text:
+            chunks.append(text)
+    return "\n".join(chunks)
 
 
 def _build_llm_prompt(observation: Dict[str, Any], score: float, action: str) -> str:
