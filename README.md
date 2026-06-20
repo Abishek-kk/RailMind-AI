@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/RailMind_AI-v1.5-0A84FF?style=for-the-badge&logo=railway&logoColor=white" alt="RailMind AI"/>
 
 # RailMind AI
-### Intelligent Railway Safety & Security System
+### Intelligent Railway Safety & Security System.
 
 **Turning existing CCTV infrastructure into proactive behavioural monitoring — no new cameras, no facial recognition.**
 
