@@ -5,8 +5,8 @@ import sys
 import numpy as np
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "app"))
-from lstm.model import build_lstm_model
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from app.lstm.model import build_lstm_model
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "app" / "lstm" / "saved_models" / "behavior_classifier.pt"
 DATASET_DIR = Path(__file__).resolve().parents[1] / "datasets"
