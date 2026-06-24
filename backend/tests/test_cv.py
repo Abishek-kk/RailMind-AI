@@ -3,6 +3,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -14,6 +15,7 @@ from app.core.config import settings
 from app.features.following_detector import FollowingDetector
 from app.features.pacing_detector import PacingDetector
 from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
+from app.services.context_suppression_service import ContextSuppressionService
 from app.lstm.predictor import LSTMPredictor
 
 
@@ -211,3 +213,49 @@ def test_video_processor_instantiates_temporal_confirmation_tracker():
 
     from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
     assert isinstance(processor.temporal_confirmation_tracker, TemporalConfirmationTracker)
+
+
+def test_context_suppression_returns_normal_multiplier_for_no_data():
+    service = ContextSuppressionService(db=SimpleNamespace())
+
+    service._compute_peak_hours = lambda: {}
+
+    assert service.get_threshold_adjustment("Platform 1", 14, db=SimpleNamespace()) == 1.0
+
+
+def test_context_suppression_returns_peak_multiplier_for_elevated_hour():
+    db = SimpleNamespace()
+
+    def mock_query(*args, **kwargs):
+        return SimpleNamespace(
+            group_by=lambda *args, **kwargs: SimpleNamespace(
+                all=lambda: [
+                    ("Platform 1", "09", 50),
+                    ("Platform 1", "10", 200),
+                    ("Platform 1", "11", 20),
+                    ("Platform 1", "14", 180),
+                    ("Platform 1", "15", 15),
+                ]
+            )
+        )
+
+    db.query = mock_query
+
+    service = ContextSuppressionService(db=db)
+
+    assert service.get_threshold_adjustment("Platform 1", 10, db=db) == 1.3
+    assert service.get_threshold_adjustment("Platform 1", 14, db=db) == 1.3
+    assert service.get_threshold_adjustment("Platform 1", 9, db=db) == 1.0
+    assert service.get_threshold_adjustment("Platform 1", 11, db=db) == 1.0
+
+
+def test_context_suppression_is_confirmed_at_peak_hours():
+    service = ContextSuppressionService(db=SimpleNamespace())
+    service._peak_hours_cache = {"Platform 1": {8, 9, 17, 18}}
+    service._cache_expires_at = float("inf")
+
+    for hour in [8, 9, 17, 18]:
+        assert service.get_threshold_adjustment("Platform 1", hour) == 1.3
+
+    for hour in [0, 1, 10, 12, 23]:
+        assert service.get_threshold_adjustment("Platform 1", hour) == 1.0

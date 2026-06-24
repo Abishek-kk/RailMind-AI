@@ -15,6 +15,7 @@ from app.features.pacing_detector import PacingDetector
 from app.features.following_detector import FollowingDetector
 from app.features.movement_analyzer import MovementAnalyzer
 from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
+from app.services.context_suppression_service import ContextSuppressionService
 from app.services.notification_service import NotificationService
 from app.services.escalation_service import EscalationService
 from app.services.incident_service import IncidentService
@@ -73,6 +74,7 @@ class VideoProcessor:
         self.following_detector = FollowingDetector()
         self.movement_analyzer = MovementAnalyzer()
         self.temporal_confirmation_tracker = TemporalConfirmationTracker(settings.TEMPORAL_CONFIRMATION_SECONDS)
+        self.context_suppression_service = ContextSuppressionService()
         self.notification_service = NotificationService()
         self.escalation_service = EscalationService()
 
@@ -88,16 +90,24 @@ class VideoProcessor:
         self.last_detection_broadcast_time = 0.0
         self._tracker_api_version: str | None = None
 
-    def _get_context_multiplier(self) -> float:
+    def _get_context_multiplier(self, current_hour: int = None) -> float:
         """Resolve platform-specific context multiplier from configuration."""
+        multiplier = 1.0
         multiplier_map = settings.PLATFORM_CONTEXT_MULTIPLIERS or {}
         normalized_platform = self.platform.strip()
         if normalized_platform in multiplier_map:
-            return multiplier_map[normalized_platform]
-        for key, value in multiplier_map.items():
-            if key.lower() in normalized_platform.lower():
-                return value
-        return 1.0
+            multiplier = multiplier_map[normalized_platform]
+        else:
+            for key, value in multiplier_map.items():
+                if key.lower() in normalized_platform.lower():
+                    multiplier = value
+                    break
+
+        if current_hour is not None and self.db is not None:
+            adjustment = self.context_suppression_service.get_threshold_adjustment(self.platform, current_hour, self.db)
+            multiplier *= adjustment
+
+        return multiplier
 
     async def start_processing_loop(self):
         """Asynchronously boots up and runs the camera feed frames processing thread."""
@@ -245,7 +255,7 @@ class VideoProcessor:
                         "loitering_duration": loitering_time,
                         "following_distance": following_distance,
                         "pose_classification": pose_label,
-                        "context_multiplier": self._get_context_multiplier(),
+                        "context_multiplier": self._get_context_multiplier(current_hour=time.localtime(frame_time).tm_hour),
                         "bounding_box": bbox
                     }
 
