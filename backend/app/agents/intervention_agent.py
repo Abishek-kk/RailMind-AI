@@ -22,6 +22,7 @@ def intervention_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "risk_level": decision.get("risk_level"),
         "bounding_box": obs.get("bounding_box"),
         "metadata": obs.get("metadata", {}),
+        "reasoning_mode": decision.get("reasoning_mode"),
     }
     
     execution_status = []

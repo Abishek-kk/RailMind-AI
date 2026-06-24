@@ -668,7 +668,33 @@ function AlertDetails({
         </button>
       </div>
       <div className="space-y-4 p-4">
-        <RiskBadge level={alert.riskLevel} />
+        <div className="flex items-center gap-2">
+          <RiskBadge level={alert.riskLevel} />
+          {alert.reasoning_mode === "llm" && (
+            <span
+              className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide"
+              style={{
+                backgroundColor: "rgba(59,130,246,0.15)",
+                color: "#3b82f6",
+                border: "1px solid rgba(59,130,246,0.4)",
+              }}
+            >
+              AI-Reasoned
+            </span>
+          )}
+          {alert.reasoning_mode === "rule_based" && (
+            <span
+              className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide"
+              style={{
+                backgroundColor: "rgba(148,163,184,0.15)",
+                color: "#94a3b8",
+                border: "1px solid rgba(148,163,184,0.4)",
+              }}
+            >
+              Rule-Based
+            </span>
+          )}
+        </div>
         <h2 className="text-lg font-bold">{alert.type}</h2>
         <div className="space-y-1 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">

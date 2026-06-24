@@ -28,6 +28,7 @@ class IncidentRead(IncidentBase):
     false_positive: bool = False
     false_positive_reported_by: Optional[str] = None
     false_positive_notes: Optional[str] = None
+    reasoning_mode: Optional[str] = None
 
     class Config:
         from_attributes = True

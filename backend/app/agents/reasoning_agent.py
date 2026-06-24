@@ -45,9 +45,11 @@ def reasoning_node(state: Dict[str, Any]) -> Dict[str, Any]:
         risk_level, action = scorer.classify(final_risk_score)
         recommended_action = llm_response.get("recommended_action_override") or action
         reasoning_summary = llm_response.get("reasoning_summary")
+        reasoning_mode = "llm"
     else:
         recommended_action = action
         reasoning_summary = None
+        reasoning_mode = "rule_based"
 
     decision = {
         "final_risk_score": final_risk_score,
@@ -55,6 +57,7 @@ def reasoning_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "recommended_action": recommended_action,
         "incident_type": determine_incident_type(obs, pose),
         "reasoning_summary": reasoning_summary,
+        "reasoning_mode": reasoning_mode,
     }
 
     return {"decision": decision}

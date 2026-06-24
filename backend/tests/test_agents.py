@@ -180,6 +180,65 @@ def test_llm_reasoning_failure_falls_back_to_rule_based(monkeypatch):
 
     assert result["decision"]["final_risk_score"] == 36
     assert result["decision"]["reasoning_summary"] is None
+    assert result["decision"]["reasoning_mode"] == "rule_based"
+
+
+def test_reasoning_node_marks_rule_based_when_no_api_keys():
+    original_openai = settings.OPENAI_API_KEY
+    original_anthropic = settings.ANTHROPIC_API_KEY
+    try:
+        settings.OPENAI_API_KEY = ""
+        settings.ANTHROPIC_API_KEY = ""
+
+        state = {
+            "observation": {
+                "lstm_score": 0.5,
+                "edge_distance": 2.0,
+                "duration_seconds": 30,
+                "pose_classification": "normal",
+                "following_distance": None,
+                "loitering_duration": 0,
+                "context_multiplier": 1.0,
+            }
+        }
+
+        result = reasoning_node(state)
+        assert result["decision"]["reasoning_mode"] == "rule_based"
+    finally:
+        settings.OPENAI_API_KEY = original_openai
+        settings.ANTHROPIC_API_KEY = original_anthropic
+
+
+def test_reasoning_node_marks_llm_when_api_key_configured(monkeypatch):
+    class DummyResponses:
+        def create(self, **kwargs):
+            return types.SimpleNamespace(
+                output_text='{"reasoning_summary":"test summary","risk_adjustment":0,"recommended_action_override":null}'
+            )
+
+    class DummyOpenAI:
+        def __init__(self, api_key):
+            self.responses = DummyResponses()
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=DummyOpenAI))
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "openai-test-key")
+    monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "")
+
+    state = {
+        "observation": {
+            "lstm_score": 0.5,
+            "edge_distance": 2.0,
+            "duration_seconds": 30,
+            "pose_classification": "normal",
+            "following_distance": None,
+            "loitering_duration": 0,
+            "context_multiplier": 1.0,
+        }
+    }
+
+    result = reasoning_node(state)
+    assert result["decision"]["reasoning_mode"] == "llm"
+    assert result["decision"]["reasoning_summary"] == "test summary"
 
 
 def test_intervention_agent_triggers_broadcast():

@@ -37,6 +37,7 @@ export interface Alert {
   image: string;
   /** Optional operator assigned to this alert, as returned by the backend */
   operator_assigned?: string | null;
+  reasoning_mode?: string | null;
 }
 
 import p1 from "@/assets/cctv-platform.jpg";

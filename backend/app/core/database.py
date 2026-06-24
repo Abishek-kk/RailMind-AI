@@ -62,6 +62,8 @@ def init_db() -> None:
     _ensure_analytics_hotspot_columns()
     _ensure_training_run_sample_columns()
     _ensure_station_fp_alerts_table()
+    _ensure_alert_reasoning_mode_column()
+    _ensure_incident_reasoning_mode_column()
 
 
 def _ensure_feed_stream_url_column() -> None:
@@ -169,3 +171,31 @@ def _ensure_station_fp_alerts_table() -> None:
                 resolved_at DATETIME
             )
         """))
+
+
+def _ensure_alert_reasoning_mode_column() -> None:
+    """Add reasoning_mode column to existing alerts table if missing."""
+    inspector = inspect(Engine)
+    if "alerts" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("alerts")}
+    if "reasoning_mode" in columns:
+        return
+
+    with Engine.begin() as connection:
+        connection.execute(text("ALTER TABLE alerts ADD COLUMN reasoning_mode VARCHAR"))
+
+
+def _ensure_incident_reasoning_mode_column() -> None:
+    """Add reasoning_mode column to existing incidents table if missing."""
+    inspector = inspect(Engine)
+    if "incidents" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("incidents")}
+    if "reasoning_mode" in columns:
+        return
+
+    with Engine.begin() as connection:
+        connection.execute(text("ALTER TABLE incidents ADD COLUMN reasoning_mode VARCHAR"))

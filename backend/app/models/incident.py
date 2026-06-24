@@ -24,5 +24,6 @@ class Incident(Base):
     false_positive_reported_by = Column(String, nullable=True)
     false_positive_notes = Column(String, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    reasoning_mode = Column(String, nullable=True)
 
     alert = relationship("Alert")

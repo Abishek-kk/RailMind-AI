@@ -30,3 +30,4 @@ class Alert(Base):
     operator_assigned = Column(String, nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     video_snippet_url = Column(String, nullable=True)
+    reasoning_mode = Column(String, nullable=True)

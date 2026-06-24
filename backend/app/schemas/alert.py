@@ -33,6 +33,7 @@ class AlertRead(AlertBase):
     is_false_positive: bool = False
     lstm_confidence: Optional[float] = None
     resolved_at: Optional[datetime] = None
+    reasoning_mode: Optional[str] = None
 
     class Config:
         from_attributes = True

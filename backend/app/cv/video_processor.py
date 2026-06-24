@@ -295,6 +295,7 @@ class VideoProcessor:
                                 "risk_level": alert_payload.get("risk_level", "Safe"),
                                 "status": "active",
                                 "bounding_box": raw_cv_state.get("bounding_box"),
+                                "reasoning_mode": alert_payload.get("reasoning_mode"),
                             })
                             if alert_record:
                                 alert_payload["id"] = alert_record.id
@@ -308,6 +309,7 @@ class VideoProcessor:
                                 "risk_score": alert_payload.get("risk_score", 0.0),
                                 "risk_level": alert_payload.get("risk_level", "Safe"),
                                 "status": "unacknowledged",
+                                "reasoning_mode": alert_payload.get("reasoning_mode"),
                             }
                             self.incident_service.create_incident(incident_payload)
 

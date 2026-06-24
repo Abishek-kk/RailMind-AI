@@ -13,6 +13,7 @@ export interface BackendAlert {
   timestamp: string;
   /** Operator assigned to this alert (may be null if unassigned) */
   operator_assigned?: string | null;
+  reasoning_mode?: string | null;
 }
 
 export type ApiAlert = Alert & { backendId: number };
@@ -78,6 +79,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     description: `${alert.incident_type} on ${alert.platform}`,
     image: getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
+    reasoning_mode: alert.reasoning_mode ?? null,
   };
 }
 
