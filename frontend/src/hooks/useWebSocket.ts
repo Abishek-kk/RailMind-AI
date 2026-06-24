@@ -2,6 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type WebSocketStatus = "connecting" | "connected" | "disconnected" | "error";
 
+const apiKey = import.meta.env.VITE_RAILMIND_API_KEY?.trim();
+
+function buildAuthenticatedWebSocketUrl(url: string) {
+  if (!apiKey) {
+    return url;
+  }
+
+  const websocketUrl = new URL(url);
+  websocketUrl.searchParams.set("api_key", apiKey);
+  return websocketUrl.toString();
+}
+
 export function useWebSocket<T>(url: string) {
   const [data, setData] = useState<T | null>(null);
   const [status, setStatus] = useState<WebSocketStatus>("connecting");
@@ -61,7 +73,7 @@ export function useWebSocket<T>(url: string) {
     setStatus("connecting");
     setError(null);
 
-    const socket = new WebSocket(url);
+    const socket = new WebSocket(buildAuthenticatedWebSocketUrl(url));
     socketRef.current = socket;
 
     socket.onopen = () => {

@@ -1,6 +1,7 @@
 """Main FastAPI application entry point for the RailMind AI backend."""
 import glob
 import os
+import secrets
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,9 +113,19 @@ for mw in app.user_middleware:
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
+def _is_valid_websocket_api_key(api_key: str | None) -> bool:
+    """Validate WebSocket API keys using the same comparison as REST routes."""
+    configured_key = settings.RAILMIND_API_KEY.strip()
+    return bool(configured_key and api_key and secrets.compare_digest(api_key, configured_key))
+
+
 @app.websocket("/ws/alerts")
 async def websocket_alerts_endpoint(websocket: WebSocket):
     """WebSocket endpoint for streaming live alerts and detections to frontend clients."""
+    if not _is_valid_websocket_api_key(websocket.query_params.get("api_key")):
+        await websocket.close(code=1008)
+        return
+
     try:
         await websocket_manager.manager.connect(websocket, channel="alerts")
         try:
@@ -129,6 +140,10 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 @app.websocket("/ws/feed/{camera_id}")
 async def websocket_feed_endpoint(websocket: WebSocket, camera_id: str):
     """WebSocket endpoint for streaming annotated feed data for a specific camera."""
+    if not _is_valid_websocket_api_key(websocket.query_params.get("api_key")):
+        await websocket.close(code=1008)
+        return
+
     try:
         await websocket_manager.manager.connect(websocket, channel=f"feed:{camera_id}")
         try:
