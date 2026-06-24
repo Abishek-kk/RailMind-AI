@@ -39,11 +39,11 @@ def _start_fallback_escalation_loop() -> asyncio.AbstractEventLoop:
 class AlertService:
     """Handles alert operations"""
 
+    escalation_timers: Dict[int, Union[asyncio.Task[Any], concurrent.futures.Future[Any]]] = {}
+
     def __init__(self, db: Session, escalation_service: Optional[EscalationService] = None):
         self.db = db
         self.escalation_service = escalation_service or EscalationService()
-        # Track active escalation timers: {alert_id: asyncio.Task | concurrent.futures.Future}
-        self.escalation_timers: Dict[int, Union[asyncio.Task[Any], concurrent.futures.Future[Any]]] = {}
 
     def list_alerts(self, filters: Optional[Dict[str, str]] = None) -> List[Alert]:
         query = self.db.query(Alert)
@@ -153,13 +153,17 @@ class AlertService:
         self.db.commit()
         self.db.refresh(alert)
         
-        # Cancel escalation timer if one is active
-        if alert_id in self.escalation_timers:
-            self.escalation_timers[alert_id].cancel()
-            del self.escalation_timers[alert_id]
+        if self.cancel_escalation_timer(alert_id):
             logger.info(f"Cancelled escalation timer for acknowledged alert {alert_id}")
         
         return alert
+
+    def cancel_escalation_timer(self, alert_id: int) -> bool:
+        timer = AlertService.escalation_timers.pop(alert_id, None)
+        if timer is not None:
+            timer.cancel()
+            return True
+        return False
 
     def escalate_alert(self, alert_id: int) -> Optional[Alert]:
         alert = self.get_alert(alert_id)
@@ -180,10 +184,7 @@ class AlertService:
         self.db.commit()
         self.db.refresh(alert)
         
-        # Cancel escalation timer if one is active
-        if alert_id in self.escalation_timers:
-            self.escalation_timers[alert_id].cancel()
-            del self.escalation_timers[alert_id]
+        if self.cancel_escalation_timer(alert_id):
             logger.info(f"Cancelled escalation timer for resolved alert {alert_id}")
         
         return alert

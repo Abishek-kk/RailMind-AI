@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_key
 from app.models.alert import Alert
 from app.schemas.alert import AlertCreate, AlertRead, AssignAlert
 from app.services.alert_service import AlertService
+from app.services.escalation_service import EscalationService
 
 router = APIRouter()
 
@@ -85,6 +86,34 @@ async def assign_alert(id: int, payload: AssignAlert, db: Session = Depends(get_
     alert.operator_assigned = assignee
     # Optionally mark who acknowledged when assigning
     alert.acknowledged_by = assignee
+    db.commit()
+    db.refresh(alert)
+    return alert
+
+
+@router.post("/{id}/escalate", response_model=AlertRead, dependencies=[Depends(require_api_key)])
+async def escalate_alert(id: int, db: Session = Depends(get_db)):
+    """Manually escalate an alert to the next level."""
+    service = AlertService(db)
+    alert = service.get_alert(id)
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert record not found")
+
+    service.cancel_escalation_timer(id)
+
+    escalation_service = EscalationService()
+    payload = {
+        "alert_id": alert.id,
+        "incident_type": alert.incident_type,
+        "platform": alert.platform,
+        "risk_score": alert.risk_score,
+        "risk_level": alert.risk_level,
+        "timestamp": alert.timestamp.isoformat() if alert.timestamp else None,
+    }
+    escalation_service.escalate(payload)
+
+    alert.escalation_level = (alert.escalation_level or 0) + 1
+    alert.escalation_triggered_at = datetime.utcnow()
     db.commit()
     db.refresh(alert)
     return alert
