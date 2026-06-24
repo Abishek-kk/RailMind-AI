@@ -13,6 +13,7 @@ from app.cv.lstm_behavior import BehaviorAnalyzer
 from app.core.config import settings
 from app.features.following_detector import FollowingDetector
 from app.features.pacing_detector import PacingDetector
+from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
 from app.lstm.predictor import LSTMPredictor
 
 
@@ -160,3 +161,53 @@ def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):
     assert predictor.unavailable_models == {"normal", "suicide", "pickpocket", "anomaly"}
     assert predictor.run_inference("anomaly", np.zeros((1, 30, 7), dtype=np.float32)) == 0.0
     assert list(tmp_path.glob("*.pt")) == []
+
+
+def test_temporal_confirmation_single_frame_does_not_trigger():
+    tracker = TemporalConfirmationTracker(confirmation_seconds=15)
+
+    tracker.update(1, True, 0.0)
+    tracker.update(1, True, 1.0)
+
+    assert not tracker.is_confirmed(1)
+
+
+def test_temporal_confirmation_confirms_after_sustained_high_score():
+    tracker = TemporalConfirmationTracker(confirmation_seconds=15)
+
+    for i in range(16):
+        tracker.update(1, True, float(i))
+
+    assert tracker.is_confirmed(1)
+
+
+def test_temporal_confirmation_resets_when_score_drops():
+    tracker = TemporalConfirmationTracker(confirmation_seconds=15)
+
+    for i in range(10):
+        tracker.update(1, True, float(i))
+    tracker.update(1, False, 10.0)
+    tracker.update(1, False, 11.0)
+
+    assert not tracker.is_confirmed(1)
+
+
+def test_temporal_confirmation_clears_disappeared_tracks():
+    tracker = TemporalConfirmationTracker(confirmation_seconds=15)
+
+    for i in range(16):
+        tracker.update(1, True, float(i))
+    assert tracker.is_confirmed(1)
+
+    tracker.clear_track(1)
+
+    assert not tracker.is_confirmed(1)
+    assert 1 not in tracker.consecutive_seconds
+    assert 1 not in tracker.last_update_time
+
+
+def test_video_processor_instantiates_temporal_confirmation_tracker():
+    processor = VideoProcessor(feed_source="missing.mp4", camera_id="CAM_TRACKER", platform="Platform 1")
+
+    from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
+    assert isinstance(processor.temporal_confirmation_tracker, TemporalConfirmationTracker)

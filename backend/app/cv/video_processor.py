@@ -14,6 +14,7 @@ from app.features.loitering_detector import LoiteringDetector
 from app.features.pacing_detector import PacingDetector
 from app.features.following_detector import FollowingDetector
 from app.features.movement_analyzer import MovementAnalyzer
+from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
 from app.services.notification_service import NotificationService
 from app.services.escalation_service import EscalationService
 from app.services.incident_service import IncidentService
@@ -71,6 +72,7 @@ class VideoProcessor:
         self.pacing_detector = PacingDetector()
         self.following_detector = FollowingDetector()
         self.movement_analyzer = MovementAnalyzer()
+        self.temporal_confirmation_tracker = TemporalConfirmationTracker(settings.TEMPORAL_CONFIRMATION_SECONDS)
         self.notification_service = NotificationService()
         self.escalation_service = EscalationService()
 
@@ -155,6 +157,7 @@ class VideoProcessor:
                     self.behavior_analyzer.clear_track_history(track_id)
                     self.loitering_detector.clear_track(track_id)
                     self.pacing_detector.clear_track(track_id)
+                    self.temporal_confirmation_tracker.clear_track(track_id)
                     self.track_entry_times.pop(track_id, None)
                 self.previous_track_ids = current_track_ids
 
@@ -246,81 +249,87 @@ class VideoProcessor:
                         "bounding_box": bbox
                     }
 
-                    # 5. Invoke LangGraph Execution Workflow
-                    final_state = await run_agent_pipeline(raw_cv_state)
-                    alert_payload = final_state.get("alert_payload", {})
-                    execution_status = final_state.get("execution_status", [])
-                    alert_info = alert_payload
+                    is_above_risk_threshold = lstm_score >= settings.MEDIUM_RISK_THRESHOLD / 100.0
+                    self.temporal_confirmation_tracker.update(track_id, is_above_risk_threshold, frame_time)
 
-                    # Persist alert and incident records when a high-risk event is generated
-                    should_persist_alert = any(
-                        flag in execution_status
-                        for flag in [
-                            "websocket_broadcast_required",
-                            "email_alert_required",
-                            "sms_escalation_required",
-                        ]
-                    )
+                    alert_info = {
+                        "risk_score": 0.0,
+                        "risk_level": "Safe",
+                        "incident_type": "Normal Activity",
+                    }
+                    execution_status = []
 
-                    alert_record = None
-                    if should_persist_alert:
-                        alert_record = self.alert_service.create_alert({
-                            "person_id": raw_cv_state["person_id"],
-                            "camera_id": raw_cv_state["camera_id"],
-                            "platform": raw_cv_state["platform"],
-                            "incident_type": alert_payload.get("incident_type", "Normal Activity"),
-                            "risk_score": alert_payload.get("risk_score", 0.0),
-                            "risk_level": alert_payload.get("risk_level", "Safe"),
-                            "status": "active",
-                            "bounding_box": raw_cv_state.get("bounding_box"),
-                        })
-                        if alert_record:
-                            alert_payload["id"] = alert_record.id
+                    if self.temporal_confirmation_tracker.is_confirmed(track_id):
+                        final_state = await run_agent_pipeline(raw_cv_state)
+                        alert_payload = final_state.get("alert_payload", {})
+                        execution_status = final_state.get("execution_status", [])
+                        alert_info = alert_payload
 
-                    if alert_payload.get("risk_score", 0.0) >= settings.MEDIUM_RISK_THRESHOLD:
-                        incident_payload = {
-                            "alert_id": alert_record.id if alert_record else None,
-                            "camera_id": raw_cv_state["camera_id"],
-                            "platform": raw_cv_state["platform"],
-                            "incident_type": alert_payload.get("incident_type", "Normal Activity"),
-                            "risk_score": alert_payload.get("risk_score", 0.0),
-                            "risk_level": alert_payload.get("risk_level", "Safe"),
-                            "status": "unacknowledged",
-                        }
-                        self.incident_service.create_incident(incident_payload)
-
-                    if "websocket_broadcast_required" in execution_status:
-                        await manager.broadcast_detection(alert_payload)
-
-                    is_acknowledged = self.incident_service.is_track_acknowledged(
-                        person_id=str(track_id), camera_id=self.camera_id
-                    )
-
-                    if is_acknowledged:
-                        logger.info(
-                            f"Skipping notification for acknowledged track {track_id} on camera {self.camera_id}"
+                        should_persist_alert = any(
+                            flag in execution_status
+                            for flag in [
+                                "websocket_broadcast_required",
+                                "email_alert_required",
+                                "sms_escalation_required",
+                            ]
                         )
-                    else:
-                        if "email_alert_required" in execution_status:
-                            # Check cooldown before sending email alert
-                            alert_time = time.time()
-                            last_alert_time = self.email_alert_cooldown.get(track_id, 0)
-                            time_since_last_alert = alert_time - last_alert_time
-                            
-                            if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
-                                # Cooldown expired or first alert for this track - send email
-                                await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
-                                self.email_alert_cooldown[track_id] = alert_time
-                                logger.info(f"Email alert sent for track {track_id}")
-                            else:
-                                # Cooldown still active - skip email but log for debugging
-                                remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
-                                logger.debug(
-                                    f"Email alert skipped for track {track_id}: "
-                                    f"cooldown active for {remaining_cooldown:.1f}s more"
-                                )
-                        if "sms_escalation_required" in execution_status:
-                            await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
+
+                        alert_record = None
+                        if should_persist_alert:
+                            alert_record = self.alert_service.create_alert({
+                                "person_id": raw_cv_state["person_id"],
+                                "camera_id": raw_cv_state["camera_id"],
+                                "platform": raw_cv_state["platform"],
+                                "incident_type": alert_payload.get("incident_type", "Normal Activity"),
+                                "risk_score": alert_payload.get("risk_score", 0.0),
+                                "risk_level": alert_payload.get("risk_level", "Safe"),
+                                "status": "active",
+                                "bounding_box": raw_cv_state.get("bounding_box"),
+                            })
+                            if alert_record:
+                                alert_payload["id"] = alert_record.id
+
+                        if alert_payload.get("risk_score", 0.0) >= settings.MEDIUM_RISK_THRESHOLD:
+                            incident_payload = {
+                                "alert_id": alert_record.id if alert_record else None,
+                                "camera_id": raw_cv_state["camera_id"],
+                                "platform": raw_cv_state["platform"],
+                                "incident_type": alert_payload.get("incident_type", "Normal Activity"),
+                                "risk_score": alert_payload.get("risk_score", 0.0),
+                                "risk_level": alert_payload.get("risk_level", "Safe"),
+                                "status": "unacknowledged",
+                            }
+                            self.incident_service.create_incident(incident_payload)
+
+                        if "websocket_broadcast_required" in execution_status:
+                            await manager.broadcast_detection(alert_payload)
+
+                        is_acknowledged = self.incident_service.is_track_acknowledged(
+                            person_id=str(track_id), camera_id=self.camera_id
+                        )
+
+                        if is_acknowledged:
+                            logger.info(
+                                f"Skipping notification for acknowledged track {track_id} on camera {self.camera_id}"
+                            )
+                        else:
+                            if "email_alert_required" in execution_status:
+                                alert_time = time.time()
+                                last_alert_time = self.email_alert_cooldown.get(track_id, 0)
+                                time_since_last_alert = alert_time - last_alert_time
+                                
+                                if time_since_last_alert >= EMAIL_ALERT_COOLDOWN_SECONDS:
+                                    await asyncio.to_thread(self.notification_service.send_email_alert, alert_payload)
+                                    self.email_alert_cooldown[track_id] = alert_time
+                                    logger.info(f"Email alert sent for track {track_id}")
+                                else:
+                                    remaining_cooldown = EMAIL_ALERT_COOLDOWN_SECONDS - time_since_last_alert
+                                    logger.debug(
+                                        f"Email alert skipped for track {track_id}: "
+                                        f"cooldown active for {remaining_cooldown:.1f}s more"
+                                    )
+                            if "sms_escalation_required" in execution_status:
+                                await asyncio.to_thread(self.escalation_service.send_sms_alert, alert_payload)
 
                     # 6. Accumulate visual metadata overlay values
                     active_frame_detections.append({

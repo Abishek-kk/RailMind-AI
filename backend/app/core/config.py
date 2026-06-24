@@ -89,6 +89,7 @@ class Settings(BaseSettings):
         }
     )
     RISK_CONTEXT_MULTIPLIER_WEIGHT: float = 0.1
+    TEMPORAL_CONFIRMATION_SECONDS: int = 15
 
     # Twilio Escalation Configuration
     TWILIO_ACCOUNT_SID: str = Field(default="")
