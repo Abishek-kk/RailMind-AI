@@ -59,6 +59,7 @@ def init_db() -> None:
     _ensure_incident_platform_column()
     _ensure_alert_delivery_columns()
     _ensure_analytics_hotspot_columns()
+    _ensure_training_run_sample_columns()
 
 
 def _ensure_feed_stream_url_column() -> None:
@@ -130,3 +131,21 @@ def _ensure_analytics_hotspot_columns() -> None:
         for column_name, column_type in required_columns.items():
             if column_name not in columns:
                 connection.execute(text(f"ALTER TABLE analytics ADD COLUMN {column_name} {column_type}"))
+
+
+def _ensure_training_run_sample_columns() -> None:
+    """Add continual-learning sample counters to existing training run tables."""
+    inspector = inspect(Engine)
+    if "training_runs" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("training_runs")}
+    required_columns = {
+        "synthetic_sample_count": "INTEGER NOT NULL DEFAULT 0",
+        "real_sample_count": "INTEGER NOT NULL DEFAULT 0",
+    }
+
+    with Engine.begin() as connection:
+        for column_name, column_type in required_columns.items():
+            if column_name not in columns:
+                connection.execute(text(f"ALTER TABLE training_runs ADD COLUMN {column_name} {column_type}"))

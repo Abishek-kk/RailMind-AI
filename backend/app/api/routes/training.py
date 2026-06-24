@@ -24,6 +24,8 @@ class TrainingRunSchema(BaseModel):
     model_type: str
     epochs: int
     batch_size: int
+    synthetic_sample_count: int
+    real_sample_count: int
     final_train_loss: Optional[float]
     final_val_loss: Optional[float]
     final_train_accuracy: Optional[float]

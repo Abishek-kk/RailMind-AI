@@ -21,6 +21,8 @@ class TrainingRun(Base):
     # Training parameters
     epochs = Column(Integer, nullable=False, default=30)
     batch_size = Column(Integer, nullable=False, default=32)
+    synthetic_sample_count = Column(Integer, nullable=False, default=0)
+    real_sample_count = Column(Integer, nullable=False, default=0)
     
     # Performance metrics
     final_train_loss = Column(Float, nullable=True)
