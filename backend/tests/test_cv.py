@@ -215,6 +215,29 @@ def test_video_processor_instantiates_temporal_confirmation_tracker():
     assert isinstance(processor.temporal_confirmation_tracker, TemporalConfirmationTracker)
 
 
+def test_frame_skip_interval_setting():
+    from app.core.config import settings
+    import app.cv.video_processor as vp
+    import inspect
+
+    assert settings.FRAME_SKIP_INTERVAL == 2
+
+    original = settings.FRAME_SKIP_INTERVAL
+    try:
+        settings.FRAME_SKIP_INTERVAL = 1
+        source = inspect.getsource(vp.VideoProcessor.start_processing_loop)
+        assert "settings.FRAME_SKIP_INTERVAL" in source
+
+        for frame_count in [1, 2, 3, 4, 5]:
+            assert not (frame_count % settings.FRAME_SKIP_INTERVAL != 0)
+
+        settings.FRAME_SKIP_INTERVAL = 3
+        for frame_count in [1, 2, 3, 4, 5, 6]:
+            assert (frame_count % settings.FRAME_SKIP_INTERVAL != 0) == (frame_count % 3 != 0)
+    finally:
+        settings.FRAME_SKIP_INTERVAL = original
+
+
 def test_context_suppression_returns_normal_multiplier_for_no_data():
     service = ContextSuppressionService(db=SimpleNamespace())
 

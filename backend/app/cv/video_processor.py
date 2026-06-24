@@ -148,8 +148,10 @@ class VideoProcessor:
                         break
 
                 frame_count += 1
-                # Skip frames strategically to optimize edge hardware performance overhead
-                if frame_count % 2 != 0:
+                # Skip frames according to the configured interval to manage CPU/GPU load.
+                # With the default interval of 2 and a 10 FPS source, the effective
+                # processing rate is approximately 5 FPS.
+                if frame_count % settings.FRAME_SKIP_INTERVAL != 0:
                     await asyncio.sleep(0.001)
                     continue
 
@@ -370,7 +372,8 @@ class VideoProcessor:
                     await manager.broadcast_detection(live_broadcast_packet)
                     self.last_detection_broadcast_time = frame_time
 
-                # Control frequency to match expected video runtime speeds (~30 frames/sec execution)
+                # Yield control to the event loop between processed frames.
+                # The actual processing throughput is source_fps / FRAME_SKIP_INTERVAL.
                 await asyncio.sleep(0.033)
         finally:
             if cap is not None:
