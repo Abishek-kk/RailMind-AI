@@ -4,11 +4,12 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_key
 from app.api.routes.dashboard import get_incident_trend
 from app.analytics.heatmap import get_persistent_platform_heatmap
 from app.models.incident import Incident
 from app.models.alert import Alert
+from app.models.station_fp_alert import StationFpAlert
 
 router = APIRouter()
 
@@ -173,4 +174,19 @@ async def analytics_lstm_performance(db = Depends(get_db)):
         "false_positive_count": int(false_positive_count),
         "per_class_counts": per_class,
     }
+
+
+@router.get("/fp-rate-alerts", dependencies=[Depends(require_api_key)])
+async def fp_rate_alerts(db = Depends(get_db)):
+    """Return currently flagged stations where the false-positive rate exceeds the threshold."""
+    alerts = db.query(StationFpAlert).filter(StationFpAlert.resolved_at.is_(None)).all()
+    return [
+        {
+            "id": alert.id,
+            "platform": alert.platform,
+            "fp_rate": float(alert.fp_rate),
+            "alerted_at": alert.alerted_at.isoformat() if alert.alerted_at else None,
+        }
+        for alert in alerts
+    ]
 

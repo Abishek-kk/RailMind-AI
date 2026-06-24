@@ -51,6 +51,7 @@ def init_db() -> None:
     import app.models.incident
     import app.models.platform
     import app.models.staff
+    import app.models.station_fp_alert
     import app.models.track
     import app.models.training_run
     
@@ -60,6 +61,7 @@ def init_db() -> None:
     _ensure_alert_delivery_columns()
     _ensure_analytics_hotspot_columns()
     _ensure_training_run_sample_columns()
+    _ensure_station_fp_alerts_table()
 
 
 def _ensure_feed_stream_url_column() -> None:
@@ -149,3 +151,21 @@ def _ensure_training_run_sample_columns() -> None:
         for column_name, column_type in required_columns.items():
             if column_name not in columns:
                 connection.execute(text(f"ALTER TABLE training_runs ADD COLUMN {column_name} {column_type}"))
+
+
+def _ensure_station_fp_alerts_table() -> None:
+    """Create station_fp_alerts table if it does not exist."""
+    inspector = inspect(Engine)
+    if "station_fp_alerts" in inspector.get_table_names():
+        return
+
+    with Engine.begin() as connection:
+        connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS station_fp_alerts (
+                id INTEGER PRIMARY KEY,
+                platform VARCHAR NOT NULL UNIQUE,
+                fp_rate FLOAT NOT NULL,
+                alerted_at DATETIME NOT NULL,
+                resolved_at DATETIME
+            )
+        """))
