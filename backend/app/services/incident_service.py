@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
+from app.models.feedback import Feedback
 from app.models.incident import Incident
 
 
@@ -91,6 +92,19 @@ class IncidentService:
         incident.false_positive = True
         incident.false_positive_reported_by = staff_id
         incident.false_positive_notes = notes
+        if incident.alert_id is not None:
+            try:
+                feedback_staff_id = int(staff_id)
+            except (TypeError, ValueError):
+                feedback_staff_id = None
+            self.db.add(
+                Feedback(
+                    alert_id=incident.alert_id,
+                    staff_id=feedback_staff_id,
+                    is_false_positive=True,
+                    notes=notes,
+                )
+            )
         self.db.commit()
         self.db.refresh(incident)
         return incident

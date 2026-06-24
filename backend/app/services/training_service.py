@@ -4,7 +4,7 @@ import logging
 import os
 import traceback
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy.orm import Session
@@ -16,6 +16,9 @@ from app.lstm.train import (
     create_multiclass_dataset,
     train_behavior_classifier,
 )
+from app.models.alert import Alert
+from app.models.feedback import Feedback
+from app.models.incident import Incident
 from app.models.training_run import TrainingRun
 
 logger = logging.getLogger("railmind.training")
@@ -32,6 +35,62 @@ class TrainingService:
         if self.db is None:
             return SessionLocal()
         return self.db
+
+    def get_labelled_feedback_dataset(self) -> Dict[str, Any]:
+        """Return operator-labelled feedback examples for future retraining."""
+        db = self.get_db_session()
+        try:
+            rows = (
+                db.query(Feedback, Alert, Incident)
+                .join(Alert, Feedback.alert_id == Alert.id)
+                .outerjoin(Incident, Incident.alert_id == Alert.id)
+                .order_by(Feedback.submitted_at.desc(), Incident.timestamp.desc())
+                .all()
+            )
+
+            examples = []
+            for feedback, alert, incident in rows:
+                examples.append(
+                    {
+                        "feedback_id": feedback.id,
+                        "label": feedback.corrected_label,
+                        "is_false_positive": feedback.is_false_positive,
+                        "notes": feedback.notes,
+                        "submitted_at": feedback.submitted_at,
+                        "staff_id": feedback.staff_id,
+                        "training_run_id": feedback.training_run_id,
+                        "alert": {
+                            "id": alert.id,
+                            "person_id": alert.person_id,
+                            "camera_id": alert.camera_id,
+                            "platform": alert.platform,
+                            "incident_type": alert.incident_type,
+                            "risk_score": alert.risk_score,
+                            "risk_level": alert.risk_level,
+                            "lstm_confidence": alert.lstm_confidence,
+                            "bounding_box": alert.bounding_box,
+                            "timestamp": alert.timestamp,
+                        },
+                        "incident": {
+                            "id": incident.id,
+                            "camera_id": incident.camera_id,
+                            "platform": incident.platform,
+                            "incident_type": incident.incident_type,
+                            "risk_score": incident.risk_score,
+                            "risk_level": incident.risk_level,
+                            "status": incident.status,
+                            "false_positive": incident.false_positive,
+                            "timestamp": incident.timestamp,
+                        }
+                        if incident is not None
+                        else None,
+                    }
+                )
+
+            return {"source": "feedback", "count": len(examples), "examples": examples}
+        finally:
+            if self.db is None:
+                db.close()
 
     def create_training_run_record(
         self,
