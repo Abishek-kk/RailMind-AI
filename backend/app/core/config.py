@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # CORS Security Policies
     BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],
+        default_factory=lambda: ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],
         validation_alias="CORS_ORIGINS"
     )
 
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = Field(default=587)
     SMTP_USER: str = Field(default="")
     SMTP_PASSWORD: str = Field(default="")
-    ALERT_EMAIL_RECIPIENTS: List[str] = Field(default=["admin@railmind.ai"], validation_alias="ALERT_EMAIL_RECIPIENTS")
+    ALERT_EMAIL_RECIPIENTS: List[str] = Field(default_factory=lambda: ["admin@railmind.ai"], validation_alias="ALERT_EMAIL_RECIPIENTS")
 
     # Database Architecture 
     DATABASE_URL: str = Field(default="sqlite:///./data/railmind.db", validation_alias="DATABASE_URL")
@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = Field(default="")
     TWILIO_AUTH_TOKEN: str = Field(default="")
     TWILIO_FROM_NUMBER: str = Field(default="")
-    TWILIO_TO_NUMBERS: List[str] = Field(default=[], validation_alias="TWILIO_TO_NUMBERS")
+    TWILIO_TO_NUMBERS: List[str] = Field(default_factory=list, validation_alias="TWILIO_TO_NUMBERS")
 
     @field_validator("SECRET_KEY", mode="before")
     @classmethod
@@ -112,6 +112,16 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_cors_origins(cls, value):
         if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(value)
+                except ValueError:
+                    pass
+                else:
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
@@ -119,6 +129,16 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_alert_email_recipients(cls, value):
         if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(value)
+                except ValueError:
+                    pass
+                else:
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
@@ -126,6 +146,16 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_twilio_to_numbers(cls, value):
         if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(value)
+                except ValueError:
+                    pass
+                else:
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 

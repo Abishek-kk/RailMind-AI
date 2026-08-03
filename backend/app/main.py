@@ -86,7 +86,9 @@ else:
         # If settings is immutable in the current environment, skip explicit mutation
         pass
 
-cors_origins = [origin for origin in settings.BACKEND_CORS_ORIGINS if origin != "*"]
+cors_origins = settings.BACKEND_CORS_ORIGINS
+if isinstance(cors_origins, str):
+    cors_origins = [item.strip() for item in cors_origins.split(",") if item.strip()]
 if not cors_origins:
     cors_origins = frontend_origins
 
