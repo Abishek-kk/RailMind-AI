@@ -17,7 +17,8 @@ def reasoning_node(state: Dict[str, Any]) -> Dict[str, Any]:
     scorer = RiskScorer()
 
     score_input = {
-        "lstm_score": obs.get("lstm_score", obs.get("lstm_anomaly_score", 0.0)),
+        "transformer_score": obs.get("transformer_score", obs.get("transformer_anomaly_score", 0.0)),
+        "transformer_anomaly_score": obs.get("transformer_anomaly_score", 0.0),
         "edge_distance": obs.get("edge_distance", obs.get("edge_distance_meters", settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS * 2)),
         "duration_seconds": obs.get("behavior_duration_seconds", obs.get("duration_seconds", 0)),
         "loitering_duration": obs.get("loitering_duration", 0),

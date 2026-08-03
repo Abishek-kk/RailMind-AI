@@ -1,4 +1,4 @@
-"""Extract LSTM training sequences from real video folders.
+"""Extract transformer training sequences from real video folders.
 
 The script maps the local raw-video dataset folders into the behavior folders
 expected by prepare_dataset.py, then writes one .npy sequence per video.
@@ -14,7 +14,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.cv.pose_estimator import PoseEstimator
-from app.lstm.feature_extractor import extract_pose_features
+from app.features.feature_extractor import extract_pose_features
 
 
 DATASET_DIR = Path(__file__).resolve().parents[1] / "datasets"

@@ -1,4 +1,4 @@
-"""Background job scheduler for LSTM model retraining."""
+"""Background job scheduler for transformer model retraining."""
 import logging
 from datetime import datetime
 
@@ -35,8 +35,8 @@ def start_scheduler():
     scheduler.add_job(
         _scheduled_training_job,
         CronTrigger(day_of_week=6, hour=2, minute=0),  # Sunday 2 AM
-        id="weekly_lstm_retrain",
-        name="Weekly LSTM Model Retraining",
+        id="weekly_transformer_retrain",
+        name="Weekly Transformer Model Retraining",
         replace_existing=True,
     )
 
@@ -64,7 +64,7 @@ def stop_scheduler():
 def _scheduled_training_job():
     """Execute scheduled training job."""
     logger.info("=" * 70)
-    logger.info("Executing scheduled LSTM model retraining")
+    logger.info("Executing scheduled transformer model retraining")
     logger.info("=" * 70)
     
     try:

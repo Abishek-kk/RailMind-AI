@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pause, Play, Maximize2, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
+import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/railmind-types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 function levelToColor(level: string) {
   return riskColor(level as never);
 }
 
-export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: CCTVFeed; detections?: BoundingBox[]; onRemove?: (feedId: string) => void; removing?: boolean }) {
+export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl }: { feed: CCTVFeed; detections?: BoundingBox[]; onRemove?: (feedId: string) => void; removing?: boolean; previewUrl?: string }) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -19,6 +19,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
   const [isMuted, setIsMuted] = useState(true);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
   const [videoError, setVideoError] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
 
   // Update frozen boxes when not paused
   useEffect(() => {
@@ -29,7 +30,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
 
   useEffect(() => {
     setVideoError(false);
-  }, [feed.streamUrl]);
+  }, [feed.streamUrl, previewUrl]);
 
   // Imperatively control playback — autoPlay only fires once on mount.
   useEffect(() => {
@@ -87,8 +88,8 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-border bg-card max-w-[300px] max-h-[420px] flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2">
         <div>
           <div className="text-sm font-semibold">{feed.id}</div>
           <div className="text-xs text-muted-foreground">{feed.platform}</div>
@@ -105,18 +106,21 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
       <div
         ref={scrollRef}
         onWheel={handleWheel}
-        className="relative aspect-video overflow-hidden bg-black"
-        style={{ overscrollBehavior: "contain" }}
+        className="relative overflow-hidden bg-black flex-1 min-h-0"
+        style={{
+          overscrollBehavior: "contain",
+          aspectRatio: videoAspectRatio ? `${videoAspectRatio}` : undefined,
+        }}
       >
-        {feed.streamUrl && !videoError ? (
+        {(previewUrl || feed.streamUrl) && !videoError ? (
           <video
             ref={videoRef}
-            src={feed.streamUrl}
+            src={previewUrl || feed.streamUrl}
             autoPlay={!isPaused}
             muted={isMuted}
             loop
             controls={false}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain bg-black"
             playsInline
             onError={() => setVideoError(true)}
             onCanPlay={() => {
@@ -126,17 +130,21 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
               } catch {}
             }}
             onLoadedData={(e) => {
+              const videoEl = e.currentTarget as HTMLVideoElement;
               setVideoError(false);
               try {
-                (e.currentTarget as HTMLVideoElement).play();
+                videoEl.play();
               } catch {}
+              if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+                setVideoAspectRatio(videoEl.videoWidth / videoEl.videoHeight);
+              }
             }}
           />
         ) : (
           <img
             src={feed.image}
             alt={feed.id}
-            className={`h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
+            className={`h-full w-full object-contain transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
             loading="lazy"
           />
         )}
@@ -192,47 +200,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
           </div>
         )}
       </div>
-      <div className="flex items-center justify-between border-t border-border px-3 py-2 text-muted-foreground">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handlePlayPauseToggle}
-            title={isPaused ? "Play" : "Pause"}
-            className="rounded p-1 hover:bg-secondary hover:text-foreground"
-          >
-            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={handleMuteToggle}
-            title={isMuted ? "Unmute" : "Mute"}
-            className="rounded p-1 hover:bg-secondary hover:text-foreground"
-          >
-            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setFullscreenOpen(true)}
-            title="Fullscreen view"
-            className="rounded p-1 hover:bg-secondary hover:text-foreground"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-          {onRemove ? (
-            <button
-              type="button"
-              onClick={() => onRemove(feed.id)}
-              disabled={removing}
-              title="Remove feed"
-              className="rounded p-1 hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-      </div>
+      {/* Bottom controls removed per user request */}
 
       {/* Fullscreen Dialog */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
@@ -255,9 +223,9 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing }: { feed: C
               }}
               style={{ overscrollBehavior: "contain" }}
             >
-              {feed.streamUrl && !videoError ? (
+              {(previewUrl || feed.streamUrl) && !videoError ? (
                 <video
-                  src={feed.streamUrl}
+                  src={previewUrl || feed.streamUrl}
                   autoPlay={!isPaused}
                   muted={isMuted}
                   loop

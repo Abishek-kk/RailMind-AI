@@ -1,4 +1,4 @@
-"""Demo runner: simulates CV/LSTM outputs and executes the agent pipeline locally.
+"""Demo runner: simulates CV/transformer outputs and executes the agent pipeline locally.
 
 Run: f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/demo_runner.py
 """
@@ -22,7 +22,7 @@ def make_sample_raw_state(person_id: int) -> Dict[str, Any]:
     pacing = random.choice([0, 1, 3, 5])
     movement_speed = random.uniform(0.0, 1.5)
 
-    lstm_scores = {
+    transformer_scores = {
         "normal": max(0.0, 1.0 - random.random()),
         "suicide": random.random() * (edge_proximity / 100.0),
         "pickpocket": random.random() * (1.0 if following_distance < 1.0 else 0.1),
@@ -33,9 +33,9 @@ def make_sample_raw_state(person_id: int) -> Dict[str, Any]:
         "person_id": person_id,
         "camera_id": "CAM_DEMO_01",
         "platform": "DemoPlatform",
-        "lstm_scores": lstm_scores,
-        "lstm_anomaly_score": lstm_scores.get("anomaly", 0.0),
-        "lstm_score": max(lstm_scores.values()),
+        "transformer_scores": transformer_scores,
+        "transformer_anomaly_score": transformer_scores.get("anomaly", 0.0),
+        "transformer_score": max(transformer_scores.values()),
         "edge_distance_meters": max(0.0, 1.0 - (edge_proximity / 100.0)),
         "edge_proximity_seconds": float(edge_proximity),
         "behavior_duration_seconds": random.randint(1, 200),

@@ -9,7 +9,7 @@ from app.agents.intervention_agent import intervention_node
 
 # Define the global state for the LangGraph pipeline
 class AgentState(TypedDict):
-    raw_data: Dict[str, Any]         # Input from CV/LSTM pipeline
+    raw_data: Dict[str, Any]         # Input from CV/transformer pipeline
     observation: Dict[str, Any]      # Output of Perception
     decision: Dict[str, Any]         # Output of Reasoning
     alert_payload: Dict[str, Any]    # Output of Intervention

@@ -35,7 +35,7 @@ backend/
 │   └── scripts/            # Training and data preparation scripts
 ├── data/                   # Runtime data
 │   ├── railmind.db         # SQLite database
-│   └── mock_feeds/         # Sample video feeds
+│   └── video_feeds/        # Uploaded/runtime video feeds
 ├── tests/                  # Test suite
 ├── requirements.txt        # Python dependencies
 ├── .env                    # Environment variables
@@ -134,13 +134,13 @@ f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/demo_runner.py
 
 Notes:
 - The demo runner simulates CV/LSTM outputs and executes the LangGraph agent pipeline locally.
-- For a full CV pipeline, provide MP4 files under `backend/data/mock_feeds` or an RTSP URL and start
+- For a full CV pipeline, provide MP4 files under `backend/data/video_feeds` or an RTSP URL and start
    the `VideoProcessor` via a small runner.
 
 Run the full CV pipeline (YOLOv8-Pose + ByteTrack + feature extraction):
 
 ```bash
-# Ensure you have model weights `backend/yolov8n-pose.pt` available and mock videos in data/mock_feeds
+# Ensure you have model weights `backend/yolov8n-pose.pt` available and videos in data/video_feeds
 f:/teamaccelerate/.venv/Scripts/Activate.ps1
 f:/teamaccelerate/.venv/Scripts/python.exe backend/scripts/run_video_processors.py --device cuda:0
 

@@ -1,14 +1,4 @@
-"""
-Synthetic data generator and LSTM training script for behavior classification.
-
-Generates synthetic behavioral sequences for 4 behavior classes:
-1. Normal
-2. Suicide Risk
-3. Pickpocketing
-4. Security Threat
-
-Trains one 4-class classifier with a softmax output.
-"""
+"""Synthetic data generator and temporal transformer training utilities."""
 
 import os
 import logging
@@ -21,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 
 from app.core.config import settings
-from app.lstm.model import LSTMBehaviorModel
+from app.transformer.model import TemporalTransformerBehaviorModel
 
 BEHAVIOR_LABELS = ("normal", "suicide", "pickpocket", "security_threat")
 
@@ -33,7 +23,7 @@ logging.basicConfig(
 
 
 class SyntheticDataGenerator:
-    """Generates realistic synthetic behavioral sequences for LSTM training."""
+    """Generates realistic synthetic behavioral sequences for transformer training."""
 
     def __init__(self, sequence_length: int = 30, num_features: int = 7, seed: int = 42):
         self.sequence_length = sequence_length
@@ -153,24 +143,6 @@ def create_multiclass_dataset(
     return X_train, y_train, X_val, y_val, scaler
 
 
-def train_classifier(
-    target_name: str,
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    output_filename: str,
-    scaler: StandardScaler,
-    epochs: int = 30,
-    batch_size: int = 32,
-):
-    raise RuntimeError(
-        "Per-threat LSTM training has been replaced by the 4-class "
-        "train_behavior_classifier pipeline."
-    )
-
-
-
 def train_behavior_classifier(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -186,9 +158,9 @@ def train_behavior_classifier(
         torch.cuda.manual_seed_all(42)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = LSTMBehaviorModel(
-        sequence_length=settings.LSTM_SEQUENCE_LENGTH,
-        num_features=settings.LSTM_FEATURE_COUNT,
+    model = TemporalTransformerBehaviorModel(
+        sequence_length=settings.TRANSFORMER_SEQUENCE_LENGTH,
+        num_features=settings.TRANSFORMER_FEATURE_COUNT,
         num_classes=len(BEHAVIOR_LABELS),
     ).to(device)
 
@@ -290,12 +262,12 @@ def train_behavior_classifier(
 
 def main():
     logger.info("=" * 70)
-    logger.info("LSTM Behavior Classification Training Pipeline")
+    logger.info("Temporal Transformer Behavior Classification Training Pipeline")
     logger.info("=" * 70)
 
     generator = SyntheticDataGenerator(
-        sequence_length=settings.LSTM_SEQUENCE_LENGTH,
-        num_features=settings.LSTM_FEATURE_COUNT,
+        sequence_length=settings.TRANSFORMER_SEQUENCE_LENGTH,
+        num_features=settings.TRANSFORMER_FEATURE_COUNT,
     )
     data = generator.generate_all_data()
 

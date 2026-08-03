@@ -44,9 +44,9 @@ if __name__ == "__main__":
     
     elif args.mode == "train-cli":
         # Use the CLI directly
-        from app.lstm.cli import main as cli_main
+        from app.transformer.train import main as cli_main
         sys.argv = [
-            "python -m app.lstm.cli",
+            "python -m app.transformer.train",
             "train",
             "--type", args.model_type,
             "--epochs", str(args.epochs),

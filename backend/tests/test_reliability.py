@@ -12,7 +12,7 @@ import app.models
 from app.core.database import Base
 from app.features.loitering_detector import LoiteringDetector
 from app.core.config import settings
-from app.main import _ensure_lstm_models, app
+from app.main import _ensure_transformer_models, app
 from app.models.feedback import Feedback
 from app.models.incident import Incident
 
@@ -60,7 +60,7 @@ def test_documented_database_tables_create_on_fresh_sqlite():
         "camera_id",
         "session_id",
         "feature_sequence_json",
-        "lstm_label",
+        "transformer_label",
         "confidence",
     }.issubset(track_columns)
 
@@ -123,16 +123,14 @@ def test_loitering_detector_clears_disappeared_tracks():
     assert 1 not in detector.first_seen_frames
 
 
-def test_lstm_startup_does_not_generate_untrained_placeholders(tmp_path, monkeypatch):
+def test_transformer_startup_does_not_generate_untrained_placeholders(tmp_path, monkeypatch):
     pose_model = tmp_path / "yolov8n-pose.pt"
     pose_model.write_bytes(b"placeholder")
 
     monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path / "models"))
     monkeypatch.setattr(settings, "POSE_MODEL_PATH", str(pose_model))
-    monkeypatch.setattr("app.main._ensure_mock_feed_videos", lambda *args, **kwargs: None)
-    monkeypatch.setattr("app.main._ensure_default_station_feeds", lambda: None)
 
-    _ensure_lstm_models()
+    _ensure_transformer_models()
 
     assert list((tmp_path / "models").glob("*.pt")) == []
 

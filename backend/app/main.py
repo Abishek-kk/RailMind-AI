@@ -1,5 +1,4 @@
 """Main FastAPI application entry point for the RailMind AI backend."""
-import glob
 import os
 import secrets
 from fastapi import FastAPI
@@ -8,36 +7,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import api_router
 from app.core.config import settings
-from app.core.database import SessionLocal, init_db
+from app.core.database import init_db
 from app.core import websocket_manager
 from app.core.scheduler import start_scheduler, stop_scheduler
-from app.core.processor_manager import start_processor
-from app.models.feed import Feed
 from fastapi import WebSocket, WebSocketDisconnect
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler replacing deprecated on_event hooks.
 
-    Performs necessary startup initialization (database, LSTM models,
-    mock feed videos and default feeds). Shutdown cleanup can be added
-    here in the future.
+    Performs necessary startup initialization (database and model checks).
+    Shutdown cleanup can be added here in the future.
     """
     # Startup
     init_db()
     try:
-        _ensure_lstm_models()
+        _ensure_transformer_models()
     except Exception as e:
-        print(f"Error ensuring LSTM model bootstrap: {e}")
+        print(f"Error ensuring transformer model bootstrap: {e}")
 
-    try:
-        _ensure_mock_feed_videos(settings.MOCK_FEED_DIR, required=2)
-    except Exception:
-        pass
-
-    _ensure_default_station_feeds()
-
-    # Start background scheduler for LSTM retraining
+    # Start background scheduler for transformer retraining
     start_scheduler()
 
     yield
@@ -157,8 +146,8 @@ async def websocket_feed_endpoint(websocket: WebSocket, camera_id: str):
         websocket_manager.manager.disconnect(websocket)
 
 
-def _ensure_lstm_models() -> None:
-    """Report LSTM model availability without creating untrained placeholders."""
+def _ensure_transformer_models() -> None:
+    """Report Temporal Transformer model availability without creating untrained placeholders."""
     model_dir = settings.MODEL_DIR
     required_files = [
         "behavior_classifier.pt",
@@ -167,12 +156,11 @@ def _ensure_lstm_models() -> None:
     missing = [f for f in required_files if not os.path.exists(os.path.join(model_dir, f))]
     if missing:
         print(
-            f"Missing LSTM model files in {model_dir}: {missing}. "
-            "LSTM inference will return neutral scores until trained model weights are provided. "
-            "Run `python -m app.lstm.train` or supply validated production weights before using LSTM risk signals."
+            f"Missing Temporal Transformer model files in {model_dir}: {missing}. "
+            "Temporal Transformer inference will return neutral scores until trained model weights are provided. "
+            "Run `python -m app.transformer.train` or supply validated production weights before using Temporal Transformer risk signals."
         )
 
-    # Report pose model availability without attempting network downloads during startup.
     try:
         pose_path = settings.POSE_MODEL_PATH
         if not os.path.exists(pose_path):
@@ -184,119 +172,8 @@ def _ensure_lstm_models() -> None:
         # Non-fatal; startup continues even if pose model check fails.
         pass
 
-    # Ensure there are mock feed videos available for the demo.
-    try:
-        _ensure_mock_feed_videos(settings.MOCK_FEED_DIR, required=2)
-    except Exception:
-        pass
-
-    _ensure_default_station_feeds()
-
 # Previously startup/shutdown handlers used @app.on_event which is deprecated
 # in recent FastAPI versions; lifespan context manager above replaces them.
-
-
-def _ensure_default_station_feeds() -> None:
-    """Ensure two default station feeds are registered and started."""
-    video_dir = settings.MOCK_FEED_DIR
-    if not os.path.isdir(video_dir):
-        return
-
-    video_paths = sorted(
-        glob.glob(os.path.join(video_dir, "*.mp4"))
-        + glob.glob(os.path.join(video_dir, "*.mov"))
-        + glob.glob(os.path.join(video_dir, "*.mkv"))
-        + glob.glob(os.path.join(video_dir, "*.avi"))
-    )
-    if len(video_paths) < 2:
-        return
-
-    default_feeds = [
-        {"id": "CCTV_STATION_1", "name": "Station 1", "platform": "Station 1"},
-        {"id": "CCTV_STATION_2", "name": "Station 2", "platform": "Station 2"},
-    ]
-
-    with SessionLocal() as db:
-        for idx, feed_info in enumerate(default_feeds):
-            video_path = video_paths[idx]
-            # Compute the browser-accessible URL for the uploaded video file.
-            # The file is served by FastAPI's StaticFiles mount at /uploads/<filename>.
-            stream_url = f"/uploads/{os.path.basename(video_path)}"
-
-            feed = db.query(Feed).filter(Feed.id == feed_info["id"]).first()
-            if feed is None:
-                feed = Feed(
-                    id=feed_info["id"],
-                    name=feed_info["name"],
-                    status="active",
-                    fps=30.0,
-                    source_url=video_path,
-                    stream_url=stream_url,
-                )
-                db.add(feed)
-                db.commit()
-                db.refresh(feed)
-            else:
-                # Backfill stream_url for existing records that were created without it.
-                if not feed.stream_url:
-                    feed.stream_url = stream_url
-                    feed.source_url = video_path
-                    db.commit()
-            try:
-                start_processor(video_path, feed.id, feed_info["platform"])
-            except Exception as e:
-                print(f"Failed to start default station processor for {feed.id}: {e}")
-
-
-def _ensure_mock_feed_videos(video_dir: str, required: int = 2) -> None:
-    """Ensure there are at least `required` video files in `video_dir`.
-
-    If not present, attempt to generate simple synthetic MP4 files using OpenCV.
-    This allows the demo to run out-of-the-box without checked-in binaries.
-    """
-    try:
-        os.makedirs(video_dir, exist_ok=True)
-    except Exception:
-        return
-
-    existing = sorted(
-        glob.glob(os.path.join(video_dir, "*.mp4"))
-        + glob.glob(os.path.join(video_dir, "*.mov"))
-    )
-    if len(existing) >= required:
-        return
-
-    # Try to create synthetic videos if OpenCV is available.
-    try:
-        import cv2
-        import numpy as np
-
-        width, height = 640, 360
-        fps = 10
-        duration_seconds = 5
-        frames = fps * duration_seconds
-
-        for i in range(required - len(existing)):
-            filename = f"sample_station_{i+1}.mp4"
-            path = os.path.join(video_dir, filename)
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            out = cv2.VideoWriter(path, fourcc, float(fps), (width, height))
-            for f in range(frames):
-                img = 30 * np.ones((height, width, 3), dtype="uint8")
-                # moving rectangle
-                x = int((width - 100) * (f / frames))
-                y = int((height - 50) * (f / frames))
-                cv2.rectangle(img, (x, y), (x + 100, y + 50), (0, 200, 0), -1)
-                cv2.putText(img, f"Sample {i+1}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                out.write(img)
-            out.release()
-            print(f"Generated synthetic mock feed video: {path}")
-    except Exception as e:
-        # If generation fails (no cv2, no write permission, etc.), log and continue.
-        try:
-            print("Unable to generate synthetic mock videos (OpenCV missing or error):", e)
-        except Exception:
-            pass
 
 @app.get("/")
 async def root():

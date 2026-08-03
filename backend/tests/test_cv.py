@@ -10,13 +10,12 @@ import numpy as np
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.cv import PoseEstimator, VideoProcessor
-from app.cv.lstm_behavior import BehaviorAnalyzer
+from app.cv.temporal_behavior import BehaviorAnalyzer
 from app.core.config import settings
 from app.features.following_detector import FollowingDetector
 from app.features.pacing_detector import PacingDetector
 from app.features.temporal_confirmation_tracker import TemporalConfirmationTracker
-from app.services.context_suppression_service import ContextSuppressionService
-from app.lstm.predictor import LSTMPredictor
+from app.transformer.predictor import TemporalTransformerPredictor
 
 
 def test_pose_estimator_import():
@@ -154,10 +153,10 @@ def test_pacing_detector_does_not_count_stationary_person():
     assert outputs[-1] == 0
 
 
-def test_lstm_predictor_does_not_create_default_models(tmp_path, monkeypatch):
+def test_temporal_transformer_predictor_does_not_create_default_models(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
 
-    predictor = LSTMPredictor(device="cpu")
+    predictor = TemporalTransformerPredictor(device="cpu")
 
     assert predictor.models == {}
     assert predictor.unavailable_models == {"normal", "suicide", "pickpocket", "anomaly"}

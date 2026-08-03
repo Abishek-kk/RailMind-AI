@@ -1,4 +1,4 @@
-"""Training API routes for managing LSTM model retraining."""
+"""Training API routes for managing temporal transformer model retraining."""
 import asyncio
 import logging
 from typing import Dict, List, Optional
@@ -55,7 +55,7 @@ class TrainingStatusResponse(BaseModel):
 
 @router.post("/training/trigger", response_model=TrainingStatusResponse, tags=["Training"])
 async def trigger_training(request: TrainRequest = Body(...)) -> TrainingStatusResponse:
-    """Trigger a new LSTM model training run.
+    """Trigger a new transformer model training run.
     
     This endpoint:
     - Creates a training run record in the database

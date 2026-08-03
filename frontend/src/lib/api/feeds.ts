@@ -1,5 +1,5 @@
 import { apiFetch, apiHeaders } from "./client";
-import { cctvImages, type CCTVFeed } from "@/lib/mock-data";
+import { getCameraImage, type CCTVFeed } from "@/lib/railmind-types";
 
 interface BackendFeed {
   id: string;
@@ -10,37 +10,25 @@ interface BackendFeed {
   stream_url?: string;
 }
 
-function getImageForFeed(cameraId: string) {
-  const match = cameraId.match(/\d+/);
-  const index = match ? Number(match[0]) - 1 : 0;
-  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
-}
-
 /**
  * The backend stores stream_url as a relative path (e.g. "/uploads/video.mp4").
  * StaticFiles are served directly by FastAPI at its root (port 8000), NOT under
  * the /api prefix. We must prepend the backend origin so the browser's <video>
  * element can actually fetch the file.
  */
-function resolveStreamUrl(streamUrl: string | undefined): string | undefined {
+export function resolveStreamUrl(
+  streamUrl: string | undefined,
+  apiBase: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
+): string | undefined {
   if (!streamUrl) return undefined;
-  // Already an absolute URL — return as-is.
   if (streamUrl.startsWith("http://") || streamUrl.startsWith("https://")) {
     return streamUrl;
   }
 
-  // Derive the backend origin from VITE_API_BASE_URL env var, or fall back to
-  // the default backend address used in development.
-  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
-  const baseToUse = apiBase.startsWith("/") && typeof window !== "undefined"
-    ? `${window.location.origin}${apiBase}`
-    : apiBase;
-
-  if (apiBase.startsWith("/")) {
-    console.warn(
-      "VITE_API_BASE_URL is set to a relative path. Video stream URLs need the backend origin (e.g. http://localhost:8000/api)."
-    );
-  }
+  const normalizedApiBase = apiBase?.trim() || "http://localhost:8000/api";
+  const baseToUse = normalizedApiBase.startsWith("/") && typeof window !== "undefined"
+    ? `${window.location.origin}${normalizedApiBase}`
+    : normalizedApiBase;
 
   const encodedPath = streamUrl
     .split("/")
@@ -48,7 +36,7 @@ function resolveStreamUrl(streamUrl: string | undefined): string | undefined {
     .join("/");
 
   try {
-    return new URL(streamUrl, baseToUse).href;
+    return new URL(encodedPath, baseToUse).href;
   } catch {
     try {
       const origin = new URL(baseToUse).origin;
@@ -68,7 +56,7 @@ export async function getFeeds(): Promise<CCTVFeed[]> {
   return feeds.map((feed) => ({
     id: feed.id,
     platform: feed.name,
-    image: getImageForFeed(feed.id),
+    image: getCameraImage(feed.id),
     streamUrl: resolveStreamUrl(feed.stream_url),
     status: feed.status === "active" ? "online" : "offline",
     peopleDetected: 0,

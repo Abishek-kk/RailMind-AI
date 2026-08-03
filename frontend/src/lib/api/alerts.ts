@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import { Alert, AlertStatus, cctvImages, RiskLevel } from "@/lib/mock-data";
+import { Alert, AlertStatus, getCameraImage, RiskLevel } from "@/lib/railmind-types";
 
 export interface BackendAlert {
   id?: number;
@@ -49,12 +49,6 @@ function formatDate(timestamp: string) {
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getImageForCamera(cameraId: string) {
-  const match = cameraId.match(/\d+/);
-  const index = match ? Number(match[0]) - 1 : 0;
-  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
-}
-
 export function mapBackendAlert(alert: BackendAlert): ApiAlert {
   const displayCameraId = getDisplayCameraId(alert.camera_id || "CCTV-1");
   const roundedRiskScore = Math.round(alert.risk_score);
@@ -77,7 +71,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     date: formatDate(alert.timestamp),
     status: normalizeStatus(alert.status),
     description: `${alert.incident_type} on ${alert.platform}`,
-    image: getImageForCamera(alert.camera_id),
+    image: getCameraImage(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
     reasoning_mode: alert.reasoning_mode ?? null,
   };

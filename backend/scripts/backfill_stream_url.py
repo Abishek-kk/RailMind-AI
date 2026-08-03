@@ -48,7 +48,7 @@ with Engine.begin() as conn:
     for r in rows2[:10]:
         print(r)
 
-    # Also attempt to map any files in the mock feed directory to feed ids
+    # Also attempt to map files in the configured feed video directory to feed ids.
     try:
         files = os.listdir(settings.MOCK_FEED_DIR)
     except Exception:
@@ -68,4 +68,4 @@ with Engine.begin() as conn:
         except Exception:
             file_updates += 0
 
-    print('Mapped', file_updates, 'feeds from files in mock_feeds')
+    print('Mapped', file_updates, 'feeds from files in the feed video directory')

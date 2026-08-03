@@ -121,14 +121,14 @@ async def analytics_heatmap(
     return out
 
 
-@router.get("/lstm-performance")
-async def analytics_lstm_performance(db = Depends(get_db)):
-    """Return simple LSTM performance metrics derived from alerts/incidents."""
+@router.get("/transformer-performance")
+async def analytics_transformer_performance(db = Depends(get_db)):
+    """Return simple transformer performance metrics derived from alerts/incidents."""
 
-    # Total predictions: alerts that have an LSTM confidence value
-    total_predictions = db.query(func.count(Alert.id)).filter(Alert.lstm_confidence.isnot(None)).scalar() or 0
+    # Total predictions: alerts that have a transformer confidence value
+    total_predictions = db.query(func.count(Alert.id)).filter(Alert.transformer_confidence.isnot(None)).scalar() or 0
 
-    avg_confidence = db.query(func.avg(Alert.lstm_confidence)).filter(Alert.lstm_confidence.isnot(None)).scalar() or 0.0
+    avg_confidence = db.query(func.avg(Alert.transformer_confidence)).filter(Alert.transformer_confidence.isnot(None)).scalar() or 0.0
     try:
         avg_confidence = float(avg_confidence)
     except Exception:

@@ -29,7 +29,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import { riskColor } from "@/lib/mock-data";
+import { riskColor } from "@/lib/railmind-types";
 import {
   getDashboardStats,
   getIncidentsByCCTV,

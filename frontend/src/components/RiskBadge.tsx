@@ -1,4 +1,4 @@
-import { riskColor, type RiskLevel } from "@/lib/mock-data";
+import { riskColor, type RiskLevel } from "@/lib/railmind-types";
 
 export function RiskBadge({ level, label }: { level: RiskLevel | "very-high"; label?: string }) {
   const c = riskColor(level);

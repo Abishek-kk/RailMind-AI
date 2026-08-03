@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import { cctvImages, type RiskLevel } from "@/lib/mock-data";
+import { getCameraImage, type RiskLevel } from "@/lib/railmind-types";
 
 export interface DashboardStats {
   total_incidents: number;
@@ -84,12 +84,6 @@ function formatTime(timestamp: string) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
-function getImageForCamera(cameraId: string) {
-  const match = cameraId.match(/\d+/);
-  const index = match ? Number(match[0]) - 1 : 0;
-  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
-}
-
 function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
   return {
     id: `INC-${String(incident.id).padStart(3, "0")}`,
@@ -99,7 +93,7 @@ function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
     riskLevel: normalizeRiskLevel(incident.risk_level),
     time: formatTime(incident.timestamp),
     status: incident.status,
-    image: getImageForCamera(incident.camera_id),
+    image: getCameraImage(incident.camera_id),
   };
 }
 

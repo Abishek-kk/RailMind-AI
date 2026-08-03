@@ -15,7 +15,7 @@ class Track(Base):
     session_id = Column(String, nullable=True, index=True)
     platform_id = Column(Integer, ForeignKey("platforms.id", ondelete="SET NULL"), nullable=True)
     feature_sequence_json = Column(JSON, nullable=True)
-    lstm_label = Column(String, nullable=True)
+    transformer_label = Column(String, nullable=True)
     confidence = Column(Float, nullable=True)
     first_seen_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)

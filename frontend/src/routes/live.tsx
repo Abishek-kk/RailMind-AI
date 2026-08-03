@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
 import { createFeed, deleteFeed, getFeeds, uploadVideo } from "@/lib/api/feeds";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { getLiveFeeds, riskColor, type BoundingBox, type RiskLevel } from "@/lib/mock-data";
+import { riskColor, type BoundingBox, type RiskLevel } from "@/lib/railmind-types";
 
 interface LiveDetectionPayload {
   camera_id: string;
@@ -69,6 +69,7 @@ function mapCameraIdToFeedId(cameraId: string) {
 
 function buildWebSocketUrl(path: string) {
   const configuredBase = import.meta.env.VITE_WS_URL?.trim();
+  const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   if (configuredBase) {
@@ -84,12 +85,21 @@ function buildWebSocketUrl(path: string) {
     }
   }
 
+  if (configuredApiBase) {
+    try {
+      const apiUrl = new URL(configuredApiBase);
+      const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+      return `${protocol}//${apiUrl.host}${normalizedPath}`;
+    } catch {
+      // Fall back to the local backend below when the configured API base is relative.
+    }
+  }
+
   if (typeof window === "undefined") {
     return `ws://localhost:8000${normalizedPath}`;
   }
 
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}${normalizedPath}`;
+  return `ws://localhost:8000${normalizedPath}`;
 }
 
 export const Route = createFileRoute("/live")({
@@ -112,11 +122,10 @@ function LivePage() {
   const [cameraId, setCameraId] = useState("");
   const [platformName, setPlatformName] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [previewMediaUrlByFeed, setPreviewMediaUrlByFeed] = useState<Record<string, string>>({});
   /** BUG 6 FIX: filter level state for Live Detections sidebar */
   const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  /** BUG 15 FIX: allow user to dismiss mock-data banner */
-  const [mockBannerDismissed, setMockBannerDismissed] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -135,7 +144,12 @@ function LivePage() {
   const addFeedMutation = useMutation({
     mutationFn: (payload: { file: File; feedId: string; name: string }) =>
       uploadVideo(payload.file, payload.feedId, payload.name),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const feedId = response.feed_id ?? cameraId;
+      const previewUrl = previewMediaUrlByFeed[feedId] || previewMediaUrlByFeed[cameraId];
+      if (previewUrl) {
+        setPreviewMediaUrlByFeed((current) => ({ ...current, [feedId]: previewUrl }));
+      }
       setIsDialogOpen(false);
       setCameraId("");
       setPlatformName("");
@@ -148,6 +162,12 @@ function LivePage() {
       toast.error("Failed to upload video. Please check the file and inputs.");
     },
   });
+
+  useEffect(() => {
+    return () => {
+      Object.values(previewMediaUrlByFeed).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const removeFeedMutation = useMutation({
     mutationFn: deleteFeed,
@@ -258,26 +278,15 @@ function LivePage() {
     [playNotificationSound, soundEnabled],
   );
 
-  const isMockData = useMemo(() => {
-    return (
-      ((Array.isArray(feeds) && feeds.length === 0) || !!feedsError) &&
-      import.meta.env.MODE === "development"
-    );
-  }, [feeds, feedsError]);
-
-  const liveDataError = isMockData ? null : (feedsError ?? alertsError);
+  const liveDataError = feedsError ?? alertsError;
 
   const displayFeeds = useMemo(() => {
-    if (feedsError && import.meta.env.MODE === "development") {
-      return getLiveFeeds();
-    }
-
     if (!Array.isArray(feeds)) {
       return [];
     }
 
     return feeds;
-  }, [feeds, feedsError]);
+  }, [feeds]);
 
   const enrichedDisplayFeeds = useMemo(() => {
     return displayFeeds.map((f) => ({
@@ -465,24 +474,6 @@ function LivePage() {
           </div>
         ) : (
           <>
-            {/* BUG 15 FIX: visible yellow banner when showing mock feeds in development */}
-            {isMockData && !mockBannerDismissed && (
-              <div className="mb-4 flex items-center justify-between rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
-                <span>⚠ Showing mock feeds — no camera feeds registered in backend.</span>
-                <button
-                  type="button"
-                  onClick={() => setMockBannerDismissed(true)}
-                  className="ml-4 rounded px-2 py-0.5 text-xs font-medium text-yellow-300 hover:bg-yellow-500/20"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-            {isMockData && feedsError && !mockBannerDismissed && (
-              <div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
-                Backend feeds are unreachable in development; mock feeds are being shown.
-              </div>
-            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
               <StatCard
                 label="Total CCTV Feeds"
@@ -572,6 +563,17 @@ function LivePage() {
                               const file = event.currentTarget.files?.[0];
                               if (file) {
                                 setUploadedFile(file);
+                                const previewUrl = URL.createObjectURL(file);
+                                setPreviewMediaUrlByFeed((current) => {
+                                  const next = { ...current };
+                                  if (cameraId) {
+                                    if (current[cameraId]) {
+                                      URL.revokeObjectURL(current[cameraId]);
+                                    }
+                                    next[cameraId] = previewUrl;
+                                  }
+                                  return next;
+                                });
                               }
                             }}
                             className="hidden"
@@ -649,6 +651,7 @@ function LivePage() {
                       detections={feedDetections[f.id]}
                       onRemove={handleRemoveFeed}
                       removing={removeFeedMutation.isPending}
+                      previewUrl={previewMediaUrlByFeed[f.id]}
                     />
                   ))}
                 </div>

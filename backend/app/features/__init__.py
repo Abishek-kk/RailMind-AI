@@ -8,8 +8,8 @@ These detectors extract behavioral features from pose tracking data:
 - FollowingDetector: Inter-person distance and crowd interactions
 - MovementAnalyzer: Speed and direction change analysis
 
-Features are aggregated into a 7-element behavioral vector consumed by the LSTM.
-For training data generation, use app.lstm.train for synthetic behavioral sequences.
+Features are aggregated into a 7-element behavioral vector consumed by the transformer.
+For training data generation, use app.transformer.train for synthetic behavioral sequences.
 """
 
 from .edge_proximity import EdgeProximityDetector

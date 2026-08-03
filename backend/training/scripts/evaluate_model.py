@@ -1,4 +1,4 @@
-"""Evaluate trained LSTM models"""
+"""Evaluate trained transformer models"""
 from pathlib import Path
 import sys
 
@@ -6,9 +6,9 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from app.lstm.model import build_lstm_model
+from app.transformer.model import build_temporal_transformer_model
 
-MODEL_PATH = Path(__file__).resolve().parents[2] / "app" / "lstm" / "saved_models" / "behavior_classifier.pt"
+MODEL_PATH = Path(__file__).resolve().parents[2] / "app" / "transformer" / "saved_models" / "behavior_classifier.pt"
 DATASET_DIR = Path(__file__).resolve().parents[1] / "datasets"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -34,7 +34,7 @@ def evaluate_all_models():
     sequence_length = test_data.shape[1]
     num_features = test_data.shape[2] if test_data.ndim == 3 else 1
 
-    model = build_lstm_model(sequence_length, num_features, num_classes).to(DEVICE)
+    model = build_temporal_transformer_model(sequence_length, num_features, num_classes).to(DEVICE)
     model.load_state_dict(torch.load(str(MODEL_PATH), map_location=DEVICE))
     model.eval()
 

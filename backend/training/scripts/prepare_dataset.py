@@ -1,4 +1,4 @@
-"""Prepare dataset for LSTM training"""
+"""Prepare dataset for transformer training"""
 from pathlib import Path
 import numpy as np
 

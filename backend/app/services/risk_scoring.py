@@ -14,7 +14,7 @@ class RiskScorer:
         weight_total = sum(additive_weights.values())
         if weight_total <= 0:
             additive_weights = {
-                "lstm": 0.4,
+                "transformer": 0.4,
                 "edge": 0.2,
                 "duration": 0.1,
                 "loitering": 0.1,
@@ -26,8 +26,8 @@ class RiskScorer:
         def weight(name, default):
             return additive_weights.get(name, default) / weight_total
 
-        lstm_score = float(incident_attributes.get("lstm_score", 0.0))
-        score += lstm_score * weight("lstm", 0.4)
+        transformer_score = float(incident_attributes.get("transformer_score", 0.0))
+        score += transformer_score * weight("transformer", 0.4)
 
         edge_distance = float(incident_attributes.get("edge_distance", 0.0))
         platform_limit = settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS

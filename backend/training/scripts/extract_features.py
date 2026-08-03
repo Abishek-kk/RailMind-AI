@@ -1,12 +1,12 @@
 """
 DEPRECATED: This offline feature extraction script is no longer used.
 
-The LSTM training pipeline now uses SYNTHETIC DATA GENERATION instead.
-See: app/lstm/train.py
+The transformer training pipeline now uses synthetic data generation instead.
+See: app.transformer.train
 
 To train models:
   cd backend
-  python -m app.lstm.train
+  python -m app.transformer.train
 
 This file can be removed.
 """
@@ -17,7 +17,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.features.feature_extractor import FeatureExtractor
-from app.lstm.preprocessor import LSTMPreprocessor
 
 def extract_features_from_dataset():
     """Extract features from all behavior categories"""
@@ -25,7 +24,6 @@ def extract_features_from_dataset():
     output_dir = Path("../datasets")
     
     feature_extractor = FeatureExtractor()
-    preprocessor = LSTMPreprocessor()
     
     behavior_types = [
         "normal",

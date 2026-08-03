@@ -19,7 +19,7 @@ class Alert(Base):
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     acknowledged_by = Column(String, nullable=True)
     is_false_positive = Column(Boolean, nullable=False, default=False)
-    lstm_confidence = Column(Float, nullable=True)
+    transformer_confidence = Column(Float, nullable=True)
     escalation_triggered_at = Column(DateTime(timezone=True), nullable=True)
     escalation_status = Column(String, nullable=True)
     escalation_error = Column(String, nullable=True)

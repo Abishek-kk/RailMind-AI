@@ -18,8 +18,8 @@ def test_perception_agent():
         "person_id": "test-person",
         "camera_id": "CCTV_TEST_01",
         "platform": "Platform 7",
-        "lstm_anomaly_score": 0.92,
-        "lstm_scores": {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31},
+        "transformer_anomaly_score": 0.92,
+        "transformer_scores": {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31},
         "edge_distance_meters": 0.8,
         "edge_proximity_seconds": 12.5,
         "behavior_duration_seconds": 45,
@@ -36,9 +36,9 @@ def test_perception_agent():
     observation = result["observation"]
 
     assert observation["person_id"] == "test-person"
-    assert observation["lstm_score"] == 0.84
-    assert observation["lstm_anomaly_score"] == 0.92
-    assert observation["lstm_scores"] == {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31}
+    assert observation["transformer_score"] == 0.84
+    assert observation["transformer_anomaly_score"] == 0.92
+    assert observation["transformer_scores"] == {"suicide": 0.84, "pickpocket": 0.12, "anomaly": 0.31}
     assert observation["edge_proximity_seconds"] == 12.5
     assert observation["edge_time_seconds"] == 12.5
     assert observation["following_distance"] == 0.7
@@ -51,7 +51,7 @@ def test_perception_agent():
 def test_reasoning_agent_high_risk():
     state = {
         "observation": {
-            "lstm_score": 0.92,
+            "transformer_score": 0.92,
             "edge_distance": 0.5,
             "duration_seconds": 120,
             "pose_classification": "distress",
@@ -70,11 +70,11 @@ def test_reasoning_agent_high_risk():
     assert decision["final_risk_score"] >= 0.7
 
 
-def test_reasoning_agent_uses_dominant_lstm_score_before_anomaly_score():
+def test_reasoning_agent_uses_dominant_transformer_score_before_anomaly_score():
     state = {
         "observation": {
-            "lstm_score": 0.9,
-            "lstm_anomaly_score": 0.1,
+            "transformer_score": 0.9,
+            "transformer_anomaly_score": 0.1,
             "edge_distance": 3.0,
             "duration_seconds": 0,
             "pose_classification": "normal",
@@ -166,7 +166,7 @@ def test_llm_reasoning_failure_falls_back_to_rule_based(monkeypatch):
 
     state = {
         "observation": {
-            "lstm_score": 0.9,
+            "transformer_score": 0.9,
             "edge_distance": 3.0,
             "duration_seconds": 0,
             "pose_classification": "normal",
@@ -192,7 +192,7 @@ def test_reasoning_node_marks_rule_based_when_no_api_keys():
 
         state = {
             "observation": {
-                "lstm_score": 0.5,
+                "transformer_score": 0.5,
                 "edge_distance": 2.0,
                 "duration_seconds": 30,
                 "pose_classification": "normal",
@@ -226,7 +226,7 @@ def test_reasoning_node_marks_llm_when_api_key_configured(monkeypatch):
 
     state = {
         "observation": {
-            "lstm_score": 0.5,
+            "transformer_score": 0.5,
             "edge_distance": 2.0,
             "duration_seconds": 30,
             "pose_classification": "normal",
@@ -290,7 +290,7 @@ async def test_agent_pipeline_end_to_end():
         "person_id": "pipeline-person",
         "camera_id": "CCTV_PIPE_01",
         "platform": "Platform 9",
-        "lstm_anomaly_score": 0.88,
+        "transformer_anomaly_score": 0.88,
         "edge_distance_meters": 0.7,
         "behavior_duration_seconds": 130,
         "pose_classification": "distress",

@@ -1,4 +1,4 @@
-"""Training service for managing LSTM model retraining workflows."""
+"""Training service for managing transformer model retraining workflows.""" 
 import asyncio
 import logging
 import os
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.lstm.train import (
+from app.transformer.train import (
     BEHAVIOR_LABELS,
     SyntheticDataGenerator,
     create_multiclass_dataset,
@@ -29,7 +29,7 @@ REAL_DATA_BLEND_RATIO = 0.20
 
 
 class TrainingService:
-    """Manages LSTM model retraining with tracking and notifications."""
+    """Manages transformer model retraining with tracking and notifications."""
 
     def __init__(self, db: Optional[Session] = None):
         self.db = db
@@ -71,7 +71,7 @@ class TrainingService:
                             "incident_type": alert.incident_type,
                             "risk_score": alert.risk_score,
                             "risk_level": alert.risk_level,
-                            "lstm_confidence": alert.lstm_confidence,
+                            "transformer_confidence": getattr(alert, "transformer_confidence", None),
                             "bounding_box": alert.bounding_box,
                             "timestamp": alert.timestamp,
                         },
@@ -184,7 +184,7 @@ class TrainingService:
                 db.close()
 
     def _feedback_label_for_training(self, example: Dict[str, Any]) -> Optional[str]:
-        """Map operator feedback and incident context into the 4-class LSTM label space."""
+        """Map operator feedback and incident context into the 4-class transformer label space."""
         corrected_label = (example.get("label") or "").strip().lower().replace(" ", "_")
         label_aliases = {
             "normal": "normal",
@@ -220,7 +220,7 @@ class TrainingService:
         return None
 
     def _feedback_example_to_sequence(self, example: Dict[str, Any]) -> Optional[tuple[str, np.ndarray]]:
-        """Convert a labelled feedback example into one LSTM-compatible sequence."""
+        """Convert a labelled feedback example into one transformer-compatible sequence."""
         label = self._feedback_label_for_training(example)
         if label is None:
             return None
@@ -229,7 +229,7 @@ class TrainingService:
         risk_score = float(context.get("risk_score") or 0.0)
         risk = max(0.0, min(risk_score / 100.0, 1.0))
         incident_type = (context.get("incident_type") or "").lower()
-        confidence = example.get("alert", {}).get("lstm_confidence")
+        confidence = example.get("alert", {}).get("transformer_confidence")
         confidence = 0.5 if confidence is None else max(0.0, min(float(confidence), 1.0))
 
         feature_vector = np.array(
@@ -244,7 +244,7 @@ class TrainingService:
             ],
             dtype=float,
         )
-        sequence = np.tile(feature_vector, (settings.LSTM_SEQUENCE_LENGTH, 1))
+        sequence = np.tile(feature_vector, (settings.TRANSFORMER_SEQUENCE_LENGTH, 1))
         return label, sequence
 
     def _real_feedback_sequences_by_label(self, examples: list[Dict[str, Any]]) -> dict[str, np.ndarray]:
@@ -259,8 +259,8 @@ class TrainingService:
         return {
             label: np.array(sequences, dtype=float).reshape(
                 len(sequences),
-                settings.LSTM_SEQUENCE_LENGTH,
-                settings.LSTM_FEATURE_COUNT,
+                settings.TRANSFORMER_SEQUENCE_LENGTH,
+                settings.TRANSFORMER_FEATURE_COUNT,
             )
             for label, sequences in sequences_by_label.items()
         }
@@ -358,8 +358,8 @@ class TrainingService:
             # Generate synthetic data
             logger.info("Generating synthetic behavioral sequences...")
             generator = SyntheticDataGenerator(
-                sequence_length=settings.LSTM_SEQUENCE_LENGTH,
-                num_features=settings.LSTM_FEATURE_COUNT,
+                sequence_length=settings.TRANSFORMER_SEQUENCE_LENGTH,
+                num_features=settings.TRANSFORMER_FEATURE_COUNT,
             )
             data = generator.generate_all_data()
             feedback_dataset = self.get_labelled_feedback_dataset()

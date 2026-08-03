@@ -1,4 +1,4 @@
-"""Start VideoProcessor instances for all videos in backend/data/mock_feeds.
+"""Start VideoProcessor instances for all videos in backend/data/video_feeds.
 
 This launches the real CV pipeline using the project's `VideoProcessor` class,
 which will perform YOLOv8-Pose inference, ByteTrack tracking, feature extraction,
@@ -21,11 +21,11 @@ from app.cv.video_processor import VideoProcessor
 from app.core.config import settings
 
 
-def find_videos(mock_dir: str):
+def find_videos(video_dir: str):
     patterns = ["*.mp4", "*.mov", "*.mkv", "*.avi"]
     files = []
     for p in patterns:
-        files.extend(glob.glob(os.path.join(mock_dir, p)))
+        files.extend(glob.glob(os.path.join(video_dir, p)))
     return sorted(files)
 
 
@@ -41,7 +41,7 @@ async def main():
     video_dir = settings.MOCK_FEED_DIR
     videos = find_videos(video_dir)
     if not videos:
-        print(f"No mock videos found in {video_dir}. Add sample MP4 files and re-run.")
+        print(f"No videos found in {video_dir}. Add MP4 files or upload a feed and re-run.")
         return
 
     tasks = []

@@ -38,7 +38,7 @@ import {
 } from "@/lib/api/alerts";
 import { getFeeds } from "@/lib/api/feeds";
 import { toast } from "sonner";
-import { riskColor, type Alert, type AlertStatus } from "@/lib/mock-data";
+import { riskColor, type Alert, type AlertStatus } from "@/lib/railmind-types";
 
 export const Route = createFileRoute("/alerts")({
   head: () => ({ meta: [{ title: "Alerts — RailMind AI" }] }),

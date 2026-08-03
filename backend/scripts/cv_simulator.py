@@ -1,4 +1,4 @@
-"""Lightweight CV simulator that reads MP4s from data/mock_feeds and drives the agent pipeline.
+"""Lightweight CV simulator that reads MP4s from data/video_feeds and drives the agent pipeline.
 
 This script does a low-cost per-frame heuristic to produce feature vectors
 and calls the LangGraph agent pipeline (`run_agent_pipeline`) so you can
@@ -22,11 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.agents.agent_graph import run_agent_pipeline
 
 
-def _find_mock_videos(mock_dir: str):
+def _find_videos(video_dir: str):
     patterns = ["*.mp4", "*.mov", "*.mkv", "*.avi"]
     files = []
     for p in patterns:
-        files.extend(glob.glob(os.path.join(mock_dir, p)))
+        files.extend(glob.glob(os.path.join(video_dir, p)))
     return sorted(files)
 
 
@@ -115,9 +115,9 @@ async def process_video(path: str, camera_id: str = "CAM_SIM", platform: str = "
                 "person_id": track_id,
                 "camera_id": camera_id,
                 "platform": platform,
-                "lstm_scores": {"normal": 0.0, "suicide": 0.0, "pickpocket": 0.0, "anomaly": 0.0},
-                "lstm_anomaly_score": 0.0,
-                "lstm_score": 0.0,
+                "transformer_scores": {"normal": 0.0, "suicide": 0.0, "pickpocket": 0.0, "anomaly": 0.0},
+                "transformer_anomaly_score": 0.0,
+                "transformer_score": 0.0,
                 "edge_distance_meters": edge_distance_meters,
                 "edge_proximity_seconds": edge_timer,
                 "behavior_duration_seconds": frame_idx / max(1, int(fps)),
@@ -144,10 +144,10 @@ async def process_video(path: str, camera_id: str = "CAM_SIM", platform: str = "
 
 async def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    mock_dir = os.path.join(repo_root, "data", "mock_feeds")
-    videos = _find_mock_videos(mock_dir)
+    video_dir = os.path.join(repo_root, "data", "video_feeds")
+    videos = _find_videos(video_dir)
     if not videos:
-        print("No mock videos found in backend/data/mock_feeds/. Add MP4 files and re-run.")
+        print("No videos found in backend/data/video_feeds/. Add MP4 files or upload a feed and re-run.")
         return
 
     tasks = []

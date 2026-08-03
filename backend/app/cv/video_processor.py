@@ -8,7 +8,7 @@ import numpy as np
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.cv.pose_estimator import PoseEstimator
-from app.cv.lstm_behavior import BehaviorAnalyzer
+from app.cv.temporal_behavior import BehaviorAnalyzer
 from app.features.edge_proximity import EdgeProximityDetector
 from app.features.loitering_detector import LoiteringDetector
 from app.features.pacing_detector import PacingDetector
@@ -234,10 +234,10 @@ class VideoProcessor:
                         float(crowd_interactions),
                     ]
 
-                    lstm_scores = self.behavior_analyzer.analyze_temporal_sequence(track_id, feature_vector)
-                    lstm_score = max(lstm_scores.values()) if lstm_scores else 0.0
+                    transformer_scores = self.behavior_analyzer.analyze_temporal_sequence(track_id, feature_vector)
+                    transformer_score = max(transformer_scores.values()) if transformer_scores else 0.0
                     pose_label = self.behavior_analyzer.determine_behavior_label(
-                        lstm_scores,
+                        transformer_scores,
                         following_distance=following_distance,
                     )
 
@@ -246,9 +246,10 @@ class VideoProcessor:
                         "person_id": track_id,
                         "camera_id": self.camera_id,
                         "platform": self.platform,
-                        "lstm_anomaly_score": lstm_scores.get("anomaly", 0.0),
-                        "lstm_score": lstm_score,
-                        "lstm_scores": lstm_scores,
+                        # Primary transformer outputs
+                        "transformer_anomaly_score": transformer_scores.get("anomaly", 0.0),
+                        "transformer_score": transformer_score,
+                        "transformer_scores": transformer_scores,
                         "edge_distance_meters": edge_distance_meters,
                         "edge_distance": edge_distance_meters,
                         "edge_proximity_seconds": edge_proximity_seconds,
@@ -261,7 +262,7 @@ class VideoProcessor:
                         "bounding_box": bbox
                     }
 
-                    is_above_risk_threshold = lstm_score >= settings.MEDIUM_RISK_THRESHOLD / 100.0
+                    is_above_risk_threshold = transformer_score >= settings.MEDIUM_RISK_THRESHOLD / 100.0
                     self.temporal_confirmation_tracker.update(track_id, is_above_risk_threshold, frame_time)
 
                     alert_info = {

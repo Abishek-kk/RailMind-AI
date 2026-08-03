@@ -427,7 +427,7 @@ python scripts/demo_runner.py
 
 ### Full CV Pipeline (With Video/RTSP)
 
-Place MP4 files in `backend/data/mock_feeds/` or set a live RTSP URL, then:
+Place MP4 files in `backend/data/video_feeds/` or set a live RTSP URL, then:
 
 ```bash
 # GPU

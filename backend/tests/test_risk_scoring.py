@@ -14,7 +14,7 @@ def test_risk_score_additive_weights_sum_to_one():
 def test_context_multiplier_scales_base_score_without_raw_addition(monkeypatch):
     scorer = RiskScorer()
     incident = {
-        "lstm_score": 0.5,
+        "transformer_score": 0.5,
         "edge_distance": settings.PLATFORM_EDGE_SAFETY_LIMIT_METERS * 2,
         "duration_seconds": 0,
         "loitering_duration": 0,
@@ -24,7 +24,7 @@ def test_context_multiplier_scales_base_score_without_raw_addition(monkeypatch):
     }
 
     monkeypatch.setattr(settings, "RISK_SCORE_WEIGHTS", {
-        "lstm": 1.0,
+        "transformer": 1.0,
         "edge": 0.0,
         "duration": 0.0,
         "loitering": 0.0,
@@ -39,7 +39,7 @@ def test_context_multiplier_scales_base_score_without_raw_addition(monkeypatch):
 def test_legacy_context_weight_is_excluded_from_additive_normalization(monkeypatch):
     scorer = RiskScorer()
     incident = {
-        "lstm_score": 1.0,
+        "transformer_score": 1.0,
         "edge_distance": 0.0,
         "duration_seconds": 60,
         "loitering_duration": 180,
@@ -49,7 +49,7 @@ def test_legacy_context_weight_is_excluded_from_additive_normalization(monkeypat
     }
 
     monkeypatch.setattr(settings, "RISK_SCORE_WEIGHTS", {
-        "lstm": 0.4,
+        "legacy_transformer": 0.4,
         "edge": 0.2,
         "duration": 0.15,
         "loitering": 0.1,

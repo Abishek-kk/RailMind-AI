@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO")
     
     # Computer Vision Directories
-    MODEL_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../lstm/saved_models")))
-    MOCK_FEED_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/mock_feeds")))
+    MODEL_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../transformer/saved_models")))
+    MOCK_FEED_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/video_feeds")))
     # Default pose model path (relative to backend folder). Override via env if needed.
     POSE_MODEL_PATH: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../yolov8n-pose.pt")))
     # Device used for pose model inference. Use 'cpu' or 'cuda:0', etc.
@@ -52,9 +52,9 @@ class Settings(BaseSettings):
         default_factory=lambda: {"Platform 1": 1.25}
     )
 
-    # LSTM configuration
-    LSTM_SEQUENCE_LENGTH: int = 30
-    LSTM_FEATURE_NAMES: List[str] = Field(
+    # Temporal Transformer configuration
+    TRANSFORMER_SEQUENCE_LENGTH: int = 30
+    TRANSFORMER_FEATURE_NAMES: List[str] = Field(
         default_factory=lambda: [
             "edge_proximity_seconds",
             "loitering_time",
@@ -65,14 +65,14 @@ class Settings(BaseSettings):
             "crowd_interactions",
         ]
     )
-    LSTM_FEATURE_COUNT: int = 7
+    TRANSFORMER_FEATURE_COUNT: int = 7
 
     ANTHROPIC_API_KEY: str = Field(default="")
     OPENAI_API_KEY: str = Field(default="")
     OPENAI_REASONING_MODEL: str = Field(default="gpt-5.5")
     ANTHROPIC_REASONING_MODEL: str = Field(default="claude-haiku-4-5-20251001")
 
-    # LSTM behavior label thresholds
+    # Behavior label thresholds
     BEHAVIOR_HIGH_SCORE_THRESHOLD: float = 0.65
     BEHAVIOR_ERRATIC_SCORE_THRESHOLD: float = 0.4
     BEHAVIOR_FOLLOWING_DISTANCE_METERS: float = 1.2
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     # Risk scoring weights
     RISK_SCORE_WEIGHTS: dict[str, float] = Field(
         default_factory=lambda: {
-            "lstm": 0.4,
+            "transformer": 0.4,
             "edge": 0.2,
             "duration": 0.1,
             "loitering": 0.1,

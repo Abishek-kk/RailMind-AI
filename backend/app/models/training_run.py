@@ -1,4 +1,4 @@
-"""Training run database model to track LSTM model retraining history"""
+"""Training run database model to track transformer model retraining history"""
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean
 from sqlalchemy.sql import func
 
@@ -6,7 +6,7 @@ from app.core.database import Base
 
 
 class TrainingRun(Base):
-    """Tracks LSTM model training history and performance metrics."""
+    """Tracks transformer model training history and performance metrics."""
     __tablename__ = "training_runs"
 
     id = Column(Integer, primary_key=True, index=True)

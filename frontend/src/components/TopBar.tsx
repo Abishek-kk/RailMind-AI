@@ -11,7 +11,7 @@ interface TopBarProps {
   right?: ReactNode;
   /**
    * BUG 12 FIX: Optional dynamic feeds list. When provided, replaces the
-   * static CCTV_OPTIONS. "All CCTV Feeds" is always prepended automatically.
+   * provided camera list. "All CCTV Feeds" is always prepended automatically.
    */
   feeds?: Array<{ id: string; label: string }>;
 }
@@ -40,7 +40,7 @@ export function TopBar({
   /**
    * BUG 13 FIX: Use dynamic feeds when provided, always prepend "All CCTV Feeds".
    * When feeds is undefined (loading), show only a single "All CCTV Feeds" option
-   * instead of the stale CCTV_OPTIONS to avoid flashing outdated camera data.
+   * instead of stale camera data.
    */
   const feedOptions = feeds
     ? [{ id: "all", label: "All CCTV Feeds" }, ...feeds]

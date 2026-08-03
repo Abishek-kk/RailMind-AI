@@ -14,7 +14,7 @@ BEHAVIOR_TYPES = {
     "suspicious_following": 5
 }
 
-# LSTM sequence settings
+# Temporal transformer sequence settings
 SEQUENCE_LENGTH = 30
 FEATURE_DIMENSION = 17
 
