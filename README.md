@@ -1,10 +1,7 @@
 <div align="center">
-
-<<<<<<< HEAD
 <img src="https://img.shields.io/badge/RailMind_AI-v2.0-0A84FF?style=for-the-badge" alt="RailMind AI"/>
 =======
 <img src="https://img.shields.io/badge/RailMind_AI-v1.5-0A84FF?style=for-the-badge&logo=railway&logoColor=white" alt="RailMind AI"/>
->>>>>>> d3e184444d1e76b83a333fc8b2fafa7e09e1a82c
 
 # RailMind AI
 ### Intelligent Railway Safety & Security System
@@ -34,7 +31,6 @@ Some capabilities described in early planning docs (edge/Jetson deployment, mult
 
 ## Table of Contents
 
-<<<<<<< HEAD
 - [Overview](#-overview)
 - [Key Metrics](#-key-metrics)
 - [Features](#-features)
@@ -54,26 +50,6 @@ Some capabilities described in early planning docs (edge/Jetson deployment, mult
 - [Testing](#-testing)
 - [Roadmap](#-roadmap)
 - [Team](#-team)
-=======
-- [Overview](#overview)
-- [What This Actually Does](#what-this-actually-does)
-- [What's Not Built Yet](#whats-not-built-yet)
-- [Screenshots](#screenshots)
-- [System Architecture](#system-architecture)
-- [AI Pipeline](#ai-pipeline)
-- [LSTM Behaviour Classifier](#lstm-behaviour-classifier)
-- [Agentic Reasoning](#agentic-reasoning)
-- [Tech Stack](#tech-stack)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Training the LSTM](#training-the-lstm)
-- [API Reference](#api-reference)
-- [Testing](#testing)
-- [Privacy & Ethics](#privacy--ethics)
-- [Project Structure](#project-structure)
-- [Roadmap](#roadmap)
-- [Team](#team)
->>>>>>> d3e184444d1e76b83a333fc8b2fafa7e09e1a82c
 
 ---
 
@@ -238,7 +214,6 @@ Three LangGraph nodes, compiled once into a `StateGraph` at startup:
 | **Reasoning** | Combines the LSTM output with context (edge distance, duration, following distance, pose) into a final risk score via `RiskScorer`; optionally asks a configured LLM (OpenAI or Anthropic) for a bounded ±10 score adjustment and a plain-language reasoning summary |
 | **Intervention** | Applies score thresholds, dispatches the alert, creates the incident record, and starts the escalation timer |
 
-<<<<<<< HEAD
  PERCEPTION → REASONING → INTERVENTION 
  AGENT AGENT AGENT 
 
@@ -755,9 +730,6 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 - [ ] Cross-network anonymised incident pattern sharing
 - [ ] Video Swin Transformer for spatio-temporal modelling
 - [ ] Reinforcement learning for dynamic threshold optimisation
-=======
-If no LLM API key is set, the Reasoning Agent runs purely on rule-based scoring — the system does not require an LLM to function.
->>>>>>> d3e184444d1e76b83a333fc8b2fafa7e09e1a82c
 
 ---
 
