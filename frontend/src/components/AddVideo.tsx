@@ -1,8 +1,10 @@
 import React, { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { uploadVideo } from "@/lib/api/feeds";
 
 export default function AddVideo() {
+  const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -16,21 +18,25 @@ export default function AddVideo() {
     setStatus("Uploading...");
     try {
       const res = await uploadVideo(file);
-      setStatus(`Uploaded: ${res.feed_id}`);
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`);
+      setStatus(`Uploaded: ${res.id ?? res.feed_id ?? file.name}`);
+      queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+      queryClient.invalidateQueries({ queryKey: ["cctvSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["incidentsByCCTV"] });
+      queryClient.invalidateQueries({ queryKey: ["recentIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["platformHeatmap"] });
+      queryClient.invalidateQueries({ queryKey: ["riskDistribution"] });
+      queryClient.invalidateQueries({ queryKey: ["peakHours"] });
+      queryClient.invalidateQueries({ queryKey: ["incidentTrend"] });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus(`Error: ${message}`);
     }
   };
 
   return (
     <div className="flex items-center gap-2">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="video/*"
-        onChange={onChange}
-        className="hidden"
-      />
+      <input ref={inputRef} type="file" accept="video/*" onChange={onChange} className="hidden" />
       <button
         type="button"
         onClick={onClick}

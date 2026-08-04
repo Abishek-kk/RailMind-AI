@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import { getCameraImage, type RiskLevel } from "@/lib/railmind-types";
+import { cctvImages, type RiskLevel } from "@/lib/mock-data";
 
 export interface DashboardStats {
   total_incidents: number;
@@ -8,6 +8,8 @@ export interface DashboardStats {
   suicide_mitigations: number;
   theft_preventions: number;
   system_status: string;
+  model_is_placeholder: boolean;
+  lstm_model_status: string;
 }
 
 export interface IncidentsByCCTVItem {
@@ -17,7 +19,7 @@ export interface IncidentsByCCTVItem {
 
 export interface IncidentTrendItem {
   date: string;
-  "Suicide Risk": number;
+  "Incident Risk": number;
   Pickpocketing: number;
   Loitering: number;
 }
@@ -73,6 +75,7 @@ export interface DashboardAlert {
 
 function normalizeRiskLevel(value: string): RiskLevel {
   const lower = value.toLowerCase();
+  if (lower.includes("critical")) return "high";
   if (lower.includes("high")) return "high";
   if (lower.includes("suspicious")) return "suspicious";
   if (lower.includes("medium")) return "medium";
@@ -84,16 +87,45 @@ function formatTime(timestamp: string) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
+function getImageForCamera(cameraId: string) {
+  const match = cameraId.match(/\d+/);
+  const index = match ? Number(match[0]) - 1 : 0;
+  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
+}
+
 function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
+  // Enforce incident type → risk level mapping
+  let riskLevel: RiskLevel = "low";
+  const incidentType = incident.incident_type || "";
+
+  if (incidentType === "Normal Activity") {
+    riskLevel = incident.risk_score < 40 ? "low" : "medium";
+  } else if (
+    incidentType === "Suspicious Following" ||
+    incidentType === "Pickpocketing" ||
+    incidentType === "Loitering"
+  ) {
+    riskLevel = "medium";
+  } else if (
+    incidentType === "Incident Risk" ||
+    incidentType === "Track Intrusion" ||
+    incidentType === "Security Threat"
+  ) {
+    riskLevel = "high";
+  } else {
+    // Default: use the backend's risk level for unknown types
+    riskLevel = normalizeRiskLevel(incident.risk_level);
+  }
+
   return {
     id: `INC-${String(incident.id).padStart(3, "0")}`,
     cctv: incident.camera_id,
     platform: incident.platform || incident.camera_id,
     type: incident.incident_type,
-    riskLevel: normalizeRiskLevel(incident.risk_level),
+    riskLevel,
     time: formatTime(incident.timestamp),
     status: incident.status,
-    image: getCameraImage(incident.camera_id),
+    image: getImageForCamera(incident.camera_id),
   };
 }
 
@@ -111,7 +143,7 @@ export async function getIncidentTrend(days = 7): Promise<IncidentTrendItem[]> {
 
 function mapRiskDistributionColor(item: Omit<RiskDistributionItem, "color">): RiskDistributionItem {
   const colorMap: Record<string, string> = {
-    "Suicide Risk Detection": "#ef4444",
+    "Incident Risk Detection": "#ef4444",
     "Pickpocketing Actions": "#f97316",
     "Loitering / Trespass": "#3b82f6",
     "General Anomalies": "#a855f7",

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getApiKey } from "../lib/api/client";
 
 type WebSocketStatus = "connecting" | "connected" | "disconnected" | "error";
 
-const apiKey = import.meta.env.VITE_RAILMIND_API_KEY?.trim();
-
 function buildAuthenticatedWebSocketUrl(url: string) {
+  const apiKey = getApiKey();
   if (!apiKey) {
     return url;
   }

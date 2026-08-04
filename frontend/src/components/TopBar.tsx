@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bell, BellOff, Calendar, Clock, Camera, ChevronDown, Check } from "lucide-react";
+import { Bell, BellOff, Calendar, Clock, Camera, ChevronDown, Check, Menu } from "lucide-react";
+import { useSidebar } from "@/components/sidebar-context-utils";
 
 interface TopBarProps {
   title: string;
@@ -11,7 +12,7 @@ interface TopBarProps {
   right?: ReactNode;
   /**
    * BUG 12 FIX: Optional dynamic feeds list. When provided, replaces the
-   * provided camera list. "All CCTV Feeds" is always prepended automatically.
+   * static CCTV_OPTIONS. "All CCTV Feeds" is always prepended automatically.
    */
   feeds?: Array<{ id: string; label: string }>;
 }
@@ -28,6 +29,7 @@ export function TopBar({
 }: TopBarProps) {
   const [now, setNow] = useState(new Date());
   const [open, setOpen] = useState(false);
+  const { toggle } = useSidebar();
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -40,7 +42,7 @@ export function TopBar({
   /**
    * BUG 13 FIX: Use dynamic feeds when provided, always prepend "All CCTV Feeds".
    * When feeds is undefined (loading), show only a single "All CCTV Feeds" option
-   * instead of stale camera data.
+   * instead of the stale CCTV_OPTIONS to avoid flashing outdated camera data.
    */
   const feedOptions = feeds
     ? [{ id: "all", label: "All CCTV Feeds" }, ...feeds]
@@ -49,19 +51,29 @@ export function TopBar({
   const current = feedOptions.find((c) => c.id === selectedFeed) ?? feedOptions[0];
 
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-border bg-background px-8 py-5">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-      </div>
+    <header className="flex items-center justify-between gap-4 border-b border-border bg-background px-4 py-5 md:px-8">
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggle}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:bg-secondary md:hidden"
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 md:gap-3">
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span>{date}</span>
+          <span className="font-mono">{date}</span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm tabular-nums">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <span>{time}</span>
+          <span className="font-mono">{time}</span>
         </div>
         <div className="relative">
           <button
@@ -75,7 +87,7 @@ export function TopBar({
           {open && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+              <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-lg border border-[#1a2432]/90 bg-[#0b0e14]/75 backdrop-blur-md shadow-xl">
                 {feedOptions.map((opt) => (
                   <button
                     key={opt.id}
@@ -86,13 +98,14 @@ export function TopBar({
                     className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-secondary"
                   >
                     <span>{opt.label}</span>
-                    {opt.id === selectedFeed && <Check className="h-4 w-4 text-[#22c55e]" />}
+                    {opt.id === selectedFeed && <Check className="h-4 w-4 text-[#00e676]" />}
                   </button>
                 ))}
               </div>
             </>
           )}
         </div>
+
         {onSoundToggle ? (
           <button
             type="button"

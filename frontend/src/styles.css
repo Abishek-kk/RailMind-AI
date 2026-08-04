@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
 @import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
@@ -59,82 +60,59 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-risk-high: var(--risk-high);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-low: var(--risk-low);
+  --color-risk-suspicious: var(--risk-suspicious);
+  --font-mono: var(--font-mono);
 }
 
-:root {
+:root, .dark {
   --radius: 0.625rem;
-  /* RailMind AI dark theme */
-  --background: #0a0a0f;
-  --foreground: #ffffff;
-  --card: #111118;
-  --card-foreground: #ffffff;
-  --popover: #111118;
-  --popover-foreground: #ffffff;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #1a1a24;
-  --secondary-foreground: #ffffff;
-  --muted: #1a1a24;
-  --muted-foreground: #94a3b8;
-  --accent: #1a1a24;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
+  /* RailMind AI Sci-Fi Command Center dark theme */
+  --background: #050608;          /* near-black, slightly blue-black */
+  --foreground: #e6f1ff;          /* cool white, not pure white */
+  --card: #0b0e14;                /* panel background, subtle blue tint */
+  --card-foreground: #e6f1ff;
+  --popover: #0b0e14;
+  --popover-foreground: #e6f1ff;
+  --primary: #00e5ff;             /* cyan — primary accent, replaces indigo */
+  --primary-foreground: #001014;
+  --secondary: #10151f;
+  --secondary-foreground: #cfe8ff;
+  --muted: #10151f;
+  --muted-foreground: #6b7f99;
+  --accent: #10151f;
+  --accent-foreground: #cfe8ff;
+  --destructive: #ff2d55;         /* hotter red for high-risk */
   --destructive-foreground: #ffffff;
-  --border: #1e1e2e;
-  --input: #1e1e2e;
-  --ring: #6366f1;
-  --risk-high: #ef4444;
-  --risk-medium: #f97316;
-  --risk-low: #22c55e;
-  --risk-suspicious: #a855f7;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #0d0d14;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #6366f1;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a1a24;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1e1e2e;
-  --sidebar-ring: #6366f1;
-}
+  --border: #1a2432;              /* faint cyan-blue border, not gray */
+  --input: #1a2432;
+  --ring: #00e5ff;
+  --risk-high: #ff2d55;
+  --risk-medium: #ff9f0a;
+  --risk-low: #00e676;
+  --risk-suspicious: #b026ff;
+  --sidebar: #060810;
+  --sidebar-foreground: #e6f1ff;
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #001014;
+  --sidebar-accent: #10151f;
+  --sidebar-accent-foreground: #cfe8ff;
+  --sidebar-border: #1a2432;
+  --sidebar-ring: #00e5ff;
 
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --chart-1: #00e5ff;
+  --chart-2: #ff2d55;
+  --chart-3: #ff9f0a;
+  --chart-4: #00e676;
+  --chart-5: #b026ff;
+
+  --glow-primary: 0 0 12px rgba(0, 229, 255, 0.35);
+  --glow-danger: 0 0 14px rgba(255, 45, 85, 0.45);
+  --glow-warning: 0 0 12px rgba(255, 159, 10, 0.4);
+  --glow-success: 0 0 12px rgba(0, 230, 118, 0.35);
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 @layer base {
@@ -145,5 +123,64 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: 
+      radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.03) 0%, transparent 80%),
+      repeating-linear-gradient(rgba(0, 229, 255, 0.03) 0px, rgba(0, 229, 255, 0.03) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(90deg, rgba(0, 229, 255, 0.03) 0px, rgba(0, 229, 255, 0.03) 1px, transparent 1px, transparent 60px);
   }
 }
+
+/* Reusable Sci-Fi HUD Panel Utilities */
+.hud-panel {
+  position: relative;
+  border: 1px solid var(--border) !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud-panel:hover {
+  border-color: rgba(0, 229, 255, 0.5) !important;
+  box-shadow: var(--glow-primary) !important;
+}
+
+/* Monospace telemetry style utility */
+.hud-mono {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+/* Corner bracket marks for HUD framing */
+.hud-brackets {
+  position: relative;
+}
+.hud-brackets::before,
+.hud-brackets::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  width: 14px;
+  height: 14px;
+  border-color: var(--primary);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 10;
+  border-style: solid;
+}
+.hud-brackets::before {
+  left: -1px;
+  border-width: 1.5px 0 0 1.5px;
+}
+.hud-brackets::after {
+  right: -1px;
+  border-width: 1.5px 1.5px 0 0;
+}
+

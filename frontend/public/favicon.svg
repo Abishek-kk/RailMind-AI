@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RailMind AI favicon">
+  <rect width="64" height="64" rx="16" fill="#eef2ff" />
+  <path d="M18 16h28a6 6 0 0 1 6 6v16a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V22a6 6 0 0 1 6-6Z" fill="#6366f1" />
+  <rect x="24" y="24" width="16" height="8" rx="2" fill="#ffffff" />
+  <rect x="20" y="34" width="24" height="4" rx="2" fill="#c7d2fe" />
+  <path d="M22 22h20" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+  <path d="M22 40h20" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+  <circle cx="25" cy="42" r="2.5" fill="#ffffff" />
+  <circle cx="39" cy="42" r="2.5" fill="#ffffff" />
+</svg>
