@@ -1,17 +1,43 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pause, Play, Maximize2, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/railmind-types";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { riskColor, type BoundingBox, type CCTVFeed } from "@/lib/mock-data";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
 function levelToColor(level: string) {
   return riskColor(level as never);
 }
 
-export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl }: { feed: CCTVFeed; detections?: BoundingBox[]; onRemove?: (feedId: string) => void; removing?: boolean; previewUrl?: string }) {
+function getGlowShadow(level: string) {
+  switch (level) {
+    case "high":
+    case "very-high":
+      return "0 0 14px rgba(255, 45, 85, 0.45)";
+    case "medium":
+      return "0 0 12px rgba(255, 159, 10, 0.4)";
+    case "suspicious":
+      return "0 0 12px rgba(176, 38, 255, 0.35)";
+    case "low":
+    default:
+      return "0 0 4px rgba(0, 230, 118, 0.15)";
+  }
+}
+
+export function CCTVFeedCard({
+  feed,
+  detections,
+  onRemove,
+  removing,
+}: {
+  feed: CCTVFeed;
+  detections?: BoundingBox[];
+  onRemove?: (feedId: string) => void;
+  removing?: boolean;
+}) {
   const alertColor = feed.riskLevel ? levelToColor(feed.riskLevel) : "#22c55e";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -19,7 +45,6 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
   const [isMuted, setIsMuted] = useState(true);
   const [frozenBoxes, setFrozenBoxes] = useState<BoundingBox[]>([]);
   const [videoError, setVideoError] = useState(false);
-  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
 
   // Update frozen boxes when not paused
   useEffect(() => {
@@ -30,7 +55,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
 
   useEffect(() => {
     setVideoError(false);
-  }, [feed.streamUrl, previewUrl]);
+  }, [feed.streamUrl]);
 
   // Imperatively control playback — autoPlay only fires once on mount.
   useEffect(() => {
@@ -88,17 +113,47 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card max-w-[300px] max-h-[420px] flex flex-col">
-      <div className="flex items-center justify-between px-3 py-2">
+    <div className="hud-panel overflow-hidden rounded-xl bg-card">
+      {/* Top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent pointer-events-none" />
+      <div className="flex items-center justify-between px-4 py-3">
         <div>
           <div className="text-sm font-semibold">{feed.id}</div>
           <div className="text-xs text-muted-foreground">{feed.platform}</div>
         </div>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold ${activeDetections.length > 0 && isActuallyLive ? "bg-[#ef4444]/15 text-[#ef4444]" : isActuallyLive ? "bg-[#22c55e]/15 text-[#22c55e]" : "bg-[#64748b]/15 text-[#64748b]"}`}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold font-mono tracking-wider ${
+            activeDetections.length > 0 && isActuallyLive
+              ? "bg-[#ff2d55]/15 text-[#ff2d55]"
+              : isActuallyLive
+                ? "bg-[#00e676]/15 text-[#00e676]"
+                : "bg-[#6b7f99]/15 text-[#6b7f99]"
+          }`}
+          style={{
+            boxShadow:
+              activeDetections.length > 0 && isActuallyLive
+                ? "0 0 8px rgba(255, 45, 85, 0.25)"
+                : isActuallyLive
+                  ? "0 0 8px rgba(0, 230, 118, 0.2)"
+                  : "none",
+          }}
         >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${activeDetections.length > 0 && isActuallyLive ? "animate-pulse bg-[#ef4444]" : isActuallyLive ? "bg-[#22c55e]" : "bg-[#64748b]"}`}
+            className={`h-1.5 w-1.5 rounded-full ${
+              activeDetections.length > 0 && isActuallyLive
+                ? "animate-pulse bg-[#ff2d55]"
+                : isActuallyLive
+                  ? "bg-[#00e676]"
+                  : "bg-[#6b7f99]"
+            }`}
+            style={{
+              boxShadow:
+                activeDetections.length > 0 && isActuallyLive
+                  ? "0 0 8px rgba(255, 45, 85, 0.8)"
+                  : isActuallyLive
+                    ? "0 0 6px rgba(0, 230, 118, 0.6)"
+                    : "none",
+            }}
           />
           {isActuallyLive ? "LIVE" : isPaused ? "PAUSED" : "OFFLINE"}
         </span>
@@ -106,37 +161,34 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
       <div
         ref={scrollRef}
         onWheel={handleWheel}
-        className="relative overflow-hidden bg-black flex-1 min-h-0"
-        style={{
-          overscrollBehavior: "contain",
-          aspectRatio: videoAspectRatio ? `${videoAspectRatio}` : undefined,
-        }}
+        className="hud-brackets relative aspect-video overflow-hidden bg-black"
+        style={{ overscrollBehavior: "contain" }}
       >
-        {(previewUrl || feed.streamUrl) && !videoError ? (
+        {feed.streamUrl && !videoError ? (
           <video
             ref={videoRef}
-            src={previewUrl || feed.streamUrl}
+            src={feed.streamUrl}
             autoPlay={!isPaused}
             muted={isMuted}
             loop
             controls={false}
-            className="h-full w-full object-contain bg-black"
+            className="h-full w-full object-cover"
             playsInline
             onError={() => setVideoError(true)}
             onCanPlay={() => {
               setVideoError(false);
               try {
                 videoRef.current?.play();
-              } catch {}
+              } catch {
+                // autoplay blocked by browser; ignore
+              }
             }}
             onLoadedData={(e) => {
-              const videoEl = e.currentTarget as HTMLVideoElement;
               setVideoError(false);
               try {
-                videoEl.play();
-              } catch {}
-              if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-                setVideoAspectRatio(videoEl.videoWidth / videoEl.videoHeight);
+                (e.currentTarget as HTMLVideoElement).play();
+              } catch {
+                // autoplay blocked by browser; ignore
               }
             }}
           />
@@ -144,7 +196,7 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
           <img
             src={feed.image}
             alt={feed.id}
-            className={`h-full w-full object-contain transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
+            className={`h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}
             loading="lazy"
           />
         )}
@@ -160,18 +212,18 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
           return (
             <div
               key={b.id}
-              className="absolute"
+              className="absolute animate-fade-in"
               style={{
                 left: `${b.x}%`,
                 top: `${b.y}%`,
                 width: `${b.w}%`,
                 height: `${b.h}%`,
                 border: `2px solid ${c}`,
-                boxShadow: `0 0 0 1px ${c}33`,
+                boxShadow: `0 0 8px ${c}88, 0 0 16px ${c}33`,
               }}
             >
               <span
-                className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white"
+                className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white font-mono"
                 style={{ backgroundColor: c }}
               >
                 ID: {b.id}
@@ -183,7 +235,11 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
         {feed.alertType && (
           <div
             className="absolute bottom-3 left-3 rounded-md px-3 py-2 backdrop-blur"
-            style={{ backgroundColor: `${alertColor}26`, border: `1px solid ${alertColor}66` }}
+            style={{
+              backgroundColor: `${alertColor}26`,
+              border: `1px solid ${alertColor}66`,
+              boxShadow: getGlowShadow(feed.riskLevel || "low"),
+            }}
           >
             <div
               className="flex items-center gap-1.5 text-xs font-bold"
@@ -193,25 +249,69 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
             </div>
             <div className="text-[11px] text-white/90">
               Risk Score:{" "}
-              <span className="font-bold" style={{ color: alertColor }}>
+              <span className="font-bold font-mono" style={{ color: alertColor }}>
                 {feed.riskScore}%
               </span>
             </div>
           </div>
         )}
       </div>
-      {/* Bottom controls removed per user request */}
+      <div className="flex items-center justify-between border-t border-border px-3 py-2 text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePlayPauseToggle}
+            title={isPaused ? "Play" : "Pause"}
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={handleMuteToggle}
+            title={isMuted ? "Unmute" : "Mute"}
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setFullscreenOpen(true)}
+            title="Fullscreen view"
+            className="rounded p-1 hover:bg-secondary hover:text-foreground"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={() => onRemove(feed.id)}
+              disabled={removing}
+              title="Remove feed"
+              className="rounded p-1 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {/* Fullscreen Dialog */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
         <DialogContent className="max-w-5xl p-2">
           <div className="overflow-hidden rounded-lg bg-black">
+            <DialogTitle className="sr-only">{`${feed.id} — ${feed.platform}`}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Fullscreen CCTV feed playback for {feed.id} on {feed.platform}.
+            </DialogDescription>
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-sm font-semibold text-white">
                 {feed.id} — {feed.platform}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-bold text-[#22c55e]">
-                <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-[#22c55e]" />
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-[#00e676]/15 px-2 py-0.5 text-[10px] font-bold font-mono tracking-wider text-[#00e676]">
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-[#00e676]" />
                 LIVE
               </span>
             </div>
@@ -223,9 +323,10 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
               }}
               style={{ overscrollBehavior: "contain" }}
             >
-              {(previewUrl || feed.streamUrl) && !videoError ? (
+              {feed.streamUrl && !videoError ? (
                 <video
-                  src={previewUrl || feed.streamUrl}
+                  ref={fullscreenVideoRef}
+                  src={feed.streamUrl}
                   autoPlay={!isPaused}
                   muted={isMuted}
                   loop
@@ -235,21 +336,15 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
                   onError={() => setVideoError(true)}
                   onCanPlay={() => {
                     setVideoError(false);
-                    // attempt to play the fullscreen video element
-                    try {
-                      const els = document.getElementsByTagName('video');
-                      for (const el of Array.from(els)) {
-                        if (el.src === feed.streamUrl) {
-                          el.play().catch(() => {});
-                        }
-                      }
-                    } catch {}
+                    fullscreenVideoRef.current?.play().catch(() => {
+                      // autoplay blocked by browser; ignore
+                    });
                   }}
-                  onLoadedData={(e) => {
+                  onLoadedData={() => {
                     setVideoError(false);
-                    try {
-                      (e.currentTarget as HTMLVideoElement).play().catch(() => {});
-                    } catch {}
+                    fullscreenVideoRef.current?.play().catch(() => {
+                      // autoplay blocked by browser; ignore
+                    });
                   }}
                 />
               ) : (
@@ -272,11 +367,11 @@ export function CCTVFeedCard({ feed, detections, onRemove, removing, previewUrl 
                       width: `${b.w}%`,
                       height: `${b.h}%`,
                       border: `2px solid ${c}`,
-                      boxShadow: `0 0 0 1px ${c}33`,
+                      boxShadow: `0 0 8px ${c}88, 0 0 16px ${c}33`,
                     }}
                   >
                     <span
-                      className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white"
+                      className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white font-mono"
                       style={{ backgroundColor: c }}
                     >
                       ID: {b.id}

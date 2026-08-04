@@ -1,10 +1,18 @@
 import { QueryClient } from "@tanstack/react-query";
-import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  HeadContent,
+} from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import "../styles.css";
 import { reportAppError } from "../lib/error-reporting";
 import { Sidebar } from "@/components/Sidebar";
+import { SidebarProvider } from "@/components/sidebar-context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -74,11 +82,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <Sidebar />
-      <main className="flex-1 overflow-x-hidden">
-        <Outlet />
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="flex min-h-screen bg-background text-foreground">
+        <HeadContent />
+        <Sidebar />
+        <main className="flex-1 overflow-x-hidden md:ml-0">
+          <Outlet />
+        </main>
+        <Toaster position="top-right" richColors />
+      </div>
+    </SidebarProvider>
   );
 }
