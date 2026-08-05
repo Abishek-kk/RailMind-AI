@@ -1,4 +1,11 @@
-opencv-python
-ultralytics
-shapely
-numpy
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+# Computer vision / pose detection pipeline
+opencv-python>=4.9.0
+ultralytics>=8.1.0
+shapely>=2.0.0
+numpy>=1.26.0

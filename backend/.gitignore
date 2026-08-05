@@ -83,3 +83,4 @@ training/datasets/*/
 # OS
 .DS_Store
 Thumbs.db
+structure.txt

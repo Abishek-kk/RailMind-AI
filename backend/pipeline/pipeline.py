@@ -59,7 +59,11 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from frames_to_video import frames_to_video, get_fps_from_video
+try:
+    from .frames_to_video import frames_to_video, get_fps_from_video
+except ImportError:
+    # allows running this file directly (python pipeline.py) without a package context
+    from frames_to_video import frames_to_video, get_fps_from_video
 
 
 # =====================================================================
@@ -75,7 +79,7 @@ class config:
     DENSITY_HIGH_THRESHOLD = 15           # people count considered "high density"
     ASSUMED_FPS = 30                      # fallback if video FPS can't be read
 
-WORK_ROOT = "pipeline"
+WORK_ROOT = os.environ.get("PIPELINE_WORK_ROOT", "pipeline")
 
 
 # =====================================================================
@@ -362,9 +366,19 @@ class BehaviorAnalyzer:
 # =====================================================================
 
 def _video_id(video_path):
-    stat = os.stat(video_path)
-    key = f"{os.path.abspath(video_path)}::{stat.st_size}::{stat.st_mtime}"
-    return hashlib.sha1(key.encode()).hexdigest()[:16]
+    """
+    Content-based hash (not path+mtime) so re-uploading the exact same
+    video content -- even if the destination file gets rewritten and its
+    mtime changes -- still resolves to the same video_id and reuses
+    cached frames/calibration instead of silently recalibrating.
+    Hashes in chunks so this doesn't load huge video files fully into
+    memory.
+    """
+    hasher = hashlib.sha1()
+    with open(video_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()[:16]
 
 def _video_paths(video_path):
     vid = _video_id(video_path)
@@ -539,7 +553,7 @@ def process_video(video_path, conf_threshold=0.35, save_annotated_frames=True,
 # =====================================================================
 
 if __name__ == "__main__":
-    VIDEO_PATH = "../data/input_video_data/video1.mp4"
+    VIDEO_PATH = "video1.mp4"
 
     video_path = VIDEO_PATH
 
@@ -550,4 +564,4 @@ if __name__ == "__main__":
 
     result = process_video(video_path)
     print("\n--- FINAL RESULT ---")
-    print(json.dumps(result, indent=2, default=str))
+    print(json.dumps(result, indent=2, default=str))    

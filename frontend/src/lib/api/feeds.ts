@@ -74,23 +74,22 @@ export async function createFeed(payload: {
   });
 }
 
-export async function uploadVideo(file: File, feed_id?: string, name?: string) {
-  const form = new FormData();
-  form.append("file", file, file.name);
-  if (feed_id) form.append("feed_id", feed_id);
-  if (name) form.append("name", name);
+// frontend/src/lib/api/feeds.ts
+export async function uploadVideo(
+  file: File,
+  feedId?: string,
+  name?: string,
+): Promise<{ id: string; status: "processing" | "active" | "error"; msg: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (feedId) formData.append("feed_id", feedId);
+  if (name) formData.append("name", name);
 
-  const url = (import.meta.env.VITE_API_BASE_URL ?? "/api") + "/feeds/upload";
-  const resp = await fetch(url, {
+  const response = await apiFetch("/feeds/upload", {
     method: "POST",
-    headers: apiHeaders(),
-    body: form,
+    body: formData,
   });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Upload failed: ${resp.status} ${text}`);
-  }
-  return await resp.json();
+  return response.json();
 }
 
 export async function deleteFeed(id: string): Promise<void> {
