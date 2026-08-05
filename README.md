@@ -21,7 +21,7 @@
 
 ---
 
-## Status: Working Prototype
+## Status: Working Prototype.
 
 This is a hackathon build for **FAR AWAY 2026** by **Team Accelerate**. Everything described below as "implemented" has been verified by running it — backend boots, 57 backend tests pass, frontend builds, and the CV → LSTM → agent pipeline runs end-to-end on uploaded video.
 
