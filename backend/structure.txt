@@ -1,0 +1,12 @@
++---app
+�   �   main.py
+�   �          
++---data
+�   +---input_video_data
+�   �       video1.mp4
+�   �       
+�   +---pipeline_video_data
++---pipeline
+�       frames_to_video.py
+�       pipeline.py
+�       yolov8n-pose.pt

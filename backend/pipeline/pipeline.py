@@ -1,3 +1,50 @@
+"""
+railway_safety_pipeline.py
+---------------------------
+Single-file, drop-in pipeline for railway platform safety analytics.
+
+WHAT THIS DOES
+    Given a video, it:
+        1. Extracts frames (skipped automatically if already done for
+           that exact video file).
+        2. Calibrates the track (danger) zone + platform zone ONCE per
+           video, using only the first extracted frame -- since every
+           frame from one video shares the same camera angle. The
+           calibration is cached to disk, so re-running the same video
+           never re-prompts you. A NEW video (different file) will
+           trigger calibration again.
+        3. Runs YOLOv8 pose detection + ByteTrack across every frame,
+           feeding ankle keypoints into a behavior analyzer.
+        4. Returns a dict keyed by track ID:
+               {
+                   track_id: {
+                       "activity": "IN_DANGER_ZONE" | "NORMAL" | ...,
+                       "in_danger_zone": bool,
+                       ...
+                   },
+                   ...
+               }
+
+HOW TO USE
+    1. Paste this file into an empty directory.
+    2. pip install ultralytics opencv-python shapely numpy
+    3. Edit the VIDEO_PATH constant near the bottom, or run:
+           python railway_safety_pipeline.py path/to/video.mp4
+    4. First run on a video: a window pops up on the first frame.
+           - Click points around the TRACK / DANGER zone (the track bed).
+           - Press 'n' to finish that polygon and start the next one.
+           - Click points around the PLATFORM zone (the walkable area).
+           - Press 'q' to finish and save.
+       Every future run on that same video file reuses this
+       automatically -- no window will pop up again for it.
+
+WHAT GETS CREATED (all under ./pipeline_data/<video_id>/)
+    frames/          extracted frames
+    annotated/        frames with pose + zone overlays drawn
+    zones.json        cached calibration for this video
+    events_log.csv    every intrusion/loitering/reversal/density event
+"""
+
 import os
 import sys
 import json
@@ -12,6 +59,9 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from frames_to_video import frames_to_video, get_fps_from_video
+
+
 # =====================================================================
 # CONFIG -- tune these thresholds for your camera / use case
 # =====================================================================
@@ -23,24 +73,10 @@ class config:
     DIRECTION_REVERSAL_ANGLE_DEG = 120    # heading change considered a "reversal"
     MIN_SPEED_FOR_HEADING_PX = 5          # ignore heading calc below this displacement
     DENSITY_HIGH_THRESHOLD = 15           # people count considered "high density"
-    ASSUMED_FPS = 25                      # fallback if video FPS can't be read
+    ASSUMED_FPS = 30                      # fallback if video FPS can't be read
 
-BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
-WORK_ROOT = os.path.join(BACKEND_ROOT, "pipeline_data")
-MODEL_PATH = os.path.join(PIPELINE_DIR, "yolov8n-pose.pt")
+WORK_ROOT = "pipeline"
 
-
-def _get_backend_root():
-    return BACKEND_ROOT
-
-
-def _get_work_root():
-    return WORK_ROOT
-
-
-def _get_model_path():
-    return MODEL_PATH if os.path.exists(MODEL_PATH) else os.path.abspath("yolov8n-pose.pt")
 
 # =====================================================================
 # STEP 1: frame extraction
@@ -139,31 +175,13 @@ def _ensure_zones_calibrated(frames_dir, zones_path):
         raise RuntimeError(f"No frames found in '{frames_dir}' to calibrate zones on.")
 
     first_frame_path = os.path.join(frames_dir, frame_files[0])
-    interactive_mode = os.getenv("RAILMIND_INTERACTIVE_ZONE_CALIBRATION", "0").lower() in {"1", "true", "yes", "on"}
-
-    if not interactive_mode:
-        print(f"[pipeline] No calibration found for this video. Using default fallback zones for '{first_frame_path}'.")
-        zones = {"track_zone": [(0, 0), (1, 0), (1, 1), (0, 1)], "platform_zone": [(0, 0), (1, 0), (1, 1), (0, 1)]}
-        os.makedirs(os.path.dirname(zones_path), exist_ok=True)
-        with open(zones_path, "w") as f:
-            json.dump(zones, f, indent=2)
-        return zones
-
     print(f"[pipeline] No calibration found for this video. Launching zone calibration "
           f"on first frame: '{first_frame_path}'")
     print("[pipeline] Click the TRACK (danger) zone polygon first, press 'n', "
           "then click the PLATFORM zone polygon, then press 'q'.")
 
-    try:
-        data = _get_config_zones(first_frame_path)
-        poly_coords = data["poly_coords"]
-    except Exception as exc:
-        print(f"[pipeline] Interactive calibration unavailable ({exc}). Falling back to default zones.")
-        zones = {"track_zone": [(0, 0), (1, 0), (1, 1), (0, 1)], "platform_zone": [(0, 0), (1, 0), (1, 1), (0, 1)]}
-        os.makedirs(os.path.dirname(zones_path), exist_ok=True)
-        with open(zones_path, "w") as f:
-            json.dump(zones, f, indent=2)
-        return zones
+    data = _get_config_zones(first_frame_path)
+    poly_coords = data["poly_coords"]
 
     if len(poly_coords) < 2:
         raise RuntimeError(
@@ -350,7 +368,7 @@ def _video_id(video_path):
 
 def _video_paths(video_path):
     vid = _video_id(video_path)
-    base = os.path.join(_get_work_root(), vid)
+    base = os.path.join(WORK_ROOT, vid)
     return {
         "video_id": vid,
         "base": base,
@@ -358,6 +376,7 @@ def _video_paths(video_path):
         "annotated_dir": os.path.join(base, "annotated"),
         "zones_path": os.path.join(base, "zones.json"),
         "events_csv_path": os.path.join(base, "events_log.csv"),
+        "annotated_video_path": os.path.join(base, "annotated_output.mp4"),
     }
 
 
@@ -381,54 +400,28 @@ def _get_video_fps(video_path):
     return int(round(fps))
 
 
-def _infer_with_fallback(pose_model, fallback_model, image_path, conf_threshold):
-    for candidate_conf in [max(conf_threshold, 0.15), 0.10, 0.05]:
-        for candidate_imgsz in [640, 960, 1280]:
-            for model in (pose_model, fallback_model):
-                if model is None:
-                    continue
-                try:
-                    results = model(image_path, classes=[0], conf=candidate_conf,
-                                    imgsz=candidate_imgsz, stream=False, verbose=False)
-                    result = results[0]
-                    boxes = getattr(result, "boxes", None)
-                    if boxes is not None and len(boxes) > 0:
-                        return result
-                except Exception:
-                    continue
-    return None
-
-
-def _detect_track_and_pose_in_frames(input_dir, output_dir, conf_threshold=0.35,
-                                     save_annotated_frames=True, overlay_zones=None):
+def _run_pose_and_analytics(frames_dir, annotated_dir, zones, fps, conf_threshold=0.35,
+                             save_annotated_frames=True):
     from ultralytics import YOLO
 
-    os.makedirs(output_dir, exist_ok=True)
-    pose_model = YOLO(_get_model_path())
-    fallback_model = YOLO("yolov8n.pt")
+    os.makedirs(annotated_dir, exist_ok=True)
+    model = YOLO("yolov8n-pose.pt")
+    analyzer = BehaviorAnalyzer(zones["track_zone"], zones["platform_zone"], fps=fps)
 
-    valid_extensions = (".jpg", ".jpeg", ".png")
-    image_files = [f for f in os.listdir(input_dir) if f.lower().endswith(valid_extensions)]
-    image_files.sort()
+    image_files = sorted(f for f in os.listdir(frames_dir) if f.lower().endswith(".jpg"))
+    print(f"[pipeline] Running pose detection + behavior analytics on {len(image_files)} frames...")
 
-    print(f"[pipeline] Found {len(image_files)} frames in '{input_dir}'. Processing...")
-
-    detections = []
     for idx, img_name in enumerate(image_files):
-        img_path = os.path.join(input_dir, img_name)
-        result = _infer_with_fallback(pose_model, fallback_model, img_path, conf_threshold)
-
-        if result is None:
-            continue
-
+        img_path = os.path.join(frames_dir, img_name)
+        results = model.track(source=img_path, classes=[0], conf=conf_threshold,
+                               tracker="bytetrack.yaml", persist=True, verbose=False)
+        result = results[0]
         boxes = result.boxes
+
         track_ids = boxes.id.int().cpu().tolist() if boxes.id is not None else []
-        if not track_ids:
-            track_ids = list(range(1, len(boxes) + 1))
         confidences = boxes.conf.cpu().tolist() if boxes.conf is not None else []
 
         people_for_analyzer = []
-        keypoints_pixel = None
         if result.keypoints is not None and len(result.keypoints) > 0:
             keypoints_pixel = result.keypoints.xy.cpu().numpy()
             for i, tid in enumerate(track_ids):
@@ -442,55 +435,17 @@ def _detect_track_and_pose_in_frames(input_dir, output_dir, conf_threshold=0.35,
                     "confidence": confidences[i] if i < len(confidences) else None,
                 })
 
+        analyzer.process_frame(idx, people_for_analyzer)
+
         if save_annotated_frames:
-            try:
-                annotated_frame = result.plot()
-            except Exception:
-                annotated_frame = cv2.imread(img_path)
-                if annotated_frame is None:
-                    continue
-            if overlay_zones is not None:
-                annotated_frame = _draw_zones(annotated_frame, overlay_zones["track_zone"], overlay_zones["platform_zone"])
+            annotated_frame = result.plot()
+            annotated_frame = _draw_zones(annotated_frame, zones["track_zone"], zones["platform_zone"])
             cv2.putText(annotated_frame, f"People: {len(track_ids)} | IDs: {track_ids}",
                         (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
-            save_path = os.path.join(output_dir, f"detected_{img_name}")
-            cv2.imwrite(save_path, annotated_frame)
+            cv2.imwrite(os.path.join(annotated_dir, f"safety_{img_name}"), annotated_frame)
 
-        detections.append({
-            "frame_name": img_name,
-            "track_ids": track_ids,
-            "confidences": confidences,
-            "people_for_analyzer": people_for_analyzer,
-            "keypoints": keypoints_pixel,
-            "person_count": len(track_ids),
-        })
-
-        if (idx + 1) % 10 == 0 or (idx + 1) == len(image_files):
-            print(f"[pipeline] Processed {idx + 1}/{len(image_files)} frames...")
-
-    return detections
-
-
-def _run_pose_and_analytics(frames_dir, annotated_dir, zones, fps, conf_threshold=0.35,
-                             save_annotated_frames=True):
-    os.makedirs(annotated_dir, exist_ok=True)
-    analyzer = BehaviorAnalyzer(zones["track_zone"], zones["platform_zone"], fps=fps)
-
-    image_files = sorted(f for f in os.listdir(frames_dir) if f.lower().endswith((".jpg", ".jpeg", ".png")))
-    print(f"[pipeline] Running pose detection + behavior analytics on {len(image_files)} frames...")
-
-    detections = _detect_track_and_pose_in_frames(
-        frames_dir,
-        annotated_dir,
-        conf_threshold=conf_threshold,
-        save_annotated_frames=save_annotated_frames,
-        overlay_zones=zones,
-    )
-
-    for idx, detection in enumerate(detections):
-        analyzer.process_frame(idx, detection["people_for_analyzer"])
-        if (idx + 1) % 25 == 0 or (idx + 1) == len(detections):
-            print(f"[pipeline] Processed {idx + 1}/{len(detections)} frames "
+        if (idx + 1) % 25 == 0 or (idx + 1) == len(image_files):
+            print(f"[pipeline] Processed {idx + 1}/{len(image_files)} frames "
                   f"({len(analyzer.events)} events so far)")
 
     return analyzer
@@ -529,21 +484,24 @@ def _build_final_result(analyzer):
     return result
 
 
-def process_video(video_path, conf_threshold=0.35, save_annotated_frames=True):
+def process_video(video_path, conf_threshold=0.35, save_annotated_frames=True,
+                   build_annotated_video=True):
     """
     Runs the full pipeline for one video and returns:
         { track_id: {activity, in_danger_zone, duration_tracked_s, ...}, ... }
-    Safe to call repeatedly on the same video -- extraction and
-    calibration are both skipped automatically if already done.
+    Safe to call repeatedly on the same video -- extraction, calibration,
+    and the annotated video are all skipped automatically if already done.
+
+    If build_annotated_video=True (default), the annotated frames are
+    stitched into a single browser-playable .mp4 for the frontend, at
+    paths["annotated_video_path"]. Requires save_annotated_frames=True
+    (there's nothing to stitch otherwise).
     """
     paths = _video_paths(video_path)
     os.makedirs(paths["base"], exist_ok=True)
 
     _ensure_frames_extracted(video_path, paths["frames_dir"])
-    try:
-        zones = _ensure_zones_calibrated(paths["frames_dir"], paths["zones_path"])
-    except Exception:
-        zones = {"track_zone": [(0, 0), (1, 0), (1, 1), (0, 1)], "platform_zone": [(0, 0), (1, 0), (1, 1), (0, 1)]}
+    zones = _ensure_zones_calibrated(paths["frames_dir"], paths["zones_path"])
     fps = _get_video_fps(video_path)
 
     analyzer = _run_pose_and_analytics(
@@ -554,10 +512,25 @@ def process_video(video_path, conf_threshold=0.35, save_annotated_frames=True):
 
     _write_events_csv(analyzer.events, paths["events_csv_path"])
 
+    if build_annotated_video and save_annotated_frames:
+        if os.path.exists(paths["annotated_video_path"]):
+            print(f"[pipeline] Annotated video already exists at "
+                  f"'{paths['annotated_video_path']}', skipping stitch.")
+        else:
+            print(f"[pipeline] Stitching annotated frames into video...")
+            frames_to_video(
+                frames_dir=paths["annotated_dir"],
+                output_path=paths["annotated_video_path"],
+                fps=fps,
+            )
+
     final_result = _build_final_result(analyzer)
     print(f"[pipeline] Done. {len(final_result)} tracked people. "
           f"Events log: '{paths['events_csv_path']}'. "
           f"Annotated frames: '{paths['annotated_dir']}'.")
+    if build_annotated_video and save_annotated_frames:
+        print(f"[pipeline] Annotated video: '{paths['annotated_video_path']}'")
+
     return final_result
 
 
@@ -566,7 +539,7 @@ def process_video(video_path, conf_threshold=0.35, save_annotated_frames=True):
 # =====================================================================
 
 if __name__ == "__main__":
-    VIDEO_PATH = "raw_test_video_1.mp4"
+    VIDEO_PATH = "../data/input_video_data/video1.mp4"
 
     video_path = VIDEO_PATH
 

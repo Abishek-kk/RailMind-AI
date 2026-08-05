@@ -13,8 +13,8 @@ from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-VIDEO_FEEDS_DIR = BASE_DIR / "data" / "video_feeds"
+BASE_DIR = "backend"
+VIDEO_FEEDS_DIR = BASE_DIR / "data" / "input_video_Data"
 
 app = FastAPI(title="RailMind AI", version="1.0.0")
 app.mount("/uploads", StaticFiles(directory=str(VIDEO_FEEDS_DIR)), name="uploads")
