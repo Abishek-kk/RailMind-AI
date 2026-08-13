@@ -84,3 +84,4 @@ training/datasets/*/
 .DS_Store
 Thumbs.db
 structure.txt
+pipeline_video_data

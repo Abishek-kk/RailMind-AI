@@ -27,7 +27,6 @@ import {
 import { toast } from "sonner";
 import { getAlerts, mapBackendAlert, type ApiAlert, type BackendAlert } from "@/lib/api/alerts";
 import { createFeed, deleteFeed, getFeeds, uploadVideo, type Feed } from "@/lib/api/feeds";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import { riskColor, type BoundingBox, type RiskLevel, type CCTVFeed } from "@/lib/mock-data";
 import { parseCameraId } from "@/lib/utils";
 
@@ -69,32 +68,6 @@ function normalizeTrackId(trackId: string): number {
 // Map camera_id from backend to feed id (if different)
 function mapCameraIdToFeedId(cameraId: string) {
   return parseCameraId(cameraId);
-}
-
-// Build WebSocket URL from environment
-function buildWebSocketUrl(path: string) {
-  const configuredBase = import.meta.env.VITE_WS_URL?.trim();
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-
-  if (configuredBase) {
-    const base = configuredBase.replace(/\/+$/, "");
-    if (base.startsWith("ws://") || base.startsWith("wss://")) {
-      return `${base}${normalizedPath}`;
-    }
-    if (base.startsWith("http://")) {
-      return `ws://${base.slice("http://".length)}${normalizedPath}`;
-    }
-    if (base.startsWith("https://")) {
-      return `wss://${base.slice("https://".length)}${normalizedPath}`;
-    }
-  }
-
-  if (typeof window === "undefined") {
-    return `ws://localhost:3000${normalizedPath}`;
-  }
-
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}${normalizedPath}`;
 }
 
 export default function LivePage() {
@@ -190,15 +163,6 @@ export default function LivePage() {
     },
   });
 
-  // --- WebSocket ---
-  const websocketUrl = useMemo(() => buildWebSocketUrl("/ws/alerts"), []);
-  const {
-    data: latestMessage,
-    status: wsStatus,
-    error: wsError,
-    reconnect: reconnectWebSocket,
-  } = useWebSocket<Record<string, unknown>>(websocketUrl);
-
   const [realtimeAlerts, setRealtimeAlerts] = useState<ApiAlert[]>([]);
   const [feedAlerts, setFeedAlerts] = useState<
     Record<string, { alertType: string; riskScore: number; riskLevel: RiskLevel }>
@@ -209,12 +173,6 @@ export default function LivePage() {
   const SHOWN_TOAST_MAX = 500;
   const shownToastIds = useRef<Map<number, true>>(new Map());
   const lastAudioPlaybackAt = useRef<number>(0);
-
-  useEffect(() => {
-    if (wsError) {
-      toast.error(`Real-time updates unavailable: ${wsError}`);
-    }
-  }, [wsError]);
 
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -297,17 +255,16 @@ export default function LivePage() {
     return feeds.map((f) => ({
       id: f.id,
       name: f.name,
-      platform: f.name, // or derive from id if needed
+      platform: f.name,
       status: f.status,
-      streamUrl: f.stream_url,
+      streamUrl: f.stream_url || "",
       peopleDetected: f.track_count ?? 0,
       error_message: f.error_message,
       track_count: f.track_count,
-      // These will be filled by real-time updates
       alertType: undefined,
       riskScore: undefined,
       riskLevel: undefined,
-      image: "/cctv-platform.jpg", // placeholder
+      image: "/cctv-platform.jpg",
     }));
   }, [feeds]);
 
@@ -347,76 +304,6 @@ export default function LivePage() {
     },
     [feeds],
   );
-
-  // --- WebSocket message handler ---
-  useEffect(() => {
-    if (!latestMessage) return;
-
-    // Check if it's a backend alert (raw, not mapped)
-    if ("risk_score" in latestMessage && "incident_type" in latestMessage) {
-      const backendAlert = latestMessage as unknown as BackendAlert;
-      const mappedAlert = mapBackendAlert(backendAlert);
-      const feedId = resolveFeedId(backendAlert.camera_id || mappedAlert.cctv);
-
-      setFeedAlerts((current) => ({
-        ...current,
-        [feedId]: {
-          alertType: mappedAlert.type,
-          riskScore: mappedAlert.riskScore,
-          riskLevel: mappedAlert.riskLevel,
-        },
-      }));
-
-      setRealtimeAlerts((current) => {
-        if (current.some((a) => a.backendId === mappedAlert.backendId)) {
-          return current;
-        }
-        return [mappedAlert, ...current];
-      });
-      // Notification popup disabled - alerts now only visible in notification center
-      return;
-    }
-
-    // Detection payload
-    if ("camera_id" in latestMessage && Array.isArray(latestMessage.detections)) {
-      const latestDetection = latestMessage as unknown as LiveDetectionPayload;
-      const feedId = resolveFeedId(latestDetection.camera_id);
-      const { width, height } = latestDetection.dimensions || {};
-      const safeWidth = width || 1;
-      const safeHeight = height || 1;
-      const boxes: BoundingBox[] = latestDetection.detections.map((detection) => {
-        const [x1, y1, x2, y2] = detection.bbox;
-        const normalizedLevel = (
-          detection.risk_level.toLowerCase().includes("high")
-            ? "high"
-            : detection.risk_level.toLowerCase().includes("suspicious")
-              ? "suspicious"
-              : detection.risk_level.toLowerCase().includes("medium")
-                ? "medium"
-                : "low"
-        ) as RiskLevel;
-
-        return {
-          id: normalizeTrackId(detection.track_id),
-          level: normalizedLevel,
-          x: Math.max(0, Math.min(100, (x1 / safeWidth) * 100)),
-          y: Math.max(0, Math.min(100, (y1 / safeHeight) * 100)),
-          w: Math.max(0, Math.min(100, ((x2 - x1) / safeWidth) * 100)),
-          h: Math.max(0, Math.min(100, ((y2 - y1) / safeHeight) * 100)),
-        };
-      });
-
-      setFeedDetections((current) => ({
-        ...current,
-        [feedId]: boxes,
-      }));
-      setFeedPeopleCount((current) => ({
-        ...current,
-        [feedId]: boxes.length,
-      }));
-      return;
-    }
-  }, [latestMessage, showAlertToast, resolveFeedId]);
 
   // --- Filter alerts for sidebar ---
   const filteredAlerts = useMemo(() => {
@@ -493,21 +380,6 @@ export default function LivePage() {
         feeds={dynamicFeeds}
       />
       <div className="p-6">
-        {wsError && (
-          <div className="mb-6 rounded-xl border border-[#ff2d55]/40 bg-[#ff2d55]/10 px-4 py-3 text-sm text-[#ff2d55]">
-            <div className="flex items-center justify-between gap-3">
-              <span>Real-time updates are blocked: {wsError}</span>
-              <button
-                type="button"
-                onClick={reconnectWebSocket}
-                className="rounded-md border border-[#ff2d55]/50 bg-[#ff2d55]/10 px-3 py-1 text-xs font-semibold text-[#ff2d55] transition-all hover:bg-[#ff2d55]/20 hover:shadow-[var(--glow-danger)]"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Stats & Add Button */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatCard

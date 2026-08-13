@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 *.log
 structure.txt
+frontend/.env
+*.env.
+.env

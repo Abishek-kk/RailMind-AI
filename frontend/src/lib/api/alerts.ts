@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import { resolveStreamUrl } from "./feeds";
+import { resolveStreamUrl } from "@/lib/api/feeds";
 import { Alert, AlertStatus, cctvImages, RiskLevel } from "@/lib/mock-data";
 import { parseCameraId } from "@/lib/utils";
 
@@ -39,6 +39,13 @@ function normalizeStatus(value?: string | null): AlertStatus {
   if (lower === "acknowledged") return "acknowledged";
   if (lower === "resolved") return "resolved";
   return "active";
+}
+
+function normalizeReasoningMode(value?: string | null): "llm" | "rule_based" | undefined {
+  const lower = value?.trim().toLowerCase();
+  if (lower === "llm") return "llm";
+  if (lower === "rule_based" || lower === "rule-based") return "rule_based";
+  return undefined;
 }
 
 function formatTime(timestamp: string) {
@@ -104,7 +111,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     description: `${alert.incident_type} on ${alert.platform}`,
     image: getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
-    reasoning_mode: alert.reasoning_mode ?? null,
+    reasoning_mode: normalizeReasoningMode(alert.reasoning_mode),
     videoUrl: resolveStreamUrl(alert.video_snippet_url ?? undefined) ?? null,
   };
 }
@@ -118,7 +125,7 @@ export async function acknowledgeAlert(id: number, operatorId?: string | null): 
   const trimmedOperatorId = operatorId?.trim();
   const query = trimmedOperatorId ? `?operator_id=${encodeURIComponent(trimmedOperatorId)}` : "";
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/acknowledge${query}`, {
-    method: "PATCH",
+    method: "POST",
   });
   return mapBackendAlert(alert);
 }
@@ -130,7 +137,8 @@ export async function resolveAlert(id: number): Promise<ApiAlert> {
 
 export async function assignAlert(id: number, assignee: string): Promise<ApiAlert> {
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/assign`, {
-    method: "PATCH",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ assignee }),
   });
   return mapBackendAlert(alert);

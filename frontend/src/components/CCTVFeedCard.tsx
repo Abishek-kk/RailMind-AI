@@ -179,6 +179,13 @@ export function CCTVFeedCard({
               }
             }}
           />
+        ) : feed.status === "active" ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-4">
+            <AlertTriangle className="h-8 w-8 text-yellow-500" />
+            <span className="mt-2 text-xs text-white/70">
+              {videoError ? "Video failed to load" : "No stream URL for this feed"}
+            </span>
+          </div>
         ) : (
           <img
             src={feed.image || "/placeholder-cctv.jpg"}

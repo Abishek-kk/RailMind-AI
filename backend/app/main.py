@@ -176,9 +176,54 @@ def assign_alert(alert_id: str) -> dict[str, str]:
 # Feeds
 # ---------------------------------------------------------------------
 
+def _enrich_feed_with_processed_video(feed: dict[str, Any]) -> dict[str, Any]:
+    feed = dict(feed)
+    feed_id = str(feed.get("id", ""))
+    if not feed_id:
+        return feed
+
+    result = store.get_by_feed_id(str(PIPELINE_DATA_DIR), feed_id)
+    if result is None:
+        return feed
+
+    annotated_path = str(result.get("annotated_video_path", "")).replace("\\", "/")
+    if annotated_path:
+        feed["stream_url"] = f"/processed/{annotated_path}"
+        feed["annotated_video_url"] = f"/processed/{annotated_path}"
+    return feed
+
+
 @app.get("/api/feeds")
 def feeds() -> list[dict[str, Any]]:
-    return FEEDS
+    enriched: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+
+    for raw_feed in FEEDS:
+        feed = _enrich_feed_with_processed_video(raw_feed)
+        feed_id = str(feed.get("id", ""))
+        if feed_id and feed_id not in seen_ids:
+            seen_ids.add(feed_id)
+            enriched.append(feed)
+
+    for result in store.load_all(str(PIPELINE_DATA_DIR)):
+        feed_id = str(result.get("feed_id", ""))
+        if not feed_id or feed_id in seen_ids:
+            continue
+
+        annotated_path = str(result.get("annotated_video_path", "")).replace("\\", "/")
+        enriched.append(
+            {
+                "id": feed_id,
+                "name": result.get("feed_name") or feed_id,
+                "status": "active",
+                "stream_url": f"/processed/{annotated_path}",
+                "annotated_video_url": f"/processed/{annotated_path}",
+                "track_count": len(result.get("tracks") or {}),
+            }
+        )
+        seen_ids.add(feed_id)
+
+    return enriched
 
 
 @app.post("/api/feeds")
@@ -228,6 +273,7 @@ async def upload_feed(
 
         paths = _video_paths(str(destination))
         annotated_rel_path = os.path.relpath(paths["annotated_video_path"], PIPELINE_DATA_DIR)
+        annotated_rel_path = annotated_rel_path.replace("\\", "/")
 
         store.save_result(
             str(PIPELINE_DATA_DIR),
@@ -265,6 +311,7 @@ def feed_result(feed_id: str) -> dict[str, Any]:
     if entry is None:
         raise HTTPException(status_code=404, detail=f"No pipeline result found for feed_id={feed_id}")
     entry = dict(entry)
+    entry["annotated_video_path"] = entry["annotated_video_path"].replace("\\", "/")
     entry["annotated_video_url"] = f"/processed/{entry['annotated_video_path']}"
     return entry
 
