@@ -178,7 +178,7 @@ def assign_alert(alert_id: str) -> dict[str, str]:
 
 def _enrich_feed_with_processed_video(feed: dict[str, Any]) -> dict[str, Any]:
     feed = dict(feed)
-    feed_id = str(feed.get("id", ""))
+    feed_id = str(feed.get("id"))
     if not feed_id:
         return feed
 
@@ -200,7 +200,7 @@ def feeds() -> list[dict[str, Any]]:
 
     for raw_feed in FEEDS:
         feed = _enrich_feed_with_processed_video(raw_feed)
-        feed_id = str(feed.get("id", ""))
+        feed_id = str(feed.get("id"))
         if feed_id and feed_id not in seen_ids:
             seen_ids.add(feed_id)
             enriched.append(feed)
