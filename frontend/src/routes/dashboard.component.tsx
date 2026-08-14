@@ -106,7 +106,6 @@ export default function DashboardPage() {
     error: recentError,
   } = useQuery({ queryKey: ["recentIncidents"], queryFn: getRecentIncidents });
 
-
   const queryClient = useQueryClient();
 
   /** BUG 12 FIX: fetch feeds so TopBar can show dynamic camera list */
@@ -186,7 +185,6 @@ export default function DashboardPage() {
       // Optionally show a toast or inline error state here
     }
   };
-
 
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 p-6">
@@ -556,7 +554,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-
         {/* CCTV Summary */}
         <div className="hud-panel rounded-xl bg-card">
           {/* Top accent line */}
@@ -677,4 +674,3 @@ function Hotspots({
     </>
   );
 }
-

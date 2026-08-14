@@ -108,9 +108,9 @@ def trend(data_dir: str, days: int = 7) -> list[dict[str, Any]]:
         counter = by_date[date_str]
         rows.append({
             "date": date_str,
-            "Track Zone Intrusion": counter.get("Track Zone Intrusion", 0),
-            "Loitering / Trespass": counter.get("Loitering / Trespass", 0),
-            "General Anomalies": counter.get("General Anomalies", 0),
+            "Incident Risk": counter.get("Track Zone Intrusion", 0),
+            "Pickpocketing": counter.get("Loitering / Trespass", 0),
+            "Loitering": counter.get("General Anomalies", 0),
         })
     return rows
 

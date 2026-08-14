@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap");
 @import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
@@ -67,16 +67,17 @@
   --font-mono: var(--font-mono);
 }
 
-:root, .dark {
+:root,
+.dark {
   --radius: 0.625rem;
   /* RailMind AI Sci-Fi Command Center dark theme */
-  --background: #050608;          /* near-black, slightly blue-black */
-  --foreground: #e6f1ff;          /* cool white, not pure white */
-  --card: #0b0e14;                /* panel background, subtle blue tint */
+  --background: #050608; /* near-black, slightly blue-black */
+  --foreground: #e6f1ff; /* cool white, not pure white */
+  --card: #0b0e14; /* panel background, subtle blue tint */
   --card-foreground: #e6f1ff;
   --popover: #0b0e14;
   --popover-foreground: #e6f1ff;
-  --primary: #00e5ff;             /* cyan — primary accent, replaces indigo */
+  --primary: #00e5ff; /* cyan — primary accent, replaces indigo */
   --primary-foreground: #001014;
   --secondary: #10151f;
   --secondary-foreground: #cfe8ff;
@@ -84,9 +85,9 @@
   --muted-foreground: #6b7f99;
   --accent: #10151f;
   --accent-foreground: #cfe8ff;
-  --destructive: #ff2d55;         /* hotter red for high-risk */
+  --destructive: #ff2d55; /* hotter red for high-risk */
   --destructive-foreground: #ffffff;
-  --border: #1a2432;              /* faint cyan-blue border, not gray */
+  --border: #1a2432; /* faint cyan-blue border, not gray */
   --input: #1a2432;
   --ring: #00e5ff;
   --risk-high: #ff2d55;
@@ -132,10 +133,21 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: 
+    background:
       radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.03) 0%, transparent 80%),
-      repeating-linear-gradient(rgba(0, 229, 255, 0.03) 0px, rgba(0, 229, 255, 0.03) 1px, transparent 1px, transparent 60px),
-      repeating-linear-gradient(90deg, rgba(0, 229, 255, 0.03) 0px, rgba(0, 229, 255, 0.03) 1px, transparent 1px, transparent 60px);
+      repeating-linear-gradient(
+        rgba(0, 229, 255, 0.03) 0px,
+        rgba(0, 229, 255, 0.03) 1px,
+        transparent 1px,
+        transparent 60px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 229, 255, 0.03) 0px,
+        rgba(0, 229, 255, 0.03) 1px,
+        transparent 1px,
+        transparent 60px
+      );
   }
 }
 
@@ -143,7 +155,9 @@
 .hud-panel {
   position: relative;
   border: 1px solid var(--border) !important;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .hud-panel:hover {
@@ -183,4 +197,3 @@
   right: -1px;
   border-width: 1.5px 1.5px 0 0;
 }
-

@@ -58,9 +58,4 @@ export function riskColor(level: RiskLevel | "very-high" | string): string {
 /**
  * Placeholder images for CCTV feeds (used when no real image is available).
  */
-export const cctvImages = [
-  "/cctv-platform.jpg",
-  "/cctv-platform2.jpg",
-  "/cctv-platform3.jpg",
-  "/cctv-platform4.jpg",
-];
+export const cctvImages = [];
