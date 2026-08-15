@@ -110,8 +110,8 @@ export async function getFeedStatus(feedId: string): Promise<{
  * Resolve a stream URL to an absolute URL.
  * If the path is already a fully-qualified http(s) URL, return it as-is.
  * Otherwise (including root-relative paths like "/processed/..." returned by
- * the backend), prepend the configured API base URL -- a leading "/" is
- * relative to the FastAPI backend's origin, not the Vite dev server's.
+ * the backend), prepend the backend origin (VITE_API_BASE_URL with /api stripped).
+ * This ensures video streams served at the backend's origin are resolved correctly.
  */
 export function resolveStreamUrl(path: string | undefined): string {
   if (!path) return "";
@@ -122,6 +122,9 @@ export function resolveStreamUrl(path: string | undefined): string {
     return normalizedPath;
   }
 
-  const baseUrl = import.meta.env.VITE_API_URL || "";
-  return `${baseUrl.replace(/\/+$/, "")}/${normalizedPath.replace(/^\/+/, "")}`;
+  // Strip trailing /api from VITE_API_BASE_URL to get the backend origin
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  const origin = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/+$/, "");
+  
+  return `${origin}/${normalizedPath.replace(/^\/+/, "")}`;
 }

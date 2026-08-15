@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/TopBar";
 import { StatCard } from "@/components/StatCard";
 import { RiskBadge, ScorePill } from "@/components/RiskBadge";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   AlertTriangle,
   AlertOctagon,
@@ -35,8 +36,10 @@ import {
   resolveAlert,
   assignAlert,
   type ApiAlert,
+  type BackendAlert,
 } from "@/lib/api/alerts";
 import { getFeeds } from "@/lib/api/feeds";
+import { getApiKey } from "@/lib/api/client";
 import { toast } from "sonner";
 import { riskColor, type Alert, type AlertStatus } from "@/lib/mock-data";
 
@@ -90,8 +93,20 @@ export default function AlertsPage() {
     staleTime: 1000 * 60,
   });
 
+  // Wire up real-time alerts via WebSocket
+  const wsBaseUrl = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
+  const wsUrl = `${wsBaseUrl}/ws/alerts`;
+  const { data: wsAlert } = useWebSocket<BackendAlert>(wsUrl);
+
+  // When a new alert arrives via WebSocket, invalidate the alerts query
+  useEffect(() => {
+    if (wsAlert) {
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    }
+  }, [wsAlert, queryClient]);
+
   const acknowledgeMutation = useMutation({
-    mutationFn: ({ backendId, operatorId }: { backendId: number; operatorId?: string | null }) =>
+    mutationFn: ({ backendId, operatorId }: { backendId: string; operatorId?: string | null }) =>
       acknowledgeAlert(backendId, operatorId),
     onError: (error: Error) => {
       toast.error(error.message || "Failed to acknowledge alert. Please try again.");
@@ -100,7 +115,7 @@ export default function AlertsPage() {
   });
 
   const resolveMutation = useMutation({
-    mutationFn: (backendId: number) => resolveAlert(backendId),
+    mutationFn: (backendId: string) => resolveAlert(backendId),
     onError: (error: Error) => {
       toast.error(error.message || "Failed to resolve alert. Please try again.");
     },

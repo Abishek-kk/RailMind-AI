@@ -6,12 +6,16 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Body, BackgroundTask, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import APIKeyHeader
 
 load_dotenv()
+
+# Load API key from environment for securing all /api/* and /ws/alerts routes
+RAILMIND_API_KEY = os.getenv("RAILMIND_API_KEY", "change-this-admin-api-key")
 
 # ---------------------------------------------------------------------
 # Paths
@@ -41,8 +45,62 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from pipeline import aggregation  # noqa: E402
+from pipeline import alert_status_store  # noqa: E402
 from pipeline import results_store as store  # noqa: E402
 from pipeline.pipeline import process_video  # noqa: E402
+
+
+# ---------------------------------------------------------------------
+# API Key Verification
+# ---------------------------------------------------------------------
+def verify_api_key_http(api_key: str | None = Security(APIKeyHeader(name="X-API-Key", auto_error=False))) -> str:
+    """
+    FastAPI Security dependency to verify X-API-Key header against RAILMIND_API_KEY.
+    Applied to all /api/* routes. Raises HTTPException 403 if key is missing or invalid.
+    """
+    if api_key is None or api_key.strip() == "":
+        raise HTTPException(
+            status_code=403,
+            detail="Missing X-API-Key header",
+        )
+    if api_key != RAILMIND_API_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid X-API-Key",
+        )
+    return api_key
+
+
+# Connection manager for real-time alert broadcasting
+class AlertConnectionManager:
+    """Manages WebSocket connections for real-time alert streaming."""
+    
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+    
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+    
+    async def broadcast(self, message: dict[str, Any]):
+        """Broadcast a message to all connected clients."""
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                # Connection failed, mark for removal
+                disconnected.append(connection)
+        
+        # Clean up failed connections
+        for connection in disconnected:
+            self.disconnect(connection)
+
+
+alert_manager = AlertConnectionManager()
 
 
 app = FastAPI(title="RailMind AI", version="1.0.0")
@@ -90,7 +148,7 @@ FEEDS: list[dict[str, Any]] = []
 
 
 @app.get("/api/health")
-def health() -> dict[str, Any]:
+def health(api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     return {"status": "ok", "service": "railmind-api"}
 
 
@@ -99,32 +157,32 @@ def health() -> dict[str, Any]:
 # ---------------------------------------------------------------------
 
 @app.get("/api/dashboard/stats")
-def dashboard_stats() -> dict[str, Any]:
+def dashboard_stats(api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     return aggregation.dashboard_stats(str(PIPELINE_DATA_DIR))
 
 
 @app.get("/api/dashboard/incidents-by-cctv")
-def incidents_by_cctv() -> list[dict[str, Any]]:
+def incidents_by_cctv(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.incidents_by_cctv(str(PIPELINE_DATA_DIR))
 
 
 @app.get("/api/dashboard/trend")
-def dashboard_trend(days: int = 7) -> list[dict[str, Any]]:
+def dashboard_trend(days: int = 7, api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.trend(str(PIPELINE_DATA_DIR), days=days)
 
 
 @app.get("/api/dashboard/risk-distribution")
-def risk_distribution() -> list[dict[str, Any]]:
+def risk_distribution(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.risk_distribution(str(PIPELINE_DATA_DIR))
 
 
 @app.get("/api/dashboard/peak-hours")
-def peak_hours() -> list[dict[str, Any]]:
+def peak_hours(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.peak_hours(str(PIPELINE_DATA_DIR))
 
 
 @app.get("/api/dashboard/heatmap")
-def heatmap() -> list[dict[str, Any]]:
+def heatmap(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     # No zone-level (North/South/East) subdivision exists in the pipeline's
     # output today -- it only has a single track_zone + platform_zone per
     # camera, not named sub-zones. Returning per-camera intrusion counts
@@ -135,7 +193,7 @@ def heatmap() -> list[dict[str, Any]]:
 
 
 @app.get("/api/dashboard/cctv-summary")
-def cctv_summary() -> list[dict[str, Any]]:
+def cctv_summary(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.cctv_summary(str(PIPELINE_DATA_DIR))
 
 
@@ -144,32 +202,80 @@ def cctv_summary() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------
 
 @app.get("/api/incidents")
-def incidents() -> list[dict[str, Any]]:
-    return aggregation.incidents_list(str(PIPELINE_DATA_DIR))
+def incidents(status: str | None = None, limit: int | None = None, api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
+    """Get incidents with optional filtering by status and limiting by count.
+    
+    Query parameters:
+    - status: Filter by status (e.g., "active", "acknowledged", "resolved")
+    - limit: Maximum number of most recent incidents to return
+    """
+    result = aggregation.incidents_list(str(PIPELINE_DATA_DIR))
+    
+    # Filter by status if provided
+    if status:
+        result = [inc for inc in result if inc.get("status") == status]
+    
+    # Sort by timestamp descending (most recent first)
+    result.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    
+    # Limit the number of results if provided
+    if limit is not None and limit > 0:
+        result = result[:limit]
+    
+    return result
 
 
 @app.get("/api/alerts")
-def alerts() -> list[dict[str, Any]]:
+def alerts(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.alerts_list(str(PIPELINE_DATA_DIR))
 
 
 @app.post("/api/alerts/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: str) -> dict[str, str]:
-    # Acknowledge/assign/resolve are operator actions with no persisted
-    # state of their own yet (there's no alerts table -- alerts are
-    # derived live from results_store each request). Wire these to a
-    # real status store if/when you need acknowledgement to persist.
-    return {"status": "acknowledged", "alert_id": alert_id}
+def acknowledge_alert(alert_id: str, operator_id: str | None = None, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    # Update persisted alert status with operator_id from query parameter
+    alert_status_store.update_status(
+        str(PIPELINE_DATA_DIR),
+        alert_id,
+        status="acknowledged",
+        operator_assigned=operator_id,
+    )
+    # Return the full alert record
+    alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
 
 
 @app.patch("/api/alerts/{alert_id}/resolve")
-def resolve_alert(alert_id: str) -> dict[str, str]:
-    return {"status": "resolved", "alert_id": alert_id}
+def resolve_alert(alert_id: str, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    # Update persisted alert status
+    alert_status_store.update_status(
+        str(PIPELINE_DATA_DIR),
+        alert_id,
+        status="resolved",
+    )
+    # Return the full alert record
+    alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
 
 
 @app.post("/api/alerts/{alert_id}/assign")
-def assign_alert(alert_id: str) -> dict[str, str]:
-    return {"status": "assigned", "alert_id": alert_id}
+def assign_alert(alert_id: str, body: dict[str, Any] = Body(...), api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    assignee = body.get("assignee")
+    # Update persisted alert status with assignee as operator_assigned
+    alert_status_store.update_status(
+        str(PIPELINE_DATA_DIR),
+        alert_id,
+        status="active",
+        operator_assigned=assignee,
+    )
+    # Return the full alert record
+    alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
 
 
 # ---------------------------------------------------------------------
@@ -194,7 +300,7 @@ def _enrich_feed_with_processed_video(feed: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.get("/api/feeds")
-def feeds() -> list[dict[str, Any]]:
+def feeds(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
@@ -227,7 +333,7 @@ def feeds() -> list[dict[str, Any]]:
 
 
 @app.post("/api/feeds")
-def create_feed(payload: dict[str, Any]) -> dict[str, Any]:
+def create_feed(payload: dict[str, Any], api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     feed_id = payload.get("id", f"feed-{len(FEEDS) + 1}")
     FEEDS.append(
         {
@@ -240,11 +346,58 @@ def create_feed(payload: dict[str, Any]) -> dict[str, Any]:
     return {"id": feed_id, "status": "created", "msg": "Feed created"}
 
 
+def _process_and_broadcast_alerts(
+    video_path: str, feed_id: str, feed_name: str, safe_name: str
+) -> None:
+    """Process video and broadcast any high-risk alerts to connected WebSocket clients."""
+    import asyncio
+    
+    try:
+        pipeline_result = process_video(
+            video_path, conf_threshold=0.35, save_annotated_frames=True
+        )
+
+        from pipeline.pipeline import _video_paths  # local import: internal helper
+
+        paths = _video_paths(video_path)
+        annotated_rel_path = os.path.relpath(paths["annotated_video_path"], PIPELINE_DATA_DIR)
+        annotated_rel_path = annotated_rel_path.replace("\\", "/")
+
+        store.save_result(
+            str(PIPELINE_DATA_DIR),
+            video_id=paths["video_id"],
+            feed_id=feed_id,
+            feed_name=feed_name,
+            camera_id=feed_id,
+            source_filename=safe_name,
+            annotated_video_path=annotated_rel_path,
+            tracks=pipeline_result,
+        )
+
+        # Broadcast high-risk alerts to all connected WebSocket clients
+        alerts = aggregation.alerts_list(str(PIPELINE_DATA_DIR))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            for alert in alerts:
+                loop.run_until_complete(
+                    alert_manager.broadcast({
+                        "type": "new_alert",
+                        "data": alert,
+                    })
+                )
+        finally:
+            loop.close()
+    except Exception as e:
+        print(f"Error processing video {video_path}: {e}")
+
+
 @app.post("/api/feeds/upload")
 async def upload_feed(
     file: UploadFile = File(...),
     feed_id: str = Form(default=""),
     name: str = Form(default=""),
+    api_key: str = Depends(verify_api_key_http),
 ) -> dict[str, Any]:
     safe_name = file.filename or "uploaded-video"
     destination = VIDEO_FEEDS_DIR / safe_name
@@ -262,50 +415,27 @@ async def upload_feed(
     }
     FEEDS.append(feed_record)
 
-    try:
-        pipeline_result = process_video(
-            str(destination), conf_threshold=0.35, save_annotated_frames=True
-        )
+    # Run video processing in background to avoid blocking the upload response
+    background_task = BackgroundTask(
+        _process_and_broadcast_alerts,
+        str(destination),
+        feed_key,
+        feed_name,
+        safe_name,
+    )
 
-        # Pull the video_id + annotated video path back out so the
-        # frontend can be pointed at the actual processed output.
-        from pipeline.pipeline import _video_paths  # local import: internal helper
-
-        paths = _video_paths(str(destination))
-        annotated_rel_path = os.path.relpath(paths["annotated_video_path"], PIPELINE_DATA_DIR)
-        annotated_rel_path = annotated_rel_path.replace("\\", "/")
-
-        store.save_result(
-            str(PIPELINE_DATA_DIR),
-            video_id=paths["video_id"],
-            feed_id=feed_key,
-            feed_name=feed_name,
-            camera_id=feed_key,
-            source_filename=safe_name,
-            annotated_video_path=annotated_rel_path,
-            tracks=pipeline_result,
-        )
-
-        feed_record["stream_url"] = f"/processed/{annotated_rel_path}"
-
-        return {
+    return JSONResponse(
+        {
             "id": feed_key,
-            "status": "uploaded",
-            "msg": "Upload accepted and pipeline processed",
-            "track_count": len(pipeline_result),
-            "annotated_video_url": f"/processed/{annotated_rel_path}",
-        }
-    except Exception as exc:
-        return {
-            "id": feed_key,
-            "status": "uploaded",
-            "msg": f"Upload saved; pipeline skipped: {exc}",
-            "saved_path": str(destination),
-        }
+            "status": "processing",
+            "msg": "Video uploaded and queued for processing. Alerts will be streamed in real-time.",
+        },
+        background=background_task,
+    )
 
 
 @app.get("/api/feeds/{feed_id}/result")
-def feed_result(feed_id: str) -> dict[str, Any]:
+def feed_result(feed_id: str, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     """Full stored pipeline result for one feed: per-track activity + annotated video path."""
     entry = store.get_by_feed_id(str(PIPELINE_DATA_DIR), feed_id)
     if entry is None:
@@ -317,7 +447,7 @@ def feed_result(feed_id: str) -> dict[str, Any]:
 
 
 @app.delete("/api/feeds/{feed_id}")
-def delete_feed(feed_id: str) -> dict[str, Any]:
+def delete_feed(feed_id: str, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     for item in FEEDS:
         if item["id"] == feed_id:
             FEEDS.remove(item)
@@ -327,20 +457,26 @@ def delete_feed(feed_id: str) -> dict[str, Any]:
 
 @app.websocket("/ws/alerts")
 async def websocket_alerts(websocket: WebSocket) -> None:
-    # NOTE: this is a connectivity stub, not a live alert stream -- there's
-    # no background process pushing pipeline events over this socket yet.
-    # Wiring that up would mean either (a) running process_video in a
-    # background task per upload and pushing new alerts as they're
-    # detected, or (b) polling results_store.json for changes. Neither is
-    # implemented here since it's a real design decision (queueing,
-    # concurrency limits on YOLO inference, etc.), not a one-line fix.
-    await websocket.accept()
+    """Real-time alert stream. Broadcasts high-risk incidents as they're detected.
+    
+    Requires api_key query parameter matching RAILMIND_API_KEY environment variable.
+    Closes with code 1008 (policy violation) if authentication fails.
+    """
+    # Extract and validate API key from query parameters before accepting connection
+    api_key = websocket.query_params.get("api_key")
+    if api_key is None or api_key.strip() == "" or api_key != RAILMIND_API_KEY:
+        # Close with code 1008 (policy violation) if key is missing or invalid
+        # Frontend's useWebSocket.ts handles 1008 specially
+        await websocket.close(code=1008, reason="Invalid or missing API key")
+        return
+    
+    await alert_manager.connect(websocket)
     try:
-        await websocket.send_json({"type": "connected", "message": "Real-time alerts stream ready"})
+        # Keep connection alive; messages are pushed from process_video
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        return
+        alert_manager.disconnect(websocket)
 
 
 @app.exception_handler(HTTPException)

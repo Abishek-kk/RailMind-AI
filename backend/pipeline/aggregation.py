@@ -33,6 +33,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from . import alert_status_store as status_store
 from . import results_store as store
 
 ACTIVITY_TO_INCIDENT_TYPE = {
@@ -47,6 +48,13 @@ RISK_LEVEL_BY_ACTIVITY = {
     "PREVIOUSLY_IN_DANGER_ZONE": "Medium",
     "LOITERING_ON_PLATFORM": "Medium",
     "ERRATIC_MOVEMENT": "Low",
+}
+
+# Map risk levels to numeric scores (0-100 scale) for frontend display
+RISK_LEVEL_TO_SCORE = {
+    "High": 85,
+    "Medium": 55,
+    "Low": 25,
 }
 
 
@@ -151,11 +159,13 @@ def cctv_summary(data_dir: str) -> list[dict[str, Any]]:
 def incidents_list(data_dir: str) -> list[dict[str, Any]]:
     result = []
     for i in _iter_incidents(data_dir):
+        risk_score = RISK_LEVEL_TO_SCORE.get(i["risk_level"], 25)
         result.append({
             "id": f"{i['feed_id']}-{i['track_id']}",
             "camera_id": i["camera_id"],
             "incident_type": i["incident_type"],
             "risk_level": i["risk_level"],
+            "risk_score": risk_score,
             "status": "active",
             "timestamp": i["processed_at"],
             "track_id": i["track_id"],
@@ -170,14 +180,31 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
     for i in _iter_incidents(data_dir):
         if i["risk_level"] != "High":
             continue
+        alert_id = f"{i['feed_id']}-{i['track_id']}"
+        risk_score = RISK_LEVEL_TO_SCORE.get(i["risk_level"], 25)
+        
+        # Consult alert_status_store for persisted status/operator
+        status_record = status_store.get_status(data_dir, alert_id)
+        status = status_record["status"] if status_record else "active"
+        operator_assigned = status_record["operator_assigned"] if status_record else None
+        
         result.append({
-            "id": f"{i['feed_id']}-{i['track_id']}",
+            "id": alert_id,
             "person_id": f"P-{i['track_id']}",
             "camera_id": i["camera_id"],
             "incident_type": i["incident_type"],
             "risk_level": i["risk_level"],
-            "status": "active",
+            "risk_score": risk_score,
+            "status": status,
             "timestamp": i["processed_at"],
-            "operator_assigned": None,
+            "operator_assigned": operator_assigned,
         })
     return result
+
+
+def get_alert_by_id(data_dir: str, alert_id: str) -> dict[str, Any] | None:
+    """Retrieve a single high-risk alert by ID, with persisted status overlay."""
+    for alert in alerts_list(data_dir):
+        if alert["id"] == alert_id:
+            return alert
+    return None

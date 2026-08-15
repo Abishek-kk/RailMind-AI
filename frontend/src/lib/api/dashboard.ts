@@ -4,12 +4,10 @@ import { cctvImages, type RiskLevel } from "@/lib/mock-data";
 export interface DashboardStats {
   total_incidents: number;
   active_alerts: number;
-  security_threats: number;
-  suicide_mitigations: number;
-  theft_preventions: number;
+  track_zone_intrusions: number;
+  loitering_trespass: number;
+  general_anomalies: number;
   system_status: string;
-  model_is_placeholder: boolean;
-  lstm_model_status: string;
 }
 
 export interface IncidentsByCCTVItem {
@@ -52,7 +50,7 @@ export interface CCTVSummaryRow {
 }
 
 export interface IncidentRead {
-  id: number;
+  id: string;
   camera_id: string;
   platform: string;
   incident_type: string;
@@ -143,8 +141,7 @@ export async function getIncidentTrend(days = 7): Promise<IncidentTrendItem[]> {
 
 function mapRiskDistributionColor(item: Omit<RiskDistributionItem, "color">): RiskDistributionItem {
   const colorMap: Record<string, string> = {
-    "Incident Risk Detection": "#ef4444",
-    "Pickpocketing Actions": "#f97316",
+    "Track Zone Intrusion": "#ef4444",
     "Loitering / Trespass": "#3b82f6",
     "General Anomalies": "#a855f7",
   };
