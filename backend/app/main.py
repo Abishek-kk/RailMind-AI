@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Body, BackgroundTask, Security, Depends
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Body, BackgroundTasks, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -109,7 +109,10 @@ app.mount("/processed", StaticFiles(directory=str(PIPELINE_DATA_DIR)), name="pro
 
 
 def _load_cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+    raw = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,http://localhost:3000,http://127.0.0.1:3000",
+    )
     raw = raw.strip()
 
     try:
@@ -131,6 +134,7 @@ cors_origins = _load_cors_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):(5173|5174|3000)(?::\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -416,7 +420,8 @@ async def upload_feed(
     FEEDS.append(feed_record)
 
     # Run video processing in background to avoid blocking the upload response
-    background_task = BackgroundTask(
+    background_task = BackgroundTasks()
+    background_task.add_task(
         _process_and_broadcast_alerts,
         str(destination),
         feed_key,

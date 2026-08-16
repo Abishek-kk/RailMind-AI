@@ -71,7 +71,7 @@ def train_model(args: argparse.Namespace) -> None:
 
     criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=args.lr)
-    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     best_val_accuracy = -1.0
 
