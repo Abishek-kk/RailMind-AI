@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { resolveStreamUrl } from "@/lib/api/feeds";
 import { cctvImages, type RiskLevel } from "@/lib/mock-data";
 
 export interface DashboardStats {
@@ -52,12 +53,17 @@ export interface CCTVSummaryRow {
 export interface IncidentRead {
   id: string;
   camera_id: string;
-  platform: string;
+  platform?: string;
   incident_type: string;
   risk_score: number;
   risk_level: string;
   status: string;
   timestamp: string;
+}
+
+export interface AlertRead extends IncidentRead {
+  image_url?: string | null;
+  video_snippet_url?: string | null;
 }
 
 export interface DashboardAlert {
@@ -91,7 +97,7 @@ function getImageForCamera(cameraId: string) {
   return cctvImages[index % cctvImages.length] ?? cctvImages[0];
 }
 
-function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
+function mapIncidentToAlert(incident: IncidentRead | AlertRead): DashboardAlert {
   // Enforce incident type → risk level mapping
   let riskLevel: RiskLevel = "low";
   const incidentType = incident.incident_type || "";
@@ -115,6 +121,8 @@ function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
     riskLevel = normalizeRiskLevel(incident.risk_level);
   }
 
+  const imageUrl = "image_url" in incident ? incident.image_url : undefined;
+
   return {
     id: `INC-${String(incident.id).padStart(3, "0")}`,
     cctv: incident.camera_id,
@@ -123,7 +131,7 @@ function mapIncidentToAlert(incident: IncidentRead): DashboardAlert {
     riskLevel,
     time: formatTime(incident.timestamp),
     status: incident.status,
-    image: getImageForCamera(incident.camera_id),
+    image: resolveStreamUrl(imageUrl ?? undefined) || getImageForCamera(incident.camera_id),
   };
 }
 
@@ -172,6 +180,9 @@ export async function getCCTVSummary(): Promise<CCTVSummaryRow[]> {
 }
 
 export async function getRecentIncidents(): Promise<DashboardAlert[]> {
-  const incidents = await apiFetch<IncidentRead[]>("/incidents?status=active&limit=4");
-  return incidents.map(mapIncidentToAlert);
+  const alerts = await apiFetch<AlertRead[]>("/alerts");
+  return (Array.isArray(alerts) ? alerts : [])
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 4)
+    .map(mapIncidentToAlert);
 }

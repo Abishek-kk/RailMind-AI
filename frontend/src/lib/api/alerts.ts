@@ -17,6 +17,7 @@ export interface BackendAlert {
   operator_assigned?: string | null;
   reasoning_mode?: string | null;
   video_snippet_url?: string | null;
+  image_url?: string | null;
 }
 
 export type ApiAlert = Alert & { backendId: string; videoUrl?: string | null };
@@ -61,7 +62,7 @@ function formatDate(timestamp: string) {
 function getImageForCamera(cameraId: string) {
   const match = cameraId.match(/\d+/);
   const index = match ? Number(match[0]) - 1 : 0;
-  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
+  return cctvImages[index % Math.max(cctvImages.length, 1)] ?? "/placeholder-cctv.jpg";
 }
 
 export function mapBackendAlert(alert: BackendAlert): ApiAlert {
@@ -107,7 +108,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     date: formatDate(alert.timestamp),
     status: normalizeStatus(alert.status),
     description: `${alert.incident_type} on ${alert.platform}`,
-    image: getImageForCamera(alert.camera_id),
+    image: resolveStreamUrl(alert.image_url ?? undefined) || getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
     reasoning_mode: normalizeReasoningMode(alert.reasoning_mode),
     videoUrl: resolveStreamUrl(alert.video_snippet_url ?? undefined) ?? null,

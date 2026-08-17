@@ -30,6 +30,7 @@ reason.
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from typing import Any
 
@@ -56,6 +57,36 @@ RISK_LEVEL_TO_SCORE = {
     "Medium": 55,
     "Low": 25,
 }
+
+
+def _first_annotated_frame_url(data_dir: str, feed_id: str) -> str | None:
+    for entry in store.load_all(data_dir):
+        if entry.get("feed_id") != feed_id:
+            continue
+
+        annotated_path = str(entry.get("annotated_video_path", "")).replace("\\", "/")
+        if not annotated_path:
+            return None
+
+        base_dir = os.path.join(data_dir, os.path.dirname(annotated_path))
+        annotated_dir = os.path.join(base_dir, "annotated")
+
+        candidates = []
+        for search_dir in [annotated_dir, base_dir]:
+            if not os.path.isdir(search_dir):
+                continue
+            for name in sorted(os.listdir(search_dir)):
+                lower_name = name.lower()
+                if lower_name.endswith(".jpg") or lower_name.endswith(".jpeg") or lower_name.endswith(".png"):
+                    candidates.append(os.path.join(search_dir, name))
+
+        if not candidates:
+            return None
+
+        rel_path = os.path.relpath(candidates[0], data_dir).replace(os.sep, "/")
+        return f"/processed/{rel_path}"
+
+    return None
 
 
 def _iter_incidents(data_dir: str):
@@ -182,12 +213,16 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             continue
         alert_id = f"{i['feed_id']}-{i['track_id']}"
         risk_score = RISK_LEVEL_TO_SCORE.get(i["risk_level"], 25)
-        
+
+        result_entry = store.get_by_feed_id(data_dir, i["feed_id"])
+        annotated_path = str(result_entry.get("annotated_video_path", "")).replace("\\", "/") if result_entry else ""
+        image_url = _first_annotated_frame_url(data_dir, i["feed_id"])
+
         # Consult alert_status_store for persisted status/operator
         status_record = status_store.get_status(data_dir, alert_id)
         status = status_record["status"] if status_record else "active"
         operator_assigned = status_record["operator_assigned"] if status_record else None
-        
+
         result.append({
             "id": alert_id,
             "person_id": f"P-{i['track_id']}",
@@ -198,6 +233,8 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             "status": status,
             "timestamp": i["processed_at"],
             "operator_assigned": operator_assigned,
+            "video_snippet_url": f"/processed/{annotated_path}" if annotated_path else None,
+            "image_url": image_url,
         })
     return result
 

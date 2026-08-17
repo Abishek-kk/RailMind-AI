@@ -300,6 +300,8 @@ def _enrich_feed_with_processed_video(feed: dict[str, Any]) -> dict[str, Any]:
     if annotated_path:
         feed["stream_url"] = f"/processed/{annotated_path}"
         feed["annotated_video_url"] = f"/processed/{annotated_path}"
+
+    feed["track_count"] = len(result.get("tracks") or {})
     return feed
 
 
@@ -453,10 +455,8 @@ def feed_result(feed_id: str, api_key: str = Depends(verify_api_key_http)) -> di
 
 @app.delete("/api/feeds/{feed_id}")
 def delete_feed(feed_id: str, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
-    for item in FEEDS:
-        if item["id"] == feed_id:
-            FEEDS.remove(item)
-            break
+    FEEDS[:] = [item for item in FEEDS if item.get("id") != feed_id]
+    store.delete_by_feed_id(str(PIPELINE_DATA_DIR), feed_id)
     return {"status": "deleted", "feed_id": feed_id}
 
 

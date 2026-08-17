@@ -152,8 +152,11 @@ export default function LivePage() {
 
   const removeFeedMutation = useMutation({
     mutationFn: deleteFeed,
-    onSuccess: () => {
+    onSuccess: (_, deletedFeedId) => {
       setFeedToRemove(null);
+      queryClient.setQueryData<Feed[]>(["liveFeeds"], (current) =>
+        (current ?? []).filter((feed) => feed.id !== deletedFeedId),
+      );
       queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
       toast.success("Feed removed successfully.");
     },

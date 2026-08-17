@@ -187,13 +187,16 @@ def _ensure_zones_calibrated(frames_dir, zones_path):
     data = _get_config_zones(first_frame_path)
     poly_coords = data["poly_coords"]
 
-    if len(poly_coords) < 2:
+    if len(poly_coords) < 1:
         raise RuntimeError(
-            "Calibration requires 2 polygons (track zone, then platform zone). "
+            "Calibration requires at least 1 polygon. "
             f"Only {len(poly_coords)} were drawn."
         )
 
-    zones = {"track_zone": poly_coords[0], "platform_zone": poly_coords[1]}
+    if len(poly_coords) == 1:
+        zones = {"track_zone": poly_coords[0], "platform_zone": []}
+    else:
+        zones = {"track_zone": poly_coords[0], "platform_zone": poly_coords[1]}
 
     os.makedirs(os.path.dirname(zones_path), exist_ok=True)
     with open(zones_path, "w") as f:
