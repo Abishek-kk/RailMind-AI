@@ -4,7 +4,7 @@ import { Alert, AlertStatus, cctvImages, RiskLevel } from "@/lib/mock-data";
 import { parseCameraId } from "@/lib/utils";
 
 export interface BackendAlert {
-  id?: number;
+  id?: string;
   person_id: string;
   camera_id: string;
   platform: string;
@@ -17,9 +17,10 @@ export interface BackendAlert {
   operator_assigned?: string | null;
   reasoning_mode?: string | null;
   video_snippet_url?: string | null;
+  image_url?: string | null;
 }
 
-export type ApiAlert = Alert & { backendId: number; videoUrl?: string | null };
+export type ApiAlert = Alert & { backendId: string; videoUrl?: string | null };
 
 function normalizeRiskLevel(value: string): RiskLevel {
   const lower = value.toLowerCase();
@@ -61,7 +62,7 @@ function formatDate(timestamp: string) {
 function getImageForCamera(cameraId: string) {
   const match = cameraId.match(/\d+/);
   const index = match ? Number(match[0]) - 1 : 0;
-  return cctvImages[index % cctvImages.length] ?? cctvImages[0];
+  return cctvImages[index % Math.max(cctvImages.length, 1)] ?? "/placeholder-cctv.jpg";
 }
 
 export function mapBackendAlert(alert: BackendAlert): ApiAlert {
@@ -69,10 +70,8 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
   const roundedRiskScore = Math.round(alert.risk_score);
   const clampedRiskScore = Math.min(100, Math.max(0, roundedRiskScore));
 
-  const alertId =
-    alert.id !== undefined && alert.id !== null
-      ? alert.id
-      : Math.floor(Math.random() * 1000000) + 10000;
+  // Backend always provides string IDs like "feed-1-3"
+  const alertId = alert.id || "unknown";
 
   // Enforce incident type → risk level mapping
   let riskLevel: RiskLevel = "low";
@@ -99,7 +98,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
 
   return {
     backendId: alertId,
-    id: `ALT-${String(alertId).padStart(3, "0")}`,
+    id: `ALT-${alertId.split("-").pop() || alertId}`,  // Use track ID from "feed-X-trackID"
     cctv: displayCameraId,
     platform: alert.platform,
     type: alert.incident_type,
@@ -109,7 +108,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     date: formatDate(alert.timestamp),
     status: normalizeStatus(alert.status),
     description: `${alert.incident_type} on ${alert.platform}`,
-    image: getImageForCamera(alert.camera_id),
+    image: resolveStreamUrl(alert.image_url ?? undefined) || getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
     reasoning_mode: normalizeReasoningMode(alert.reasoning_mode),
     videoUrl: resolveStreamUrl(alert.video_snippet_url ?? undefined) ?? null,
@@ -121,7 +120,7 @@ export async function getAlerts(): Promise<ApiAlert[]> {
   return (Array.isArray(alerts) ? alerts : []).map(mapBackendAlert);
 }
 
-export async function acknowledgeAlert(id: number, operatorId?: string | null): Promise<ApiAlert> {
+export async function acknowledgeAlert(id: string, operatorId?: string | null): Promise<ApiAlert> {
   const trimmedOperatorId = operatorId?.trim();
   const query = trimmedOperatorId ? `?operator_id=${encodeURIComponent(trimmedOperatorId)}` : "";
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/acknowledge${query}`, {
@@ -130,12 +129,12 @@ export async function acknowledgeAlert(id: number, operatorId?: string | null): 
   return mapBackendAlert(alert);
 }
 
-export async function resolveAlert(id: number): Promise<ApiAlert> {
+export async function resolveAlert(id: string): Promise<ApiAlert> {
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/resolve`, { method: "PATCH" });
   return mapBackendAlert(alert);
 }
 
-export async function assignAlert(id: number, assignee: string): Promise<ApiAlert> {
+export async function assignAlert(id: string, assignee: string): Promise<ApiAlert> {
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/assign`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

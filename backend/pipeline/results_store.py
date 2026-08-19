@@ -97,3 +97,15 @@ def get_by_feed_id(data_dir: str, feed_id: str) -> dict[str, Any] | None:
         if entry["feed_id"] == feed_id:
             return entry
     return None
+
+
+def delete_by_feed_id(data_dir: str, feed_id: str) -> bool:
+    path = _store_path(data_dir)
+    with _LOCK:
+        all_results = _load_all_unlocked(path)
+        remaining = [entry for entry in all_results if entry.get("feed_id") != feed_id]
+        if len(remaining) == len(all_results):
+            return False
+        with open(path, "w") as f:
+            json.dump(remaining, f, indent=2, default=str)
+        return True

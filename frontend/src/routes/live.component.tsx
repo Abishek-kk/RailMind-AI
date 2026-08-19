@@ -138,8 +138,7 @@ export default function LivePage() {
   });
 
   const addLiveFeedMutation = useMutation({
-    mutationFn: (payload: { id: string; name: string; source_url: string }) =>
-      createFeed(payload),
+    mutationFn: (payload: { id: string; name: string; source_url: string }) => createFeed(payload),
     onSuccess: () => {
       setIsDialogOpen(false);
       resetDialogState();
@@ -153,8 +152,11 @@ export default function LivePage() {
 
   const removeFeedMutation = useMutation({
     mutationFn: deleteFeed,
-    onSuccess: () => {
+    onSuccess: (_, deletedFeedId) => {
       setFeedToRemove(null);
+      queryClient.setQueryData<Feed[]>(["liveFeeds"], (current) =>
+        (current ?? []).filter((feed) => feed.id !== deletedFeedId),
+      );
       queryClient.invalidateQueries({ queryKey: ["liveFeeds"] });
       toast.success("Feed removed successfully.");
     },
@@ -588,9 +590,7 @@ export default function LivePage() {
           {filteredFeeds.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center">
               <h2 className="text-xl font-semibold text-foreground">No active CCTV feeds</h2>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Add a feed to begin monitoring.
-              </p>
+              <p className="mt-3 text-sm text-muted-foreground">Add a feed to begin monitoring.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 items-start md:grid-cols-2">
@@ -681,9 +681,7 @@ export default function LivePage() {
                       style={{ borderColor: `${c}33`, backgroundColor: `${c}0a` }}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-muted-foreground font-mono">
-                          {a.time}
-                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono">{a.time}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">
                           {a.cctv} / {a.platform}
                         </div>

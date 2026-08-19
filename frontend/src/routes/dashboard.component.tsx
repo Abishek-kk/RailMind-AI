@@ -106,7 +106,6 @@ export default function DashboardPage() {
     error: recentError,
   } = useQuery({ queryKey: ["recentIncidents"], queryFn: getRecentIncidents });
 
-
   const queryClient = useQueryClient();
 
   /** BUG 12 FIX: fetch feeds so TopBar can show dynamic camera list */
@@ -187,7 +186,6 @@ export default function DashboardPage() {
     }
   };
 
-
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 p-6">
       <TopBar
@@ -202,12 +200,6 @@ export default function DashboardPage() {
         {queryErrors.length > 0 && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             Some dashboard panels could not load: {queryErrors.join(", ")}.
-          </div>
-        )}
-        {stats?.model_is_placeholder && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-200">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>LSTM model is untrained - scores are not meaningful.</span>
           </div>
         )}
         {/* BUG 14 FIX: removed hardcoded change/dir props from all StatCards */}
@@ -227,22 +219,22 @@ export default function DashboardPage() {
             iconBg="rgba(239,68,68,0.15)"
           />
           <StatCard
-            label="Incident Risk"
-            value={stats?.suicide_mitigations ?? 0}
+            label="Track Zone Intrusions"
+            value={stats?.track_zone_intrusions ?? 0}
             icon={User}
             iconColor="#f97316"
             iconBg="rgba(249,115,22,0.15)"
           />
           <StatCard
-            label="Pickpocketing Risk"
-            value={stats?.theft_preventions ?? 0}
+            label="Loitering / Trespass"
+            value={stats?.loitering_trespass ?? 0}
             icon={PersonStanding}
             iconColor="#a855f7"
             iconBg="rgba(168,85,247,0.15)"
           />
           <StatCard
-            label="Security Threats"
-            value={stats?.security_threats ?? 0}
+            label="General Anomalies"
+            value={stats?.general_anomalies ?? 0}
             icon={Shield}
             iconColor="#3b82f6"
             iconBg="rgba(59,130,246,0.15)"
@@ -556,7 +548,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-
         {/* CCTV Summary */}
         <div className="hud-panel rounded-xl bg-card">
           {/* Top accent line */}
@@ -677,4 +668,3 @@ function Hotspots({
     </>
   );
 }
-

@@ -108,14 +108,26 @@ export function CCTVFeedCard({
   }
 
   // Determine status label and style
-  const statusLabel = feed.status === "processing" ? "PROCESSING" 
-                    : feed.status === "error" ? "ERROR" 
-                    : feed.status === "active" ? (isPaused ? "PAUSED" : "LIVE") 
-                    : "OFFLINE";
-  const statusColor = feed.status === "processing" ? "#ff9f0a" 
-                    : feed.status === "error" ? "#ff2d55" 
-                    : feed.status === "active" ? (activeDetections.length > 0 && isActuallyLive ? "#ff2d55" : "#00e676") 
-                    : "#6b7f99";
+  const statusLabel =
+    feed.status === "processing"
+      ? "PROCESSING"
+      : feed.status === "error"
+        ? "ERROR"
+        : feed.status === "active"
+          ? isPaused
+            ? "PAUSED"
+            : "LIVE"
+          : "OFFLINE";
+  const statusColor =
+    feed.status === "processing"
+      ? "#ff9f0a"
+      : feed.status === "error"
+        ? "#ff2d55"
+        : feed.status === "active"
+          ? activeDetections.length > 0 && isActuallyLive
+            ? "#ff2d55"
+            : "#00e676"
+          : "#6b7f99";
 
   // Determine if we should show video (active and streamUrl exists and not error)
   const showVideo = feed.status === "active" && feed.streamUrl && !videoError;
@@ -134,7 +146,10 @@ export function CCTVFeedCard({
           style={{
             backgroundColor: `${statusColor}22`,
             color: statusColor,
-            boxShadow: feed.status === "active" && activeDetections.length > 0 ? "0 0 8px rgba(255,45,85,0.25)" : "none",
+            boxShadow:
+              feed.status === "active" && activeDetections.length > 0
+                ? "0 0 8px rgba(255,45,85,0.25)"
+                : "none",
           }}
         >
           <span
@@ -210,7 +225,9 @@ export function CCTVFeedCard({
             <AlertTriangle className="h-12 w-12 text-destructive" />
             <span className="mt-2 text-sm font-semibold text-white">Processing failed</span>
             {feed.error_message && (
-              <span className="mt-1 text-xs text-muted-foreground text-center px-4">{feed.error_message}</span>
+              <span className="mt-1 text-xs text-muted-foreground text-center px-4">
+                {feed.error_message}
+              </span>
             )}
           </div>
         )}
@@ -224,30 +241,31 @@ export function CCTVFeedCard({
         )}
 
         {/* Bounding boxes (only if active and not processing/error) */}
-        {feed.status === "active" && activeDetections.map((b) => {
-          const c = levelToColor(b.level);
-          return (
-            <div
-              key={b.id}
-              className="absolute animate-fade-in"
-              style={{
-                left: `${b.x}%`,
-                top: `${b.y}%`,
-                width: `${b.w}%`,
-                height: `${b.h}%`,
-                border: `2px solid ${c}`,
-                boxShadow: `0 0 8px ${c}88, 0 0 16px ${c}33`,
-              }}
-            >
-              <span
-                className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white font-mono"
-                style={{ backgroundColor: c }}
+        {feed.status === "active" &&
+          activeDetections.map((b) => {
+            const c = levelToColor(b.level);
+            return (
+              <div
+                key={b.id}
+                className="absolute animate-fade-in"
+                style={{
+                  left: `${b.x}%`,
+                  top: `${b.y}%`,
+                  width: `${b.w}%`,
+                  height: `${b.h}%`,
+                  border: `2px solid ${c}`,
+                  boxShadow: `0 0 8px ${c}88, 0 0 16px ${c}33`,
+                }}
               >
-                ID: {b.id}
-              </span>
-            </div>
-          );
-        })}
+                <span
+                  className="absolute -top-5 left-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold text-white font-mono"
+                  style={{ backgroundColor: c }}
+                >
+                  ID: {b.id}
+                </span>
+              </div>
+            );
+          })}
 
         {/* Alert badge bottom-left (only if active and alertType exists) */}
         {feed.status === "active" && feed.alertType && (

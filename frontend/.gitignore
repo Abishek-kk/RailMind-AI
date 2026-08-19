@@ -36,3 +36,4 @@ dist-ssr
 # Environment variables
 .env
 .env.*
+backend/data

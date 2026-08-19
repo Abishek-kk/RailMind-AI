@@ -2,7 +2,7 @@
 import { apiFetch } from "./client";
 
 export interface Feed {
-  platform: any;
+  platform: "rtsp" | "youtube" | "file" | string;
   id: string;
   name: string;
   status: "active" | "processing" | "error" | "offline";
@@ -29,7 +29,11 @@ export async function getFeeds(): Promise<Feed[]> {
 /**
  * Create a new live stream feed (immediately active).
  */
-export async function createFeed(payload: { id: string; name: string; source_url: string }): Promise<Feed> {
+export async function createFeed(payload: {
+  id: string;
+  name: string;
+  source_url: string;
+}): Promise<Feed> {
   return apiFetch<Feed>("/feeds", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -46,20 +50,25 @@ export async function uploadVideo(
   feedId?: string,
   name?: string,
 ): Promise<{
-  feed_id: string; id: string; status: "processing" | "active" | "error"; msg: string 
+  feed_id: string;
+  id: string;
+  status: "processing" | "active" | "error";
+  msg: string;
 }> {
   const formData = new FormData();
   formData.append("file", file);
   if (feedId) formData.append("feed_id", feedId);
   if (name) formData.append("name", name);
 
-  return apiFetch<{ id: string; status: "processing" | "active" | "error"; msg: string }>(
-    "/feeds/upload",
-    {
-      method: "POST",
-      body: formData,
-    },
-  );
+  return apiFetch<{
+    feed_id: string;
+    id: string;
+    status: "processing" | "active" | "error";
+    msg: string;
+  }>("/feeds/upload", {
+    method: "POST",
+    body: formData,
+  });
 }
 
 /**
@@ -101,22 +110,21 @@ export async function getFeedStatus(feedId: string): Promise<{
  * Resolve a stream URL to an absolute URL.
  * If the path is already a fully-qualified http(s) URL, return it as-is.
  * Otherwise (including root-relative paths like "/processed/..." returned by
- * the backend), prepend the configured API base URL -- a leading "/" is
- * relative to the FastAPI backend's origin, not the Vite dev server's.
+ * the backend), prepend the backend origin (VITE_API_BASE_URL with /api stripped).
+ * This ensures video streams served at the backend's origin are resolved correctly.
  */
 export function resolveStreamUrl(path: string | undefined): string {
   if (!path) return "";
 
   const normalizedPath = path.replace(/\\/g, "/");
 
-  if (
-    normalizedPath.startsWith("http://") ||
-    normalizedPath.startsWith("https://")
-  ) {
+  if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
     return normalizedPath;
   }
 
-
-  const baseUrl = import.meta.env.VITE_API_URL || "";
-  return `${baseUrl.replace(/\/+$/, "")}/${normalizedPath.replace(/^\/+/, "")}`;
+  // Strip trailing /api from VITE_API_BASE_URL to get the backend origin
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  const origin = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/+$/, "");
+  
+  return `${origin}/${normalizedPath.replace(/^\/+/, "")}`;
 }
