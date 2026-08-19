@@ -854,6 +854,28 @@ function AlertDetails({
         <DetailRow label="Description">
           <p className="text-right text-xs text-muted-foreground">{alert.description}</p>
         </DetailRow>
+        {alert.reasoning && (
+          <section className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Why this alert was raised
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">{alert.reasoning.summary}</p>
+            <div className="space-y-2">
+              {alert.reasoning.evidence.map((item) => (
+                <div key={item.signal} className="text-xs">
+                  <div className="flex items-center justify-between gap-3 font-mono">
+                    <span className="text-foreground">{item.signal}</span>
+                    <span className="text-primary">{String(item.value)}</span>
+                  </div>
+                  <p className="mt-0.5 text-muted-foreground">{item.meaning}</p>
+                </div>
+              ))}
+            </div>
+            <p className="border-t border-border pt-2 text-[11px] leading-relaxed text-muted-foreground">
+              {alert.reasoning.limitations}
+            </p>
+          </section>
+        )}
         <DetailRow label="Status">
           <StatusPill status={alert.status} />
         </DetailRow>

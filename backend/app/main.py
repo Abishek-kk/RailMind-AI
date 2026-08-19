@@ -45,6 +45,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from pipeline import aggregation  # noqa: E402
+from pipeline.alert_reasoning import explain_alert  # noqa: E402
 from pipeline import alert_status_store  # noqa: E402
 from pipeline import results_store as store  # noqa: E402
 from pipeline.pipeline import process_video  # noqa: E402
@@ -232,6 +233,19 @@ def incidents(status: str | None = None, limit: int | None = None, api_key: str 
 @app.get("/api/alerts")
 def alerts(api_key: str = Depends(verify_api_key_http)) -> list[dict[str, Any]]:
     return aggregation.alerts_list(str(PIPELINE_DATA_DIR))
+
+
+@app.post("/api/alerts/reasoning")
+def explain_alert_input(body: dict[str, Any] = Body(...), api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    return explain_alert(body)
+
+
+@app.get("/api/alerts/{alert_id}/reasoning")
+def alert_reasoning(alert_id: str, api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return explain_alert(alert)
 
 
 @app.post("/api/alerts/{alert_id}/acknowledge")

@@ -16,8 +16,22 @@ export interface BackendAlert {
   /** Operator assigned to this alert (may be null if unassigned) */
   operator_assigned?: string | null;
   reasoning_mode?: string | null;
+  reasoning?: AlertReasoning | null;
   video_snippet_url?: string | null;
   image_url?: string | null;
+}
+
+export interface AlertReasoningEvidence {
+  signal: string;
+  value: string | number | boolean;
+  meaning: string;
+}
+
+export interface AlertReasoning {
+  mode: "llm" | "rule_based";
+  summary: string;
+  evidence: AlertReasoningEvidence[];
+  limitations: string;
 }
 
 export type ApiAlert = Alert & { backendId: string; videoUrl?: string | null };
@@ -111,6 +125,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     image: resolveStreamUrl(alert.image_url ?? undefined) || getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
     reasoning_mode: normalizeReasoningMode(alert.reasoning_mode),
+    reasoning: alert.reasoning ?? undefined,
     videoUrl: resolveStreamUrl(alert.video_snippet_url ?? undefined) ?? null,
   };
 }

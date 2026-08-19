@@ -35,6 +35,7 @@ from collections import Counter
 from typing import Any
 
 from . import alert_status_store as status_store
+from .alert_reasoning import explain_alert
 from . import results_store as store
 
 ACTIVITY_TO_INCIDENT_TYPE = {
@@ -233,9 +234,18 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             "status": status,
             "timestamp": i["processed_at"],
             "operator_assigned": operator_assigned,
+            "activity": i.get("activity"),
+            "frames_in_track_zone": i.get("frames_in_track_zone", 0),
+            "currently_in_track_zone": i.get("currently_in_track_zone", False),
+            "ever_entered_track_zone": i.get("ever_entered_track_zone", False),
+            "loitering_detected": i.get("loitering_detected", False),
+            "direction_reversals": i.get("direction_reversals", 0),
+            "duration_tracked_s": i.get("duration_tracked_s"),
             "video_snippet_url": f"/processed/{annotated_path}" if annotated_path else None,
             "image_url": image_url,
         })
+        result[-1]["reasoning"] = explain_alert(result[-1])
+        result[-1]["reasoning_mode"] = result[-1]["reasoning"]["mode"]
     return result
 
 

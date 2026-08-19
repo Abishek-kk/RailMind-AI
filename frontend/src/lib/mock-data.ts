@@ -42,6 +42,12 @@ export interface Alert {
   description: string;
   operator_assigned?: string | null;
   reasoning_mode?: "llm" | "rule_based";
+  reasoning?: {
+    mode: "llm" | "rule_based";
+    summary: string;
+    evidence: { signal: string; value: string | number | boolean; meaning: string }[];
+    limitations: string;
+  };
   videoUrl?: string;
 }
 
