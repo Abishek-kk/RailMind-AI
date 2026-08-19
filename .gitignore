@@ -5,3 +5,4 @@ structure.txt
 frontend/.env
 *.env.
 .env
+backend/data/
