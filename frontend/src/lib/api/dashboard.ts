@@ -18,9 +18,9 @@ export interface IncidentsByCCTVItem {
 
 export interface IncidentTrendItem {
   date: string;
-  "Incident Risk": number;
-  Pickpocketing: number;
-  Loitering: number;
+  "Track Zone Intrusion": number;
+  "Loitering / Trespass": number;
+  "General Anomalies": number;
 }
 
 export interface RiskDistributionItem {

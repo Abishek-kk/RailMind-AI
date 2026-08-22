@@ -287,24 +287,24 @@ export default function DashboardPage() {
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line
                       type="monotone"
-                      dataKey="Incident Risk"
-                      name="Incident Risk"
+                      dataKey="Track Zone Intrusion"
+                      name="Track Zone Intrusion"
                       stroke="#ff2d55"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                     />
                     <Line
                       type="monotone"
-                      dataKey="Pickpocketing"
-                      name="Pickpocketing"
+                      dataKey="Loitering / Trespass"
+                      name="Loitering / Trespass"
                       stroke="#ff9f0a"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                     />
                     <Line
                       type="monotone"
-                      dataKey="Loitering"
-                      name="Loitering"
+                      dataKey="General Anomalies"
+                      name="General Anomalies"
                       stroke="#00e5ff"
                       strokeWidth={2}
                       dot={{ r: 3 }}

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from . import alert_status_store as status_store
@@ -147,8 +148,7 @@ def incidents_by_cctv(data_dir: str) -> list[dict[str, Any]]:
 def trend(data_dir: str, days: int = 7) -> list[dict[str, Any]]:
     """
     Groups incidents by the date portion of processed_at.
-    Only dates that actually have processed videos will appear --
-    no synthetic date range is invented.
+    Returns one row per UTC calendar day in the requested window ending today.
     """
     by_date: dict[str, Counter] = {}
     for i in _iter_incidents(data_dir):
@@ -156,13 +156,15 @@ def trend(data_dir: str, days: int = 7) -> list[dict[str, Any]]:
         by_date.setdefault(date_str, Counter())[i["incident_type"]] += 1
 
     rows = []
-    for date_str in sorted(by_date.keys())[-days:]:
-        counter = by_date[date_str]
+    today = datetime.now(timezone.utc).date()
+    for offset in range(max(days, 0) - 1, -1, -1):
+        date_str = (today - timedelta(days=offset)).isoformat()
+        counter = by_date.get(date_str, Counter())
         rows.append({
             "date": date_str,
-            "Incident Risk": counter.get("Track Zone Intrusion", 0),
-            "Pickpocketing": counter.get("Loitering / Trespass", 0),
-            "Loitering": counter.get("General Anomalies", 0),
+            "Track Zone Intrusion": counter.get("Track Zone Intrusion", 0),
+            "Loitering / Trespass": counter.get("Loitering / Trespass", 0),
+            "General Anomalies": counter.get("General Anomalies", 0),
         })
     return rows
 
