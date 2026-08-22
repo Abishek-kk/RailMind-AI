@@ -61,7 +61,6 @@ logs/
 *.pkl
 *.pth
 *.pt
-!yolov8n-pose.pt
 
 # Videos
 *.mp4
@@ -85,3 +84,4 @@ training/datasets/*/
 Thumbs.db
 structure.txt
 pipeline_video_data
+.pytest_cache/
