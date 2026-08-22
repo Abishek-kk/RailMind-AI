@@ -751,10 +751,11 @@ export default function AlertsPage() {
               </label>
               <textarea
                 id="escalation-reason"
+                required
                 value={escalationReasonInput}
                 onChange={(event) => setEscalationReasonInput(event.target.value)}
                 className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                placeholder="Enter an escalation reason"
+                placeholder="Why is this being escalated to high priority?"
               />
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -762,7 +763,7 @@ export default function AlertsPage() {
                   checked={escalationConfirmedCheckbox}
                   onChange={(event) => setEscalationConfirmedCheckbox(event.target.checked)}
                 />
-                I confirm this high-level escalation
+                I confirm this escalation is necessary.
               </label>
             </div>
           )}
@@ -777,6 +778,11 @@ export default function AlertsPage() {
             <button
               type="button"
               onClick={confirmPendingAction}
+              disabled={
+                pendingAction?.type === "escalate" &&
+                pendingAction.targetLevel === "high" &&
+                (!escalationReasonInput.trim() || !escalationConfirmedCheckbox)
+              }
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               Confirm
