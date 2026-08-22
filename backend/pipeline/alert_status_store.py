@@ -77,9 +77,48 @@ def update_status(
 
     with _LOCK:
         all_records = _load_all_unlocked(path)
+        existing = next((r for r in all_records if r["alert_id"] == alert_id), {})
         # Remove existing record with this alert_id if present
         all_records = [r for r in all_records if r["alert_id"] != alert_id]
         # Append new/updated record
+        record = {
+            **existing,
+            **record,
+            "operator_assigned": operator_assigned
+            if operator_assigned is not None
+            else existing.get("operator_assigned"),
+        }
+        all_records.append(record)
+        with open(path, "w") as f:
+            json.dump(all_records, f, indent=2, default=str)
+
+    return record
+
+
+def escalate(
+    data_dir: str,
+    alert_id: str,
+    handling_level: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Persist a handling-level escalation without changing alert status."""
+    os.makedirs(data_dir, exist_ok=True)
+    path = _store_path(data_dir)
+
+    with _LOCK:
+        all_records = _load_all_unlocked(path)
+        existing = next((r for r in all_records if r["alert_id"] == alert_id), {})
+        record = {
+            **existing,
+            "alert_id": alert_id,
+            "status": existing.get("status", "active"),
+            "operator_assigned": existing.get("operator_assigned"),
+            "handling_level": handling_level,
+            "escalation_reason": reason,
+            "escalated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        all_records = [r for r in all_records if r["alert_id"] != alert_id]
         all_records.append(record)
         with open(path, "w") as f:
             json.dump(all_records, f, indent=2, default=str)
