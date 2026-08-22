@@ -100,6 +100,8 @@ def escalate(
     alert_id: str,
     handling_level: str,
     reason: str | None = None,
+    confirmed_by: str | None = None,
+    confirmation_reason: str | None = None,
 ) -> dict[str, Any]:
     """Persist a handling-level escalation without changing alert status."""
     os.makedirs(data_dir, exist_ok=True)
@@ -116,6 +118,8 @@ def escalate(
             "handling_level": handling_level,
             "escalation_reason": reason,
             "escalated_at": datetime.now(timezone.utc).isoformat(),
+            "confirmed_by": confirmed_by,
+            "confirmation_reason": confirmation_reason,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         all_records = [r for r in all_records if r["alert_id"] != alert_id]
