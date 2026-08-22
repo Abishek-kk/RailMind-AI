@@ -108,27 +108,7 @@ Changes made in this build, on top of the base hackathon MVP:
 
 ---
 
-## Screenshots
 
-### Live Monitoring
-
-2×2 grid of simultaneous CCTV feeds with AI-annotated bounding boxes, track IDs, and live risk labels overlaid directly on the video.
-
-![Live Monitoring](assets/live.png)
-
-### Dashboard
-
-Aggregated analytics across all platforms — incident counts, incident trend (zero-filled, correctly labelled by real incident type: Track Zone Intrusion / Loitering / Trespass / General Anomalies), risk distribution, a platform heatmap, peak-risk-hour histogram, and a per-camera summary table.
-
-![Dashboard](assets/dashboard.png)
-
-### Alerts
-
-Full alert triage view with filterable tabs by risk level, a sortable alert table, and a detail panel for acknowledging or resolving an incident. Escalating an alert to "high" handling level requires entering a reason and checking a confirmation box before the action can be submitted.
-
-![Alerts](assets/alerts.png)
-
----
 
 ## System Architecture
 
