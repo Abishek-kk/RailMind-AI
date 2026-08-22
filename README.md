@@ -79,8 +79,6 @@ Verified by running it, not just reading the code:
 - **Video upload & playback pipeline** — upload an `.mp4`, it runs through the full CV → Temporal Transformer → agent pipeline; not a canned demo loop.
 - **WebSocket alert delivery** — a channel-based pub/sub `ConnectionManager` broadcasts alerts to all connected dashboard clients in real time.
 - **Escalation timers** — unacknowledged alerts escalate after a configurable timeout (default 60s).
-- **Email alerts (SMTP)** — implemented via `smtplib`, configurable via `.env`.
-- **SMS escalation (Twilio)** — implemented in the escalation service, configurable via `.env`.
 - **57 passing backend tests** covering agents, CV pipeline, Temporal Transformer inference, risk scoring, alerts, incidents, escalation, and heatmaps.
 
 ---
@@ -94,34 +92,22 @@ Being direct about this so nobody — including us — overclaims it later:
 | **Edge deployment on Jetson Orin Nano / TensorRT**     | Not implemented. No Jetson-specific or TensorRT code exists. The pipeline currently runs on whatever machine hosts the backend (CPU or CUDA GPU via PyTorch).                                                                                |
 | **Multi-camera person re-identification**              | Not implemented. Tracking is per-camera only; a person is not currently re-linked across camera handoffs.                                                                                                                                    |
 | **Automated PA system integration**                    | Not implemented. No MQTT/PA-controller code exists.                                                                                                                                                                                          |
-| **Mobile app for staff (React Native)**                | Does not exist yet. Staff alerts currently surface via the web dashboard, email, and SMS only.                                                                                                                                               |
+| **Mobile app for staff (React Native)**                | Does not exist yet. Staff alerts currently surface via the web dashboard only.                                                                                                                                               |
 | **True multi-station SaaS isolation**                  | The database has a `station_id` column, but there's no multi-tenant access control or per-station billing logic yet — this is single-deployment software today.                                                                              |
 | **Live RTSP camera ingestion**                         | The video processor uses `cv2.VideoCapture`, which can technically open an `rtsp://` URL, but this path has only been exercised against uploaded video files in testing, not a live camera feed. Treat RTSP support as untested, not proven. |
 | **Temporal Transformer trained on real incident data** | The shipped model is trained on synthetic sequences generated from rule-based behavioural definitions, not real labelled incident footage. The reported accuracy is against this synthetic test set, not real-world data.                    |
 
 ---
 
-## Screenshots
+## Recent Updates
 
-### Live Monitoring
+Changes made in this build, on top of the base hackathon MVP:
 
-2×2 grid of simultaneous CCTV feeds with AI-annotated bounding boxes, track IDs, and live risk labels overlaid directly on the video.
-
-![Live Monitoring](assets/live.png)
-
-### Dashboard
-
-Aggregated analytics across all platforms — incident counts, 7-day trend, risk distribution, a platform heatmap, peak-risk-hour histogram, and a per-camera summary table.
-
-![Dashboard](assets/dashboard.png)
-
-### Alerts
-
-Full alert triage view with filterable tabs by risk level, a sortable alert table, and a detail panel for acknowledging or resolving an incident.
-
-![Alerts](assets/alerts.png)
+- **Confirmation step for high-priority escalation** — `POST /api/alerts/{id}/escalate` now requires an explicit `confirmed: true` flag and a non-empty `reason` string whenever an alert is escalated to `"high"` handling level; the request is rejected with `HTTP 428` if either is missing. This is enforced server-side, so it can't be bypassed by calling the API directly, not just gated by the frontend dialog. Escalating to `"medium"` is unchanged and doesn't require confirmation. The dashboard's escalation dialog now shows a required reason field and a confirmation checkbox before the **Confirm** button is enabled, and the confirming reason (plus who confirmed, if provided) is persisted alongside the alert and shown in the alert detail panel.
+- **Incident Trend chart fixed** — the `/api/dashboard/trend` categories were previously mislabelled: the line shown as "Pickpocketing" was actually counting `Loitering / Trespass` incidents, and the line shown as "Loitering" was actually counting `General Anomalies` (erratic movement) incidents — categories that don't correspond to any real classifier in this system. The trend endpoint and dashboard chart now use the same three real incident types the rest of the system already uses: `Track Zone Intrusion`, `Loitering / Trespass`, and `General Anomalies`. The endpoint also now zero-fills every day in the requested window instead of only returning dates that had incidents, so the trend line is continuous instead of skipping gaps.
 
 ---
+
 
 ## System Architecture
 
@@ -141,7 +127,6 @@ Full alert triage view with filterable tabs by risk level, a sortable alert tabl
 ┌─────────────────────▼──────────────────────┐
 │ FastAPI + SQLite/PostgreSQL                 │
 │ WebSocket broadcast → React Dashboard       │
-│ Email (SMTP) / SMS (Twilio) escalation      │
 └──────────────────────────────────────────────┘
 ```
 
@@ -226,8 +211,8 @@ AGENT AGENT AGENT
 
 • Pose extract • Risk scoring • Threshold eval
 • Feature comp • LLM reasoning • WebSocket alert
-• Transformer infer • Score 0-100 • Email/SMS
-• Action decide • Escalation timer
+• Transformer infer • Score 0-100 • Escalation timer
+• Action decide
 
 ````
 
@@ -353,18 +338,6 @@ OPENAI_API_KEY=sk-... # Optional OpenAI reasoning
 OPENAI_REASONING_MODEL=gpt-5.5
 ANTHROPIC_API_KEY=sk-ant-... # Optional Claude reasoning
 ANTHROPIC_REASONING_MODEL=claude-haiku-4-5-20251001
-
-# Notifications
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=alert@example.com
-SMTP_PASSWORD=your-smtp-password
-ALERT_EMAIL_RECIPIENTS=security@example.com
-
-TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_token
-TWILIO_FROM_NUMBER=+1234567890
-TWILIO_TO_NUMBERS=+19876543210
 
 # CORS
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
@@ -714,7 +687,6 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 - [x] Live RTSP stream integration
 - [x] PostgreSQL + Redis migration
 - [x] WebSocket real-time alert delivery
-- [x] Email (SMTP) + SMS (Twilio) notifications
 - [x] Edge deployment on Jetson Orin Nano
 - [x] Operator false positive feedback loop
 - [x] Transformer confidence thresholding + temporal confirmation
@@ -753,8 +725,6 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 | PyTorch              | Temporal Transformer training & inference |
 | Ultralytics YOLOv8   | Detection, pose, tracking                 |
 | OpenCV               | Video decode/preprocess                   |
-| smtplib              | Email alerts                              |
-| Twilio               | SMS escalation                            |
 
 ### Frontend
 
@@ -819,19 +789,6 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 BEHAVIOR_HIGH_SCORE_THRESHOLD=0.65
 BEHAVIOR_ERRATIC_SCORE_THRESHOLD=0.4
 BEHAVIOR_FOLLOWING_DISTANCE_METERS=1.2
-
-# Email (SMTP) — optional
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=alert@example.com
-SMTP_PASSWORD=your-smtp-password
-ALERT_EMAIL_RECIPIENTS=security@example.com,ops@example.com
-
-# SMS (Twilio) — optional
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_FROM_NUMBER=+1234567890
-TWILIO_TO_NUMBERS=+19876543210,+10987654321
 ```
 
 ### Frontend (`frontend/.env`)
@@ -878,9 +835,10 @@ All routes are prefixed with `/api` unless noted. Selected endpoints:
 | GET    | `/alerts/stats`                      | Alert statistics                        |
 | PATCH  | `/alerts/{id}/acknowledge`           | Acknowledge an alert                    |
 | PATCH  | `/alerts/{id}/resolve`               | Resolve an alert                        |
+| POST   | `/alerts/{id}/escalate`              | Raise an alert's handling level (`normal`→`medium`→`high`). Escalating to `high` requires `confirmed: true` and a non-empty `reason` in the body, or returns `HTTP 428`. |
 | PATCH  | `/alerts/{id}/assign`                | Assign an alert to staff                |
 | GET    | `/dashboard/stats`                   | Headline dashboard metrics              |
-| GET    | `/dashboard/trend`                   | Incident trend over time                |
+| GET    | `/dashboard/trend`                   | Incident trend over time — zero-filled per day, labelled by real incident type (`Track Zone Intrusion`, `Loitering / Trespass`, `General Anomalies`) |
 | GET    | `/dashboard/risk-distribution`       | Risk category breakdown                 |
 | GET    | `/dashboard/heatmap`                 | Spatial heatmap data                    |
 | GET    | `/dashboard/cctv-summary`            | Per-camera summary                      |
@@ -918,9 +876,12 @@ pytest tests/test_cv.py
 | `test_incident_and_escalation.py` | Incident creation and escalation timers                |
 | `test_heatmap.py`                 | Heatmap analytics                                      |
 | `test_dashboard_trend.py`         | Dashboard trend data                                   |
+| `test_dashboard_trend_categories.py` | Trend category labels match real incident types, and zero-fill over the requested date range |
 | `test_reliability.py`             | Failure-mode handling                                  |
 | `test_api_auth.py`                | API authentication                                     |
 | `test_feeds.py`                   | Feed registration and upload                           |
+| `test_escalation.py`              | Handling-level escalation and status persistence       |
+| `test_escalation_confirmation.py` | High-priority escalation requires `confirmed` + `reason`, medium escalation unaffected |
 
 Frontend:
 
@@ -984,7 +945,6 @@ RailMind-AI/
 - [x] SQLite storage with full schema
 - [x] React dashboard with live alerts and analytics
 - [x] WebSocket real-time alert broadcast
-- [x] Email (SMTP) and SMS (Twilio) escalation channels
 - [x] Configurable escalation timers
 - [x] Optional LLM-assisted reasoning (OpenAI/Anthropic)
 - [x] 57 passing backend tests
