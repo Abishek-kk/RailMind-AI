@@ -4,6 +4,8 @@ export type RiskLevel = "low" | "medium" | "high" | "suspicious";
 
 export type AlertStatus = "active" | "acknowledged" | "resolved";
 
+export type HandlingLevel = "normal" | "medium" | "high";
+
 export interface BoundingBox {
   id: number;
   level: RiskLevel;
@@ -38,6 +40,7 @@ export interface Alert {
   time: string;
   date: string;
   status: AlertStatus;
+  handlingLevel: HandlingLevel;
   image: string;
   description: string;
   operator_assigned?: string | null;

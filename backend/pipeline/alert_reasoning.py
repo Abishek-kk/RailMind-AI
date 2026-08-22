@@ -132,9 +132,11 @@ def _gemini_reasoning(alert_json: str, model_name: str, api_key: str) -> dict[st
         return None
 
 
-def explain_alert(alert: Mapping[str, Any]) -> dict[str, Any]:
-    """Use Gemini when configured, with a deterministic rule-based fallback."""
+def explain_alert(alert: Mapping[str, Any], use_llm: bool = True) -> dict[str, Any]:
+    """Use Gemini when requested and configured, with a deterministic fallback."""
     fallback = _explain_alert_rule_based(alert)
+    if not use_llm:
+        return fallback
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         return fallback

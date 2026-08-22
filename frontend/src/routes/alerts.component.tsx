@@ -34,6 +34,7 @@ import {
   getAlerts,
   acknowledgeAlert,
   resolveAlert,
+  escalateAlert,
   assignAlert,
   type ApiAlert,
   type BackendAlert,
@@ -41,11 +42,17 @@ import {
 import { getFeeds } from "@/lib/api/feeds";
 import { getApiKey } from "@/lib/api/client";
 import { toast } from "sonner";
-import { riskColor, type Alert, type AlertStatus } from "@/lib/mock-data";
+import { riskColor, type Alert, type AlertStatus, type HandlingLevel } from "@/lib/mock-data";
 
 // Route exported in alerts.tsx
 
 type TabId = "all" | "high" | "medium" | "low" | "resolved";
+
+function nextHandlingLevel(level: HandlingLevel): HandlingLevel | null {
+  if (level === "normal") return "medium";
+  if (level === "medium") return "high";
+  return null;
+}
 
 function getPaginationRange(current: number, total: number): (number | "ellipsis")[] {
   if (total <= 1) return [1];
@@ -76,9 +83,10 @@ export default function AlertsPage() {
   const [filterStatus, setFilterStatus] = useState<"any" | AlertStatus>("any");
   const [filterPlatform, setFilterPlatform] = useState<string>("any");
   const [pendingAction, setPendingAction] = useState<{
-    type: "acknowledge" | "resolve";
+    type: "acknowledge" | "resolve" | "escalate";
     alert: ApiAlert;
     operatorId?: string | null;
+    targetLevel?: HandlingLevel;
   } | null>(null);
 
   useEffect(() => {
@@ -123,6 +131,15 @@ export default function AlertsPage() {
     mutationFn: (backendId: string) => resolveAlert(backendId),
     onError: (error: Error) => {
       toast.error(error.message || "Failed to resolve alert. Please try again.");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+  });
+
+  const escalateMutation = useMutation({
+    mutationFn: ({ backendId, targetLevel }: { backendId: string; targetLevel: HandlingLevel }) =>
+      escalateAlert(backendId, targetLevel),
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to escalate alert. Please try again.");
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
@@ -177,12 +194,32 @@ export default function AlertsPage() {
     }
   };
 
+  const handleEscalate = async (targetLevel: HandlingLevel, alertOverride?: ApiAlert) => {
+    const target = alertOverride ?? selected;
+    if (!target) return;
+    const previousLevel = target.handlingLevel;
+    setAlerts((prev) => prev.map((a) => (a.id === target.id ? { ...a, handlingLevel: targetLevel } : a)));
+
+    try {
+      await escalateMutation.mutateAsync({ backendId: target.backendId, targetLevel });
+      toast.success(`Handling level raised to ${targetLevel}.`);
+    } catch (error) {
+      setAlerts((prev) => prev.map((a) => (a.id === target.id ? { ...a, handlingLevel: previousLevel } : a)));
+      toast.error(error instanceof Error ? `Failed to escalate alert: ${error.message}` : "Failed to escalate alert.");
+    }
+  };
+
   const requestAcknowledge = (alert: ApiAlert, operatorId?: string | null) => {
     setPendingAction({ type: "acknowledge", alert, operatorId });
   };
 
   const requestResolve = (alert: ApiAlert) => {
     setPendingAction({ type: "resolve", alert });
+  };
+
+  const requestEscalate = (alert: ApiAlert) => {
+    const targetLevel = nextHandlingLevel(alert.handlingLevel);
+    if (targetLevel) setPendingAction({ type: "escalate", alert, targetLevel });
   };
 
   const confirmPendingAction = async () => {
@@ -192,8 +229,10 @@ export default function AlertsPage() {
 
     if (action.type === "acknowledge") {
       await handleAcknowledge(action.operatorId, action.alert);
-    } else {
+    } else if (action.type === "resolve") {
       await handleResolve(action.alert);
+    } else if (action.targetLevel) {
+      await handleEscalate(action.targetLevel, action.alert);
     }
   };
 
@@ -584,6 +623,11 @@ export default function AlertsPage() {
                                     Mark Resolved
                                   </DropdownMenuItem>
                                 )}
+                                {a.status !== "resolved" && a.handlingLevel !== "high" && (
+                                  <DropdownMenuItem onClick={() => requestEscalate(a)}>
+                                    Escalate to {nextHandlingLevel(a.handlingLevel)}
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -667,12 +711,18 @@ export default function AlertsPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogTitle>
-            {pendingAction?.type === "resolve" ? "Resolve this alert?" : "Acknowledge this alert?"}
+            {pendingAction?.type === "resolve"
+              ? "Resolve this alert?"
+              : pendingAction?.type === "escalate"
+                ? `Escalate to ${pendingAction.targetLevel}?`
+                : "Acknowledge this alert?"}
           </DialogTitle>
           <DialogDescription>
             {pendingAction?.type === "resolve"
               ? "This will mark the alert as resolved. Confirm to continue."
-              : "This will mark the alert as acknowledged. Confirm to continue."}
+              : pendingAction?.type === "escalate"
+                ? "This raises the handling level for operator attention. Confirm to continue."
+                : "This will mark the alert as acknowledged. Confirm to continue."}
           </DialogDescription>
           <div className="flex justify-end gap-2">
             <button

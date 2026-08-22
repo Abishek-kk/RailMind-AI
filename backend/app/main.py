@@ -279,6 +279,25 @@ def resolve_alert(alert_id: str, api_key: str = Depends(verify_api_key_http)) ->
     return alert
 
 
+@app.post("/api/alerts/{alert_id}/escalate")
+def escalate_alert(alert_id: str, body: dict[str, Any] = Body(...), api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
+    target_level = str(body.get("handling_level", "")).lower()
+    reason = str(body.get("reason", "")).strip() or None
+    level_rank = {"normal": 0, "medium": 1, "high": 2}
+    if target_level not in level_rank:
+        raise HTTPException(status_code=422, detail="handling_level must be normal, medium, or high")
+
+    alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    current_level = alert.get("handling_level", "normal")
+    if level_rank[target_level] <= level_rank.get(current_level, 0):
+        raise HTTPException(status_code=409, detail="Escalation must move to a higher handling level")
+
+    alert_status_store.escalate(str(PIPELINE_DATA_DIR), alert_id, target_level, reason)
+    return aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id) or alert
+
+
 @app.post("/api/alerts/{alert_id}/assign")
 def assign_alert(alert_id: str, body: dict[str, Any] = Body(...), api_key: str = Depends(verify_api_key_http)) -> dict[str, Any]:
     assignee = body.get("assignee")

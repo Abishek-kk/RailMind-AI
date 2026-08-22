@@ -1,6 +1,6 @@
 import { apiFetch } from "./client";
 import { resolveStreamUrl } from "@/lib/api/feeds";
-import { Alert, AlertStatus, cctvImages, RiskLevel } from "@/lib/mock-data";
+import { Alert, AlertStatus, cctvImages, HandlingLevel, RiskLevel } from "@/lib/mock-data";
 import { parseCameraId } from "@/lib/utils";
 
 export interface BackendAlert {
@@ -12,6 +12,9 @@ export interface BackendAlert {
   risk_score: number;
   risk_level: string;
   status: string;
+  handling_level?: string | null;
+  escalation_reason?: string | null;
+  escalated_at?: string | null;
   timestamp: string;
   /** Operator assigned to this alert (may be null if unassigned) */
   operator_assigned?: string | null;
@@ -54,6 +57,14 @@ function normalizeStatus(value?: string | null): AlertStatus {
   if (lower === "acknowledged") return "acknowledged";
   if (lower === "resolved") return "resolved";
   return "active";
+}
+
+function normalizeHandlingLevel(value: string | null | undefined, riskLevel: RiskLevel): HandlingLevel {
+  const lower = String(value ?? "").toLowerCase();
+  if (lower === "medium") return "medium";
+  if (lower === "high") return "high";
+  if (lower === "normal") return "normal";
+  return riskLevel === "high" ? "high" : riskLevel === "medium" ? "medium" : "normal";
 }
 
 function normalizeReasoningMode(value?: string | null): "llm" | "rule_based" | undefined {
@@ -121,6 +132,7 @@ export function mapBackendAlert(alert: BackendAlert): ApiAlert {
     time: formatTime(alert.timestamp),
     date: formatDate(alert.timestamp),
     status: normalizeStatus(alert.status),
+    handlingLevel: normalizeHandlingLevel(alert.handling_level, riskLevel),
     description: `${alert.incident_type} on ${alert.platform}`,
     image: resolveStreamUrl(alert.image_url ?? undefined) || getImageForCamera(alert.camera_id),
     operator_assigned: alert.operator_assigned ?? null,
@@ -146,6 +158,18 @@ export async function acknowledgeAlert(id: string, operatorId?: string | null): 
 
 export async function resolveAlert(id: string): Promise<ApiAlert> {
   const alert = await apiFetch<BackendAlert>(`/alerts/${id}/resolve`, { method: "PATCH" });
+  return mapBackendAlert(alert);
+}
+
+export async function escalateAlert(
+  id: string,
+  handlingLevel: HandlingLevel,
+  reason = "Operator-confirmed escalation",
+): Promise<ApiAlert> {
+  const alert = await apiFetch<BackendAlert>(`/alerts/${id}/escalate`, {
+    method: "POST",
+    body: JSON.stringify({ handling_level: handlingLevel, reason }),
+  });
   return mapBackendAlert(alert);
 }
 

@@ -39,6 +39,7 @@ from .alert_reasoning import explain_alert
 from . import results_store as store
 
 ACTIVITY_TO_INCIDENT_TYPE = {
+    "NORMAL": "Normal Activity",
     "IN_DANGER_ZONE": "Track Zone Intrusion",
     "PREVIOUSLY_IN_DANGER_ZONE": "Track Zone Intrusion",
     "LOITERING_ON_PLATFORM": "Loitering / Trespass",
@@ -46,6 +47,7 @@ ACTIVITY_TO_INCIDENT_TYPE = {
 }
 
 RISK_LEVEL_BY_ACTIVITY = {
+    "NORMAL": "Low",
     "IN_DANGER_ZONE": "High",
     "PREVIOUSLY_IN_DANGER_ZONE": "Medium",
     "LOITERING_ON_PLATFORM": "Medium",
@@ -57,6 +59,14 @@ RISK_LEVEL_TO_SCORE = {
     "High": 85,
     "Medium": 55,
     "Low": 25,
+}
+
+HANDLING_LEVEL_BY_ACTIVITY = {
+    "NORMAL": "normal",
+    "PREVIOUSLY_IN_DANGER_ZONE": "medium",
+    "LOITERING_ON_PLATFORM": "medium",
+    "ERRATIC_MOVEMENT": "medium",
+    "IN_DANGER_ZONE": "high",
 }
 
 
@@ -92,14 +102,15 @@ def _first_annotated_frame_url(data_dir: str, feed_id: str) -> str | None:
 
 def _iter_incidents(data_dir: str):
     """
-    Yields one dict per flagged track (NORMAL tracks are skipped --
-    they're not incidents). Each dict merges the track summary with
+    Yields one dict per tracked person. Normal activity remains visible
+    as the lowest handling level, while higher-risk activity is promoted.
+    Each dict merges the track summary with
     its video/feed context.
     """
     for entry in store.load_all(data_dir):
         for track_id, summary in entry["tracks"].items():
             activity = summary.get("activity", "NORMAL")
-            if activity == "NORMAL" or activity not in ACTIVITY_TO_INCIDENT_TYPE:
+            if activity not in ACTIVITY_TO_INCIDENT_TYPE:
                 continue
             yield {
                 "video_id": entry["video_id"],
@@ -109,6 +120,7 @@ def _iter_incidents(data_dir: str):
                 "track_id": track_id,
                 "incident_type": ACTIVITY_TO_INCIDENT_TYPE[activity],
                 "risk_level": RISK_LEVEL_BY_ACTIVITY.get(activity, "Low"),
+                "handling_level": HANDLING_LEVEL_BY_ACTIVITY.get(activity, "normal"),
                 "activity": activity,
                 **summary,
             }
@@ -207,11 +219,9 @@ def incidents_list(data_dir: str) -> list[dict[str, Any]]:
 
 
 def alerts_list(data_dir: str) -> list[dict[str, Any]]:
-    """High-risk incidents surfaced as alerts."""
+    """All tracked activities surfaced with an actionable handling level."""
     result = []
     for i in _iter_incidents(data_dir):
-        if i["risk_level"] != "High":
-            continue
         alert_id = f"{i['feed_id']}-{i['track_id']}"
         risk_score = RISK_LEVEL_TO_SCORE.get(i["risk_level"], 25)
 
@@ -223,6 +233,7 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
         status_record = status_store.get_status(data_dir, alert_id)
         status = status_record["status"] if status_record else "active"
         operator_assigned = status_record["operator_assigned"] if status_record else None
+        handling_level = status_record.get("handling_level", i["handling_level"]) if status_record else i["handling_level"]
 
         result.append({
             "id": alert_id,
@@ -234,6 +245,9 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             "status": status,
             "timestamp": i["processed_at"],
             "operator_assigned": operator_assigned,
+            "handling_level": handling_level,
+            "escalation_reason": status_record.get("escalation_reason") if status_record else None,
+            "escalated_at": status_record.get("escalated_at") if status_record else None,
             "activity": i.get("activity"),
             "frames_in_track_zone": i.get("frames_in_track_zone", 0),
             "currently_in_track_zone": i.get("currently_in_track_zone", False),
@@ -244,7 +258,9 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             "video_snippet_url": f"/processed/{annotated_path}" if annotated_path else None,
             "image_url": image_url,
         })
-        result[-1]["reasoning"] = explain_alert(result[-1])
+        # Keep the list endpoint responsive; AI reasoning remains available
+        # through the dedicated reasoning endpoint for selected alerts.
+        result[-1]["reasoning"] = explain_alert(result[-1], use_llm=False)
         result[-1]["reasoning_mode"] = result[-1]["reasoning"]["mode"]
     return result
 
