@@ -83,19 +83,6 @@ Verified by running it, not just reading the code:
 
 ---
 
-## What's Not Built Yet
-
-Being direct about this so nobody — including us — overclaims it later:
-
-| Planned capability                                     | Actual status                                                                                                                                                                                                                                |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Edge deployment on Jetson Orin Nano / TensorRT**     | Not implemented. No Jetson-specific or TensorRT code exists. The pipeline currently runs on whatever machine hosts the backend (CPU or CUDA GPU via PyTorch).                                                                                |
-| **Multi-camera person re-identification**              | Not implemented. Tracking is per-camera only; a person is not currently re-linked across camera handoffs.                                                                                                                                    |
-| **Automated PA system integration**                    | Not implemented. No MQTT/PA-controller code exists.                                                                                                                                                                                          |
-| **Mobile app for staff (React Native)**                | Does not exist yet. Staff alerts currently surface via the web dashboard only.                                                                                                                                               |
-| **True multi-station SaaS isolation**                  | The database has a `station_id` column, but there's no multi-tenant access control or per-station billing logic yet — this is single-deployment software today.                                                                              |
-| **Live RTSP camera ingestion**                         | The video processor uses `cv2.VideoCapture`, which can technically open an `rtsp://` URL, but this path has only been exercised against uploaded video files in testing, not a live camera feed. Treat RTSP support as untested, not proven. |
-| **Temporal Transformer trained on real incident data** | The shipped model is trained on synthetic sequences generated from rule-based behavioural definitions, not real labelled incident footage. The reported accuracy is against this synthetic test set, not real-world data.                    |
 
 ---
 
@@ -950,17 +937,7 @@ RailMind-AI/
 - [x] Optional LLM-assisted reasoning (OpenAI/Anthropic)
 - [x] 57 passing backend tests
 
-### Not yet built
 
-- [ ] Live RTSP camera validation (currently untested beyond file upload)
-- [ ] PostgreSQL + Redis production migration
-- [ ] Temporal Transformer retrained on real, labelled incident data
-- [ ] Multi-camera person re-identification
-- [ ] Edge deployment (Jetson Orin Nano / TensorRT)
-- [ ] Automated PA system integration
-- [ ] Mobile app for staff (React Native)
-- [ ] True multi-tenant multi-station SaaS isolation
-- [ ] Predictive analytics / crowd flow optimisation
 
 ---
 
