@@ -250,6 +250,8 @@ def alerts_list(data_dir: str) -> list[dict[str, Any]]:
             "handling_level": handling_level,
             "escalation_reason": status_record.get("escalation_reason") if status_record else None,
             "escalated_at": status_record.get("escalated_at") if status_record else None,
+            "confirmed_by": status_record.get("confirmed_by") if status_record else None,
+            "confirmation_reason": status_record.get("confirmation_reason") if status_record else None,
             "activity": i.get("activity"),
             "frames_in_track_zone": i.get("frames_in_track_zone", 0),
             "currently_in_track_zone": i.get("currently_in_track_zone", False),
