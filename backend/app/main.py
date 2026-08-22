@@ -286,6 +286,15 @@ def escalate_alert(alert_id: str, body: dict[str, Any] = Body(...), api_key: str
     level_rank = {"normal": 0, "medium": 1, "high": 2}
     if target_level not in level_rank:
         raise HTTPException(status_code=422, detail="handling_level must be normal, medium, or high")
+    if target_level == "high" and (
+        body.get("confirmed") is not True
+        or not isinstance(body.get("reason"), str)
+        or not body["reason"].strip()
+    ):
+        raise HTTPException(
+            status_code=428,
+            detail="Escalating to 'high' requires confirmed=true and a non-empty reason",
+        )
 
     alert = aggregation.get_alert_by_id(str(PIPELINE_DATA_DIR), alert_id)
     if not alert:
