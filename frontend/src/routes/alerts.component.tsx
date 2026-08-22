@@ -82,12 +82,32 @@ export default function AlertsPage() {
   const [filterRisk, setFilterRisk] = useState<"any" | "high" | "medium" | "low">("any");
   const [filterStatus, setFilterStatus] = useState<"any" | AlertStatus>("any");
   const [filterPlatform, setFilterPlatform] = useState<string>("any");
-  const [pendingAction, setPendingAction] = useState<{
-    type: "acknowledge" | "resolve" | "escalate";
-    alert: ApiAlert;
-    operatorId?: string | null;
-    targetLevel?: HandlingLevel;
-  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    | {
+        type: "acknowledge";
+        alert: ApiAlert;
+        operatorId?: string | null;
+      }
+    | {
+        type: "resolve";
+        alert: ApiAlert;
+      }
+    | {
+        type: "escalate";
+        alert: ApiAlert;
+        targetLevel: HandlingLevel;
+        reason?: string;
+        confirmed?: boolean;
+      }
+    | null
+  >(null);
+  const [escalationReasonInput, setEscalationReasonInput] = useState("");
+  const [escalationConfirmedCheckbox, setEscalationConfirmedCheckbox] = useState(false);
+
+  useEffect(() => {
+    setEscalationReasonInput("");
+    setEscalationConfirmedCheckbox(false);
+  }, [pendingAction]);
 
   useEffect(() => {
     setPage(1);
@@ -724,6 +744,28 @@ export default function AlertsPage() {
                 ? "This raises the handling level for operator attention. Confirm to continue."
                 : "This will mark the alert as acknowledged. Confirm to continue."}
           </DialogDescription>
+          {pendingAction?.type === "escalate" && pendingAction.targetLevel === "high" && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium" htmlFor="escalation-reason">
+                Reason
+              </label>
+              <textarea
+                id="escalation-reason"
+                value={escalationReasonInput}
+                onChange={(event) => setEscalationReasonInput(event.target.value)}
+                className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                placeholder="Enter an escalation reason"
+              />
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={escalationConfirmedCheckbox}
+                  onChange={(event) => setEscalationConfirmedCheckbox(event.target.checked)}
+                />
+                I confirm this high-level escalation
+              </label>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"
