@@ -75,6 +75,11 @@ export default function AlertsPage() {
   const [filterRisk, setFilterRisk] = useState<"any" | "high" | "medium" | "low">("any");
   const [filterStatus, setFilterStatus] = useState<"any" | AlertStatus>("any");
   const [filterPlatform, setFilterPlatform] = useState<string>("any");
+  const [pendingAction, setPendingAction] = useState<{
+    type: "acknowledge" | "resolve";
+    alert: ApiAlert;
+    operatorId?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -134,16 +139,17 @@ export default function AlertsPage() {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   };
 
-  const handleAcknowledge = async (operatorId?: string | null) => {
-    if (!selected) return;
-    const previousStatus = selected.status;
-    setStatus(selected.id, "acknowledged");
+  const handleAcknowledge = async (operatorId?: string | null, alertOverride?: ApiAlert) => {
+    const target = alertOverride ?? selected;
+    if (!target) return;
+    const previousStatus = target.status;
+    setStatus(target.id, "acknowledged");
 
     try {
-      await acknowledgeMutation.mutateAsync({ backendId: selected.backendId, operatorId });
+      await acknowledgeMutation.mutateAsync({ backendId: target.backendId, operatorId });
       toast.success("Alert acknowledged successfully.");
     } catch (error) {
-      setStatus(selected.id, previousStatus);
+      setStatus(target.id, previousStatus);
       toast.error(
         error instanceof Error
           ? `Failed to acknowledge alert: ${error.message}`
@@ -152,21 +158,42 @@ export default function AlertsPage() {
     }
   };
 
-  const handleResolve = async () => {
-    if (!selected) return;
-    const previousStatus = selected.status;
-    setStatus(selected.id, "resolved");
+  const handleResolve = async (alertOverride?: ApiAlert) => {
+    const target = alertOverride ?? selected;
+    if (!target) return;
+    const previousStatus = target.status;
+    setStatus(target.id, "resolved");
 
     try {
-      await resolveMutation.mutateAsync(selected.backendId);
+      await resolveMutation.mutateAsync(target.backendId);
       toast.success("Alert resolved successfully.");
     } catch (error) {
-      setStatus(selected.id, previousStatus);
+      setStatus(target.id, previousStatus);
       toast.error(
         error instanceof Error
           ? `Failed to resolve alert: ${error.message}`
           : "Failed to resolve alert.",
       );
+    }
+  };
+
+  const requestAcknowledge = (alert: ApiAlert, operatorId?: string | null) => {
+    setPendingAction({ type: "acknowledge", alert, operatorId });
+  };
+
+  const requestResolve = (alert: ApiAlert) => {
+    setPendingAction({ type: "resolve", alert });
+  };
+
+  const confirmPendingAction = async () => {
+    if (!pendingAction) return;
+    const action = pendingAction;
+    setPendingAction(null);
+
+    if (action.type === "acknowledge") {
+      await handleAcknowledge(action.operatorId, action.alert);
+    } else {
+      await handleResolve(action.alert);
     }
   };
 
@@ -541,11 +568,7 @@ export default function AlertsPage() {
                                 {a.status === "active" && (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      setStatus(a.id, "acknowledged");
-                                      acknowledgeMutation.mutate({
-                                        backendId: a.backendId,
-                                        operatorId: a.operator_assigned,
-                                      });
+                                      requestAcknowledge(a, a.operator_assigned);
                                     }}
                                   >
                                     Acknowledge
@@ -555,8 +578,7 @@ export default function AlertsPage() {
                                 {a.status !== "resolved" && (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      setStatus(a.id, "resolved");
-                                      resolveMutation.mutate(a.backendId);
+                                      requestResolve(a);
                                     }}
                                   >
                                     Mark Resolved
@@ -632,12 +654,44 @@ export default function AlertsPage() {
             <AlertDetails
               alert={selected}
               onClose={() => setSelectedId(null)}
-              onAcknowledge={handleAcknowledge}
-              onResolve={handleResolve}
+              onAcknowledge={(operatorId) => requestAcknowledge(selected, operatorId)}
+              onResolve={() => requestResolve(selected)}
             />
           )}
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(pendingAction)}
+        onOpenChange={(open) => !open && setPendingAction(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>
+            {pendingAction?.type === "resolve" ? "Resolve this alert?" : "Acknowledge this alert?"}
+          </DialogTitle>
+          <DialogDescription>
+            {pendingAction?.type === "resolve"
+              ? "This will mark the alert as resolved. Confirm to continue."
+              : "This will mark the alert as acknowledged. Confirm to continue."}
+          </DialogDescription>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPendingAction(null)}
+              className="rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmPendingAction}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Confirm
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -859,7 +913,9 @@ function AlertDetails({
             <div className="text-xs font-semibold uppercase tracking-wider text-foreground">
               Why this alert was raised
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">{alert.reasoning.summary}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {alert.reasoning.summary}
+            </p>
             <div className="space-y-2">
               {alert.reasoning.evidence.map((item) => (
                 <div key={item.signal} className="text-xs">

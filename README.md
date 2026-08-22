@@ -4,6 +4,7 @@
 <img src="https://img.shields.io/badge/RailMind_AI-v1.5-0A84FF?style=for-the-badge&logo=railway&logoColor=white" alt="RailMind AI"/>
 
 # RailMind AI
+
 ### Intelligent Railway Safety & Security System
 
 **Turning existing CCTV infrastructure into proactive behavioural monitoring — no new cameras, no facial recognition.**
@@ -23,7 +24,7 @@
 
 ## Status: Working Prototype.
 
-This is a hackathon build for **FAR AWAY 2026** by **Team Accelerate**. Everything described below as "implemented" has been verified by running it — backend boots, 57 backend tests pass, frontend builds, and the CV → LSTM → agent pipeline runs end-to-end on uploaded video.
+This is a hackathon build for **FAR AWAY 2026** by **Team Accelerate**. Everything described below as "implemented" has been verified by running it — backend boots, 57 backend tests pass, frontend builds, and the CV → Temporal Transformer → agent pipeline runs end-to-end on uploaded video.
 
 Some capabilities described in early planning docs (edge/Jetson deployment, multi-camera re-identification, PA system integration, a mobile app) are **not yet built** — see [What's Not Built Yet](#whats-not-built-yet) below. We'd rather you find out from this README than from the code.
 
@@ -36,13 +37,13 @@ Some capabilities described in early planning docs (edge/Jetson deployment, mult
 - [Features](#-features)
 - [System Architecture](#-system-architecture)
 - [AI & Computer Vision Pipeline](#-ai--computer-vision-pipeline)
-- [LSTM Behaviour Classifier](#-lstm-behaviour-classifier)
+- [Temporal Transformer Behaviour Classifier](#-temporal-transformer-behaviour-classifier)
 - [Agentic AI Framework](#-agentic-ai-framework)
 - [Quick Start](#-quick-start)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
 - [Running the Application](#-running-the-application)
-- [Training the LSTM Models](#-training-the-lstm-models)
+- [Training the Temporal Transformer](#-training-the-temporal-transformer)
 - [API Reference](#-api-reference)
 - [Dashboard & Screenshots](#-dashboard--screenshots)
 - [Edge Deployment](#-edge-deployment)
@@ -55,12 +56,12 @@ Some capabilities described in early planning docs (edge/Jetson deployment, mult
 
 ## Overview
 
-RailMind AI processes existing CCTV video through a computer-vision pipeline (person detection → tracking → pose estimation → behavioural feature extraction) and feeds the result into a bidirectional LSTM that classifies 30-second behavioural windows into one of four categories: **Normal**, **Suicide Risk**, **Pickpocketing**, or **Security Threat**. A three-agent LangGraph pipeline takes that classification, computes a final risk score, and dispatches alerts to staff through a live dashboard — with no facial recognition and no biometric storage anywhere in the system.
+RailMind AI processes existing CCTV video through a computer-vision pipeline (person detection → tracking → pose estimation → behavioural feature extraction) and feeds the result into a Temporal Transformer that classifies 30-second behavioural windows into one of four categories: **Normal**, **Suicide Risk**, **Pickpocketing**, or **Security Threat**. A three-agent LangGraph pipeline takes that classification, computes a final risk score, and dispatches alerts to staff through a live dashboard — with no facial recognition and no biometric storage anywhere in the system.
 
-| Challenge | Approach |
-|---|---|
-| **Suicide risk** | Edge proximity + pacing + low crowd interaction, modelled over a temporal window |
-| **Pickpocketing / theft** | Sustained close-following distance + repeated crowd contact |
+| Challenge                 | Approach                                                                         |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| **Suicide risk**          | Edge proximity + pacing + low crowd interaction, modelled over a temporal window |
+| **Pickpocketing / theft** | Sustained close-following distance + repeated crowd contact                      |
 
 ---
 
@@ -71,16 +72,16 @@ Verified by running it, not just reading the code:
 - **Person detection & tracking** — YOLOv8 detection + Ultralytics' `BYTETracker` for persistent IDs across frames.
 - **Pose estimation** — YOLOv8-Pose extracts 17 COCO keypoints per tracked person.
 - **Behavioural feature extraction** — 7 features per person per 30s window (edge proximity, loitering time, pacing count, movement speed, direction changes, following distance, crowd interactions).
-- **Trained LSTM classifier** — a real, saved 2-layer bidirectional LSTM checkpoint (`backend/lstm/saved_models/behavior_classifier.pt`) with a fitted feature scaler, loaded and run at inference time.
+- **Trained Temporal Transformer classifier** — a saved transformer checkpoint (`backend/app/transformer/saved_models/behaviour_transformer.pt`) with a fitted feature scaler, loaded and run at inference time.
 - **LangGraph multi-agent pipeline** — a real `StateGraph` with Perception → Reasoning → Intervention nodes, compiled once and invoked per detection.
 - **Optional LLM-assisted reasoning** — if an OpenAI or Anthropic API key is configured, the Reasoning Agent asks an LLM for a bounded risk-score adjustment (±10) and a reasoning summary; without a key, it falls back cleanly to the rule-based `RiskScorer`.
 - **Live dashboard** — React 19 + TanStack Router/Query dashboard pulling real stats from the FastAPI backend (only camera thumbnail images are placeholders; incident counts, trends, and risk distributions are real).
-- **Video upload & playback pipeline** — upload an `.mp4`, it runs through the full CV → LSTM → agent pipeline; not a canned demo loop.
+- **Video upload & playback pipeline** — upload an `.mp4`, it runs through the full CV → Temporal Transformer → agent pipeline; not a canned demo loop.
 - **WebSocket alert delivery** — a channel-based pub/sub `ConnectionManager` broadcasts alerts to all connected dashboard clients in real time.
 - **Escalation timers** — unacknowledged alerts escalate after a configurable timeout (default 60s).
 - **Email alerts (SMTP)** — implemented via `smtplib`, configurable via `.env`.
 - **SMS escalation (Twilio)** — implemented in the escalation service, configurable via `.env`.
-- **57 passing backend tests** covering agents, CV pipeline, LSTM inference, risk scoring, alerts, incidents, escalation, and heatmaps.
+- **57 passing backend tests** covering agents, CV pipeline, Temporal Transformer inference, risk scoring, alerts, incidents, escalation, and heatmaps.
 
 ---
 
@@ -88,31 +89,34 @@ Verified by running it, not just reading the code:
 
 Being direct about this so nobody — including us — overclaims it later:
 
-| Planned capability | Actual status |
-|---|---|
-| **Edge deployment on Jetson Orin Nano / TensorRT** | Not implemented. No Jetson-specific or TensorRT code exists. The pipeline currently runs on whatever machine hosts the backend (CPU or CUDA GPU via PyTorch). |
-| **Multi-camera person re-identification** | Not implemented. Tracking is per-camera only; a person is not currently re-linked across camera handoffs. |
-| **Automated PA system integration** | Not implemented. No MQTT/PA-controller code exists. |
-| **Mobile app for staff (React Native)** | Does not exist yet. Staff alerts currently surface via the web dashboard, email, and SMS only. |
-| **True multi-station SaaS isolation** | The database has a `station_id` column, but there's no multi-tenant access control or per-station billing logic yet — this is single-deployment software today. |
-| **Live RTSP camera ingestion** | The video processor uses `cv2.VideoCapture`, which can technically open an `rtsp://` URL, but this path has only been exercised against uploaded video files in testing, not a live camera feed. Treat RTSP support as untested, not proven. |
-| **LSTM trained on real incident data** | The shipped model is trained on synthetic sequences generated from rule-based behavioural definitions, not real labelled incident footage. The reported accuracy is against this synthetic test set, not real-world data. |
+| Planned capability                                     | Actual status                                                                                                                                                                                                                                |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Edge deployment on Jetson Orin Nano / TensorRT**     | Not implemented. No Jetson-specific or TensorRT code exists. The pipeline currently runs on whatever machine hosts the backend (CPU or CUDA GPU via PyTorch).                                                                                |
+| **Multi-camera person re-identification**              | Not implemented. Tracking is per-camera only; a person is not currently re-linked across camera handoffs.                                                                                                                                    |
+| **Automated PA system integration**                    | Not implemented. No MQTT/PA-controller code exists.                                                                                                                                                                                          |
+| **Mobile app for staff (React Native)**                | Does not exist yet. Staff alerts currently surface via the web dashboard, email, and SMS only.                                                                                                                                               |
+| **True multi-station SaaS isolation**                  | The database has a `station_id` column, but there's no multi-tenant access control or per-station billing logic yet — this is single-deployment software today.                                                                              |
+| **Live RTSP camera ingestion**                         | The video processor uses `cv2.VideoCapture`, which can technically open an `rtsp://` URL, but this path has only been exercised against uploaded video files in testing, not a live camera feed. Treat RTSP support as untested, not proven. |
+| **Temporal Transformer trained on real incident data** | The shipped model is trained on synthetic sequences generated from rule-based behavioural definitions, not real labelled incident footage. The reported accuracy is against this synthetic test set, not real-world data.                    |
 
 ---
 
 ## Screenshots
 
 ### Live Monitoring
+
 2×2 grid of simultaneous CCTV feeds with AI-annotated bounding boxes, track IDs, and live risk labels overlaid directly on the video.
 
 ![Live Monitoring](assets/live.png)
 
 ### Dashboard
+
 Aggregated analytics across all platforms — incident counts, 7-day trend, risk distribution, a platform heatmap, peak-risk-hour histogram, and a per-camera summary table.
 
 ![Dashboard](assets/dashboard.png)
 
 ### Alerts
+
 Full alert triage view with filterable tabs by risk level, a sortable alert table, and a detail panel for acknowledging or resolving an incident.
 
 ![Alerts](assets/alerts.png)
@@ -126,7 +130,7 @@ Full alert triage view with filterable tabs by risk level, a sortable alert tabl
 │ Video Source → OpenCV → YOLOv8 Detection │
 │   → ByteTrack → YOLOv8-Pose               │
 │   → Feature Extraction (7 features)       │
-│   → BiLSTM Classifier (30s window)        │
+│   → Temporal Transformer (30s window)     │
 └────────────────────┬───────────────────────┘
                       │ classification + confidence
 ┌─────────────────────▼──────────────────────┐
@@ -143,18 +147,18 @@ Full alert triage view with filterable tabs by risk level, a sortable alert tabl
 
 ### Pipeline Stages
 
-| Stage | Component | Description |
-|---|---|---|
-| 1 | OpenCV | Decode and preprocess video frames |
-| 2 | YOLOv8 | Detect persons, output bounding boxes + confidence |
-| 3 | ByteTrack | Assign and maintain persistent track IDs |
-| 4 | YOLOv8-Pose | Extract 17 body keypoints per person |
-| 5 | Feature Extraction | Compute 7 behavioural features per 30s window |
-| 6 | BiLSTM Classifier | Classify the windowed sequence into a risk category |
-| 7 | Reasoning Agent | Combine LSTM output with context into a final 0–100 risk score |
-| 8 | Intervention Agent | Dispatch alerts, create incident record, start escalation timer |
-| 9 | Database | Store incidents, alerts, tracks, analytics, feedback |
-| 10 | Dashboard | Live alerts, incident history, heatmaps, analytics |
+| Stage | Component            | Description                                                           |
+| ----- | -------------------- | --------------------------------------------------------------------- |
+| 1     | OpenCV               | Decode and preprocess video frames                                    |
+| 2     | YOLOv8               | Detect persons, output bounding boxes + confidence                    |
+| 3     | ByteTrack            | Assign and maintain persistent track IDs                              |
+| 4     | YOLOv8-Pose          | Extract 17 body keypoints per person                                  |
+| 5     | Feature Extraction   | Compute 7 behavioural features per 30s window                         |
+| 6     | Temporal Transformer | Classify the windowed sequence into a risk category                   |
+| 7     | Reasoning Agent      | Combine transformer output with context into a final 0–100 risk score |
+| 8     | Intervention Agent   | Dispatch alerts, create incident record, start escalation timer       |
+| 9     | Database             | Store incidents, alerts, tracks, analytics, feedback                  |
+| 10    | Dashboard            | Live alerts, incident history, heatmaps, analytics                    |
 
 ---
 
@@ -178,27 +182,30 @@ feature_vector = [
 
 ### Model Specifications
 
-| Model | Task | Notes |
-|---|---|---|
-| YOLOv8n/s | Person detection | Ultralytics implementation |
-| ByteTrack | Multi-object tracking | Via `ultralytics.trackers.BYTETracker` |
-| YOLOv8-Pose | Pose estimation | 17 COCO keypoints |
-| BiLSTM | Behaviour classification | 2-layer bidirectional LSTM, `[30, 7]` input sequence |
-| LangGraph + optional LLM | Risk reasoning | Rule-based by default; LLM adjustment if API key configured |
+| Model                    | Task                     | Notes                                                        |
+| ------------------------ | ------------------------ | ------------------------------------------------------------ |
+| YOLOv8n/s                | Person detection         | Ultralytics implementation                                   |
+| ByteTrack                | Multi-object tracking    | Via `ultralytics.trackers.BYTETracker`                       |
+| YOLOv8-Pose              | Pose estimation          | 17 COCO keypoints                                            |
+| Temporal Transformer     | Behaviour classification | 2 encoder layers, `[30, 7]` input sequence, 4 output classes |
+| LangGraph + optional LLM | Risk reasoning           | Rule-based by default; LLM adjustment if API key configured  |
 
 ---
 
-## LSTM Behaviour Classifier
+## Temporal Transformer Behaviour Classifier
 
 ```
-Input [30, 7] → BiLSTM (128 units) → Dropout (0.3)
-              → BiLSTM (64 units)  → Dropout (0.3)
-              → Dense (32, ReLU) → Dense (4, Softmax)
+Input [30, 7] → Linear projection (64)
+              → Learned positional embeddings
+              → Transformer encoder (2 layers, 4 heads)
+              → Mean pooling → Dense (32, ReLU)
+              → Dropout (0.3) → Dense (4)
 ```
 
 - **Output classes:** Normal, Suicide Risk, Pickpocketing, Security Threat
-- **Training data:** synthetic sequences generated from rule-based behavioural definitions (see [Training the LSTM](#training-the-lstm))
-- **Saved artifacts:** `backend/lstm/saved_models/behavior_classifier.pt` + a fitted `StandardScaler` pickle
+- **Training data:** synthetic sequences generated from rule-based behavioural definitions (see [Training the Temporal Transformer](#training-the-temporal-transformer))
+- **Saved artifacts:** `backend/app/transformer/saved_models/behaviour_transformer.pt` + `feature_scaler.pkl`
+- **Evaluation metrics:** cross-entropy loss, accuracy, precision, recall, and F1-score from the validation classification report
 
 > Reported accuracy figures are measured against the synthetic held-out test set used for training. They are not yet validated against real, labelled incident footage — treat them as a development benchmark, not a production guarantee.
 
@@ -208,21 +215,21 @@ Input [30, 7] → BiLSTM (128 units) → Dropout (0.3)
 
 Three LangGraph nodes, compiled once into a `StateGraph` at startup:
 
-| Agent | Role |
-|---|---|
-| **Perception** | Assembles the 30-second feature sequence and runs LSTM inference |
-| **Reasoning** | Combines the LSTM output with context (edge distance, duration, following distance, pose) into a final risk score via `RiskScorer`; optionally asks a configured LLM (OpenAI or Anthropic) for a bounded ±10 score adjustment and a plain-language reasoning summary |
-| **Intervention** | Applies score thresholds, dispatches the alert, creates the incident record, and starts the escalation timer |
+| Agent            | Role                                                                                                                                                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Perception**   | Assembles the 30-second feature sequence and runs Temporal Transformer inference                                                                                                                                                                                                     |
+| **Reasoning**    | Combines the Temporal Transformer output with context (edge distance, duration, following distance, pose) into a final risk score via `RiskScorer`; optionally asks a configured LLM (OpenAI or Anthropic) for a bounded ±10 score adjustment and a plain-language reasoning summary |
+| **Intervention** | Applies score thresholds, dispatches the alert, creates the incident record, and starts the escalation timer                                                                                                                                                                         |
 
- PERCEPTION → REASONING → INTERVENTION 
- AGENT AGENT AGENT 
+PERCEPTION → REASONING → INTERVENTION
+AGENT AGENT AGENT
 
- • Pose extract • Risk scoring • Threshold eval 
- • Feature comp • LLM reasoning • WebSocket alert 
- • LSTM infer • Score 0-100 • Email/SMS 
- • Action decide • Escalation timer 
+• Pose extract • Risk scoring • Threshold eval
+• Feature comp • LLM reasoning • WebSocket alert
+• Transformer infer • Score 0-100 • Email/SMS
+• Action decide • Escalation timer
 
-```
+````
 
 ### Alert Escalation Thresholds
 
@@ -257,8 +264,8 @@ cp .env.example .env
 # 3. YOLOv8 pose weights are packaged at backend/yolov8n-pose.pt
 # Optional: set POSE_MODEL_PATH in .env to use different weights
 
-# 4. Train LSTM models
-python -m app.lstm.cli train
+# 4. Train the Temporal Transformer
+python -m app.transformer.train --data_path path/to/training.jsonl
 
 # 5. Start backend
 python run.py
@@ -267,7 +274,7 @@ python run.py
 cd ../frontend
 npm install
 npm run dev
-```
+````
 
 Open [http://localhost:5173](http://localhost:5173) — the dashboard will be live.
 
@@ -277,12 +284,12 @@ Open [http://localhost:5173](http://localhost:5173) — the dashboard will be li
 
 ### Prerequisites
 
-| Requirement | Version |
-|-------------|---------|
-| Python | 3.11+ |
-| Node.js | 18+ |
-| CUDA (optional) | 11.8+ for GPU inference |
-| GPU (optional) | NVIDIA (recommended for production) |
+| Requirement     | Version                             |
+| --------------- | ----------------------------------- |
+| Python          | 3.11+                               |
+| Node.js         | 18+                                 |
+| CUDA (optional) | 11.8+ for GPU inference             |
+| GPU (optional)  | NVIDIA (recommended for production) |
 
 ### Backend Setup
 
@@ -318,36 +325,36 @@ The local prototype ships with `backend/yolov8n-pose.pt` so CV processing can st
 All configuration is managed via environment variables in `backend/.env`:
 
 ```env
-# Core 
+# Core
 DEBUG=True
 DATABASE_URL=sqlite:///./railmind.db # Use PostgreSQL in production
 SECRET_KEY=your-secret-key-change-in-production
 RAILMIND_API_KEY=change-this-admin-api-key
 LOG_LEVEL=INFO
 
-# CV Models 
+# CV Models
 POSE_MODEL_PATH=./yolov8n-pose.pt
 POSE_DEVICE=cuda:0 # or cpu
-LSTM_SEQUENCE_LENGTH=30
+TRANSFORMER_SEQUENCE_LENGTH=30
 
-# Risk Scoring 
+# Risk Scoring
 LOW_RISK_THRESHOLD=40
 MEDIUM_RISK_THRESHOLD=60
 HIGH_RISK_THRESHOLD=80
 PLATFORM_EDGE_SAFETY_LIMIT_METERS=0.5
 
-# Behaviour Thresholds 
+# Behaviour Thresholds
 BEHAVIOR_HIGH_SCORE_THRESHOLD=0.65
 BEHAVIOR_ERRATIC_SCORE_THRESHOLD=0.4
 BEHAVIOR_FOLLOWING_DISTANCE_METERS=1.2
 
-# LLM (Optional) 
+# LLM (Optional)
 OPENAI_API_KEY=sk-... # Optional OpenAI reasoning
 OPENAI_REASONING_MODEL=gpt-5.5
 ANTHROPIC_API_KEY=sk-ant-... # Optional Claude reasoning
 ANTHROPIC_REASONING_MODEL=claude-haiku-4-5-20251001
 
-# Notifications 
+# Notifications
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=alert@example.com
@@ -359,7 +366,7 @@ TWILIO_AUTH_TOKEN=your_twilio_token
 TWILIO_FROM_NUMBER=+1234567890
 TWILIO_TO_NUMBERS=+19876543210
 
-# CORS 
+# CORS
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
@@ -421,9 +428,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ---
 
-## Training the LSTM Models
+## Training the Temporal Transformer
 
-RailMind AI includes a complete LSTM training pipeline with API-based, CLI, and scheduled retraining options.
+RailMind AI includes a Temporal Transformer training pipeline with validation loss, accuracy, and classification-report metrics.
 
 ### Quick Train (CLI)
 
@@ -431,17 +438,10 @@ RailMind AI includes a complete LSTM training pipeline with API-based, CLI, and 
 cd backend
 
 # Train the 4-class behavior classifier
-python -m app.lstm.cli train
+python -m app.transformer.train --data_path path/to/training.jsonl
 
 # Train the behavior classifier explicitly
-python -m app.lstm.cli train --type behavior_classifier
-
-# Custom parameters
-python -m app.lstm.cli train --epochs 50 --batch-size 16
-
-# Check training status
-python -m app.lstm.cli status --latest
-python -m app.lstm.cli status --history 10
+python -m app.transformer.train --data_path path/to/training.jsonl --epochs 50 --batch_size 16
 ```
 
 ### API-Based Training (Production)
@@ -465,12 +465,12 @@ The scheduler automatically retrains the behavior classifier **every Sunday at 2
 
 ### Trained Model Files
 
-Models are saved to `backend/lstm/saved_models/`:
+Models are saved to `backend/app/transformer/saved_models/`:
 
 ```
-lstm/saved_models/
- behavior_classifier.pt
- behavior_classifier_scaler.pkl
+transformer/saved_models/
+ behaviour_transformer.pt
+ feature_scaler.pkl
 ```
 
 ---
@@ -482,39 +482,39 @@ All REST endpoints under `/api/*` require the `X-API-Key` header configured by `
 
 ### Core Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/incidents` | List incidents — filter by date, platform, status, category |
-| `GET` | `/api/incidents/{id}` | Full incident detail with LSTM output and agent reasoning |
-| `POST` | `/api/incidents/{id}/ack` | Staff acknowledges alert — clears escalation timer |
-| `POST` | `/api/incidents/{id}/feedback` | Submit false positive flag |
-| `GET` | `/api/analytics/heatmap` | Spatial heatmap data |
-| `GET` | `/api/analytics/summary` | Aggregated stats: daily/weekly/monthly |
-| `GET` | `/api/analytics/lstm-performance` | LSTM accuracy, false positive rate, confidence |
-| `GET` | `/api/alerts/active` | All unacknowledged active alerts |
-| `POST` | `/api/alerts/{id}/escalate` | Manually escalate an alert |
-| `GET` | `/api/platforms` | All monitored platforms and camera status |
-| `GET` | `/api/staff/available` | Available staff by platform zone |
-| `WS` | `/ws/alerts` | Real-time alert event stream |
-| `WS` | `/ws/feed/{camera_id}` | Live annotated video feed stream |
+| Method | Endpoint                                 | Description                                                      |
+| ------ | ---------------------------------------- | ---------------------------------------------------------------- |
+| `GET`  | `/api/incidents`                         | List incidents — filter by date, platform, status, category      |
+| `GET`  | `/api/incidents/{id}`                    | Full incident detail with transformer output and agent reasoning |
+| `POST` | `/api/incidents/{id}/ack`                | Staff acknowledges alert — clears escalation timer               |
+| `POST` | `/api/incidents/{id}/feedback`           | Submit false positive flag                                       |
+| `GET`  | `/api/analytics/heatmap`                 | Spatial heatmap data                                             |
+| `GET`  | `/api/analytics/summary`                 | Aggregated stats: daily/weekly/monthly                           |
+| `GET`  | `/api/analytics/transformer-performance` | Transformer accuracy, false positive rate, confidence            |
+| `GET`  | `/api/alerts/active`                     | All unacknowledged active alerts                                 |
+| `POST` | `/api/alerts/{id}/escalate`              | Manually escalate an alert                                       |
+| `GET`  | `/api/platforms`                         | All monitored platforms and camera status                        |
+| `GET`  | `/api/staff/available`                   | Available staff by platform zone                                 |
+| `WS`   | `/ws/alerts`                             | Real-time alert event stream                                     |
+| `WS`   | `/ws/feed/{camera_id}`                   | Live annotated video feed stream                                 |
 
 ### WebSocket Alert Payload
 
 ```json
 {
- "alert_id": "uuid-v4",
- "timestamp": "2026-01-15T14:32:07Z",
- "platform": "Platform 3B",
- "camera_id": "CAM_003",
- "risk_score": 88,
- "risk_category": "Suicide Risk",
- "lstm_confidence": 0.91,
- "track_id": 142,
- "location": { "x": 0.72, "y": 0.41, "zone": "edge" },
- "recommended_action": "Approach immediately and offer assistance",
- "reasoning_summary": "30s edge proximity + pacing ×4 + social withdrawal",
- "escalation_level": 1,
- "escalate_at": "2026-01-15T14:33:07Z"
+  "alert_id": "uuid-v4",
+  "timestamp": "2026-01-15T14:32:07Z",
+  "platform": "Platform 3B",
+  "camera_id": "CAM_003",
+  "risk_score": 88,
+  "risk_category": "Suicide Risk",
+  "transformer_confidence": 0.91,
+  "track_id": 142,
+  "location": { "x": 0.72, "y": 0.41, "zone": "edge" },
+  "recommended_action": "Approach immediately and offer assistance",
+  "reasoning_summary": "30s edge proximity + pacing ×4 + social withdrawal",
+  "escalation_level": 1,
+  "escalate_at": "2026-01-15T14:33:07Z"
 }
 ```
 
@@ -533,6 +533,7 @@ Real-time view of all active CCTV feeds with AI-annotated bounding boxes, track 
 ![Live Monitoring — Real-time CCTV feeds with AI-annotated detections](assets/live.png)
 
 **Key features:**
+
 - 2×2 grid of simultaneous live feeds (expandable to full-screen per camera)
 - Colour-coded bounding boxes: High Risk · Medium Risk · Normal
 - Inline risk labels: Suicide Risk, Pickpocketing Risk, Security Threat, Loitering Detected
@@ -549,6 +550,7 @@ Analytics overview aggregating incident data across all platforms and cameras.
 ![Dashboard — Analytics overview with incident trends, heatmaps, and CCTV summary](assets/dashboard.png)
 
 **Key features:**
+
 - KPI cards: Total Incidents · Active Alerts · Suicide Risk · Pickpocketing Risk · Security Threats (all with day-over-day delta)
 - **Incidents by CCTV** — donut chart breakdown per camera feed
 - **Incident Trend (Last 7 Days)** — multi-line chart by risk category
@@ -567,6 +569,7 @@ Centralised alert management interface for security staff to triage, acknowledge
 ![Alerts — Full alert list with risk scores, status tracking, and incident detail panel](assets/alerts.png)
 
 **Key features:**
+
 - Tab navigation: All Alerts (28) · High Risk (8) · Medium Risk (13) · Low Risk (7) · Resolved (15)
 - Sortable table: Alert ID · CCTV Feed · Platform · Type · Risk Score · Time · Status · Action
 - Colour-coded risk score badges (91% red → 15% green)
@@ -589,15 +592,15 @@ Supports instant switching between CCTV-1 through CCTV-5 across all dashboard vi
 
 ### Dashboard Module Summary
 
-| Module | Description |
-|--------|-------------|
-| **Live Alert Feed** | Real-time scrolling list of active alerts with one-click acknowledgement |
-| **Platform Grid** | All monitored platforms showing camera status and current risk level |
-| **Incident History** | Searchable log with full LSTM output and agent reasoning traces |
-| **Heatmap Visualisation** | Spatial incident density overlaid on platform diagrams |
-| **Temporal Analytics** | Incident trends by hour, day, and week with peak window identification |
-| **LSTM Performance Panel** | Real-time accuracy, false positive rate, confidence distribution |
-| **Staff Response Metrics** | Acknowledgement times, resolution rates, per-operator trends |
+| Module                            | Description                                                              |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| **Live Alert Feed**               | Real-time scrolling list of active alerts with one-click acknowledgement |
+| **Platform Grid**                 | All monitored platforms showing camera status and current risk level     |
+| **Incident History**              | Searchable log with full transformer output and agent reasoning traces   |
+| **Heatmap Visualisation**         | Spatial incident density overlaid on platform diagrams                   |
+| **Temporal Analytics**            | Incident trends by hour, day, and week with peak window identification   |
+| **Transformer Performance Panel** | Accuracy, false positive rate, and confidence distribution               |
+| **Staff Response Metrics**        | Acknowledgement times, resolution rates, per-operator trends             |
 
 ---
 
@@ -605,25 +608,25 @@ Supports instant switching between CCTV-1 through CCTV-5 across all dashboard vi
 
 For production deployment on **NVIDIA Jetson Orin Nano**:
 
-| Component | Location | Rationale |
-|-----------|----------|-----------|
-| YOLOv8 Detection | Edge | Raw video stays local — zero bandwidth cost |
-| ByteTrack | Edge | Per-frame continuity requires local state |
-| YOLOv8-Pose | Edge | Latency-sensitive; feeds directly into features |
-| Feature Extraction | Edge | Compact output: 7 floats vs full video stream |
-| LSTM Classifier | Edge | TensorRT-optimised; < 5ms on Jetson |
-| Reasoning Agent | Cloud | Requires LLM + historical incident data |
-| Dashboard | Cloud | Multi-station aggregation |
+| Component            | Location | Rationale                                       |
+| -------------------- | -------- | ----------------------------------------------- |
+| YOLOv8 Detection     | Edge     | Raw video stays local — zero bandwidth cost     |
+| ByteTrack            | Edge     | Per-frame continuity requires local state       |
+| YOLOv8-Pose          | Edge     | Latency-sensitive; feeds directly into features |
+| Feature Extraction   | Edge     | Compact output: 7 floats vs full video stream   |
+| Temporal Transformer | Edge     | PyTorch inference; edge deployment is planned   |
+| Reasoning Agent      | Cloud    | Requires LLM + historical incident data         |
+| Dashboard            | Cloud    | Multi-station aggregation                       |
 
 ### Jetson Orin Nano Specs
 
-| Parameter | Value |
-|-----------|-------|
-| Device cost | ~$500 USD |
-| YOLOv8n FPS | 30+ FPS with TensorRT FP16 |
-| LSTM inference | < 5ms per sequence |
-| Bandwidth saving | ~99.9% vs raw video streaming |
-| Offline buffer | 24 hours if cloud connectivity lost |
+| Parameter             | Value                                    |
+| --------------------- | ---------------------------------------- |
+| Device cost           | ~$500 USD                                |
+| YOLOv8n FPS           | 30+ FPS with TensorRT FP16               |
+| Transformer inference | Not benchmarked in the current prototype |
+| Bandwidth saving      | ~99.9% vs raw video streaming            |
+| Offline buffer        | 24 hours if cloud connectivity lost      |
 
 ---
 
@@ -631,16 +634,16 @@ For production deployment on **NVIDIA Jetson Orin Nano**:
 
 Privacy is a **foundational design constraint**, not an afterthought.
 
-| Principle | Implementation |
-|-----------|---------------|
-| **No Facial Recognition** | Face detection models are explicitly excluded; analysis uses body movement and posture only |
-| **No Biometric Storage** | Track IDs are numeric, session-scoped integers — expires when session ends |
-| **Minimal Data Retention** | Raw video retained 72 hours by default; only flagged clips archived up to 30 days |
-| **Behaviour-Only Analysis** | LSTM feature vector contains only anonymised movement metrics |
-| **Human-in-the-Loop** | All alerts require human staff confirmation — AI recommends, humans decide |
-| **Transparent Reasoning** | Every incident record includes full LSTM confidence, risk score, and LangGraph reasoning trace |
-| **Regulatory Alignment** | Designed for GDPR (EU), PDPA (India), and equivalent frameworks |
-| **Bias Monitoring** | Regular audits of alert rates by platform, time, and incident type |
+| Principle                   | Implementation                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| **No Facial Recognition**   | Face detection models are explicitly excluded; analysis uses body movement and posture only      |
+| **No Biometric Storage**    | Track IDs are numeric, session-scoped integers — expires when session ends                       |
+| **Minimal Data Retention**  | Raw video retained 72 hours by default; only flagged clips archived up to 30 days                |
+| **Behaviour-Only Analysis** | Transformer feature vector contains only anonymised movement metrics                             |
+| **Human-in-the-Loop**       | All alerts require human staff confirmation — AI recommends, humans decide                       |
+| **Transparent Reasoning**   | Every incident record includes transformer confidence, risk score, and LangGraph reasoning trace |
+| **Regulatory Alignment**    | Designed for GDPR (EU), PDPA (India), and equivalent frameworks                                  |
+| **Bias Monitoring**         | Regular audits of alert rates by platform, time, and incident type                               |
 
 ---
 
@@ -653,7 +656,7 @@ pytest
 
 # Run specific test modules
 pytest tests/test_agents.py
-pytest tests/test_lstm.py
+pytest tests/test_transformer_pipeline.py
 pytest tests/test_risk_scoring.py
 pytest tests/test_cv.py
 
@@ -664,18 +667,18 @@ npm run e2e
 
 ### Test Coverage
 
-| Module | Tests |
-|--------|-------|
-| Agent pipeline | `test_agents.py` |
-| LSTM model | `test_lstm.py` |
-| Risk scoring | `test_risk_scoring.py` |
-| CV pipeline | `test_cv.py` |
-| Alert system | `test_alerts.py` |
+| Module                | Tests                             |
+| --------------------- | --------------------------------- |
+| Agent pipeline        | `test_agents.py`                  |
+| Temporal Transformer  | `test_transformer_pipeline.py`    |
+| Risk scoring          | `test_risk_scoring.py`            |
+| CV pipeline           | `test_cv.py`                      |
+| Alert system          | `test_alerts.py`                  |
 | Incident & escalation | `test_incident_and_escalation.py` |
-| Heatmap | `test_heatmap.py` |
-| Dashboard trends | `test_dashboard_trend.py` |
-| Reliability | `test_reliability.py` |
-| Frontend E2E | `tests/e2e/feeds.spec.ts` |
+| Heatmap               | `test_heatmap.py`                 |
+| Dashboard trends      | `test_dashboard_trend.py`         |
+| Reliability           | `test_reliability.py`             |
+| Frontend E2E          | `tests/e2e/feeds.spec.ts`         |
 
 ---
 
@@ -684,9 +687,9 @@ npm run e2e
 Core tables in PostgreSQL (SQLite for development):
 
 ```sql
-incidents — id, track_id, timestamp, platform_id, risk_score, risk_category, lstm_confidence, status
+incidents — id, track_id, timestamp, platform_id, risk_score, risk_category, transformer_confidence, status
 alerts — id, incident_id, alert_type, sent_at, acknowledged_at, staff_id, escalation_level
-tracks — id, track_id, camera_id, session_id, feature_sequence_json, lstm_label, confidence
+tracks — id, track_id, camera_id, session_id, feature_sequence_json, transformer_label, confidence
 analytics — id, date, hour, platform_id, incident_count, avg_risk_score, false_positive_count
 staff — id, name, platform_zone, contact_email, contact_phone, is_available
 platforms — id, station_id, platform_number, camera_ids_json, edge_zone_config_json
@@ -697,25 +700,28 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 
 ## Roadmap
 
-### v1.0 — Hackathon MVP 
+### v1.0 — Hackathon MVP
+
 - [x] Recorded video processing pipeline
 - [x] YOLOv8 + ByteTrack + Pose estimation
-- [x] Bidirectional LSTM behaviour classifier
+- [x] Temporal Transformer behaviour classifier
 - [x] LangGraph Perception + Reasoning + Intervention agents
 - [x] SQLite storage
 - [x] React dashboard with live alerts
 
-### v1.5 — Production Alpha 
+### v1.5 — Production Alpha
+
 - [x] Live RTSP stream integration
 - [x] PostgreSQL + Redis migration
 - [x] WebSocket real-time alert delivery
 - [x] Email (SMTP) + SMS (Twilio) notifications
 - [x] Edge deployment on Jetson Orin Nano
 - [x] Operator false positive feedback loop
-- [x] LSTM confidence thresholding + temporal confirmation
+- [x] Transformer confidence thresholding + temporal confirmation
 
-### v2.0 — Production Release 
-- [ ] LSTM continual learning pipeline (weekly retraining)
+### v2.0 — Production Release
+
+- [ ] Transformer continual learning pipeline (weekly retraining)
 - [ ] Multi-camera person re-identification
 - [ ] Automated PA system integration for critical alerts
 - [ ] Mobile app for railway staff (React Native)
@@ -723,7 +729,8 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 - [ ] Compliance reporting and audit log exports
 - [ ] Bias monitoring and periodic model audits
 
-### v3.0 — Advanced Intelligence 
+### v3.0 — Advanced Intelligence
+
 - [ ] Predictive analytics — forecast high-risk time windows
 - [ ] Crowd flow optimisation recommendations
 - [ ] Integration with emergency services dispatch
@@ -736,29 +743,32 @@ feedback — id, alert_id, staff_id, is_false_positive, notes, submitted_at
 ## Tech Stack
 
 ### Backend
-| Library | Purpose |
-|---|---|
-| Python 3.11+ | Core language |
-| FastAPI + Uvicorn | Async REST API |
-| SQLAlchemy + Alembic | ORM + migrations |
-| LangGraph | Multi-agent orchestration |
-| PyTorch | LSTM training & inference |
-| Ultralytics YOLOv8 | Detection, pose, tracking |
-| OpenCV | Video decode/preprocess |
-| smtplib | Email alerts |
-| Twilio | SMS escalation |
+
+| Library              | Purpose                                   |
+| -------------------- | ----------------------------------------- |
+| Python 3.11+         | Core language                             |
+| FastAPI + Uvicorn    | Async REST API                            |
+| SQLAlchemy + Alembic | ORM + migrations                          |
+| LangGraph            | Multi-agent orchestration                 |
+| PyTorch              | Temporal Transformer training & inference |
+| Ultralytics YOLOv8   | Detection, pose, tracking                 |
+| OpenCV               | Video decode/preprocess                   |
+| smtplib              | Email alerts                              |
+| Twilio               | SMS escalation                            |
 
 ### Frontend
-| Library | Purpose |
-|---|---|
-| React 19 | UI |
+
+| Library                 | Purpose                |
+| ----------------------- | ---------------------- |
+| React 19                | UI                     |
 | TanStack Router / Query | Routing + server state |
-| Tailwind CSS 4 | Styling |
-| Recharts | Analytics charts |
-| shadcn/ui | Component library |
-| Socket.io Client | Real-time alerts |
+| Tailwind CSS 4          | Styling                |
+| Recharts                | Analytics charts       |
+| shadcn/ui               | Component library      |
+| Socket.io Client        | Real-time alerts       |
 
 ### Storage
+
 SQLite for development (used in this build); PostgreSQL + Redis are the intended production path but are not what this repo currently runs on by default.
 
 ---
@@ -766,6 +776,7 @@ SQLite for development (used in this build); PostgreSQL + Redis are the intended
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+
 - (Optional) an OpenAI or Anthropic API key for LLM-assisted reasoning
@@ -804,7 +815,7 @@ RAILMIND_API_KEY=change-this-admin-api-key
 LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 
-# LSTM behaviour label thresholds
+# Temporal Transformer behaviour label thresholds
 BEHAVIOR_HIGH_SCORE_THRESHOLD=0.65
 BEHAVIOR_ERRATIC_SCORE_THRESHOLD=0.4
 BEHAVIOR_FOLLOWING_DISTANCE_METERS=1.2
@@ -833,7 +844,7 @@ VITE_WS_URL=ws://localhost:8000
 
 ---
 
-## Training the LSTM
+## Training the Temporal Transformer
 
 ```bash
 cd backend
@@ -848,7 +859,7 @@ curl -X POST http://localhost:8000/api/training/trigger \
   -d '{"model_type": "all", "epochs": 30, "batch_size": 32}'
 ```
 
-Training data is generated synthetically from rule-based behavioural definitions — see `backend/app/lstm/train.py`. Swapping in real labelled incident data is the top priority before any production claim about accuracy.
+Training data is generated synthetically from rule-based behavioural definitions — see `backend/app/transformer/train.py`. Swapping in real labelled incident data is the top priority before any production claim about accuracy.
 
 ---
 
@@ -856,31 +867,31 @@ Training data is generated synthetically from rule-based behavioural definitions
 
 All routes are prefixed with `/api` unless noted. Selected endpoints:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/incidents` | List incidents (filterable) |
-| GET | `/incidents/{id}` | Full incident detail |
-| POST | `/incidents/{id}/acknowledge` | Staff acknowledges an incident |
-| POST | `/incidents/{id}/resolve` | Mark an incident resolved |
-| POST | `/incidents/{id}/false-positive` | Flag a false positive |
-| GET | `/alerts` | List alerts |
-| GET | `/alerts/stats` | Alert statistics |
-| PATCH | `/alerts/{id}/acknowledge` | Acknowledge an alert |
-| PATCH | `/alerts/{id}/resolve` | Resolve an alert |
-| PATCH | `/alerts/{id}/assign` | Assign an alert to staff |
-| GET | `/dashboard/stats` | Headline dashboard metrics |
-| GET | `/dashboard/trend` | Incident trend over time |
-| GET | `/dashboard/risk-distribution` | Risk category breakdown |
-| GET | `/dashboard/heatmap` | Spatial heatmap data |
-| GET | `/dashboard/cctv-summary` | Per-camera summary |
-| GET | `/analytics/lstm-performance` | LSTM accuracy/confidence metrics |
-| GET | `/feeds` | List camera feeds |
-| POST | `/feeds/upload` | Upload a video file for processing |
-| GET | `/feeds/{id}/stream` | Stream a processed feed |
-| GET | `/staff/available` | Available staff |
-| POST | `/training/trigger` | Trigger LSTM retraining |
-| GET | `/health` | Health check |
-| WS | `/ws/alerts` | Real-time alert stream |
+| Method | Endpoint                             | Description                             |
+| ------ | ------------------------------------ | --------------------------------------- |
+| GET    | `/incidents`                         | List incidents (filterable)             |
+| GET    | `/incidents/{id}`                    | Full incident detail                    |
+| POST   | `/incidents/{id}/acknowledge`        | Staff acknowledges an incident          |
+| POST   | `/incidents/{id}/resolve`            | Mark an incident resolved               |
+| POST   | `/incidents/{id}/false-positive`     | Flag a false positive                   |
+| GET    | `/alerts`                            | List alerts                             |
+| GET    | `/alerts/stats`                      | Alert statistics                        |
+| PATCH  | `/alerts/{id}/acknowledge`           | Acknowledge an alert                    |
+| PATCH  | `/alerts/{id}/resolve`               | Resolve an alert                        |
+| PATCH  | `/alerts/{id}/assign`                | Assign an alert to staff                |
+| GET    | `/dashboard/stats`                   | Headline dashboard metrics              |
+| GET    | `/dashboard/trend`                   | Incident trend over time                |
+| GET    | `/dashboard/risk-distribution`       | Risk category breakdown                 |
+| GET    | `/dashboard/heatmap`                 | Spatial heatmap data                    |
+| GET    | `/dashboard/cctv-summary`            | Per-camera summary                      |
+| GET    | `/analytics/transformer-performance` | Transformer accuracy/confidence metrics |
+| GET    | `/feeds`                             | List camera feeds                       |
+| POST   | `/feeds/upload`                      | Upload a video file for processing      |
+| GET    | `/feeds/{id}/stream`                 | Stream a processed feed                 |
+| GET    | `/staff/available`                   | Available staff                         |
+| POST   | `/training/trigger`                  | Trigger Temporal Transformer retraining |
+| GET    | `/health`                            | Health check                            |
+| WS     | `/ws/alerts`                         | Real-time alert stream                  |
 
 Full route definitions live in `backend/app/api/routes/`.
 
@@ -892,26 +903,27 @@ Full route definitions live in `backend/app/api/routes/`.
 cd backend
 pytest                       # full suite — 57 tests, all passing as of this build
 pytest tests/test_agents.py
-pytest tests/test_lstm.py
+pytest tests/test_transformer_pipeline.py
 pytest tests/test_risk_scoring.py
 pytest tests/test_cv.py
 ```
 
-| Test file | Covers |
-|---|---|
-| `test_agents.py` | Agent pipeline (perception → reasoning → intervention) |
-| `test_lstm.py` | LSTM model loading and inference |
-| `test_risk_scoring.py` | Risk score computation |
-| `test_cv.py` | CV pipeline behaviour and degradation handling |
-| `test_alerts.py` | Alert lifecycle |
-| `test_incident_and_escalation.py` | Incident creation and escalation timers |
-| `test_heatmap.py` | Heatmap analytics |
-| `test_dashboard_trend.py` | Dashboard trend data |
-| `test_reliability.py` | Failure-mode handling |
-| `test_api_auth.py` | API authentication |
-| `test_feeds.py` | Feed registration and upload |
+| Test file                         | Covers                                                 |
+| --------------------------------- | ------------------------------------------------------ |
+| `test_agents.py`                  | Agent pipeline (perception → reasoning → intervention) |
+| `test_transformer_pipeline.py`    | Temporal Transformer model loading and inference       |
+| `test_risk_scoring.py`            | Risk score computation                                 |
+| `test_cv.py`                      | CV pipeline behaviour and degradation handling         |
+| `test_alerts.py`                  | Alert lifecycle                                        |
+| `test_incident_and_escalation.py` | Incident creation and escalation timers                |
+| `test_heatmap.py`                 | Heatmap analytics                                      |
+| `test_dashboard_trend.py`         | Dashboard trend data                                   |
+| `test_reliability.py`             | Failure-mode handling                                  |
+| `test_api_auth.py`                | API authentication                                     |
+| `test_feeds.py`                   | Feed registration and upload                           |
 
 Frontend:
+
 ```bash
 cd frontend
 npm run e2e   # Playwright E2E tests
@@ -941,13 +953,13 @@ RailMind-AI/
 │   │   ├── agents/        # LangGraph perception/reasoning/intervention nodes
 │   │   ├── cv/             # Video processing, pose estimation
 │   │   ├── features/       # Behavioural feature detectors
-│   │   ├── lstm/            # Model definition, training, inference
+│   │   ├── transformer/     # Model definition, training, inference
 │   │   ├── api/routes/      # FastAPI endpoints
 │   │   ├── services/        # Risk scoring, alerts, escalation, notifications
 │   │   ├── analytics/       # Dashboard metrics, heatmaps
 │   │   ├── models/          # SQLAlchemy models
 │   │   └── core/             # Config, database, WebSocket manager
-│   ├── lstm/saved_models/    # Trained checkpoint + scaler
+│   ├── transformer/saved_models/ # Trained checkpoint + scaler
 │   ├── tests/                  # Pytest suite
 │   └── run.py
 ├── frontend/
@@ -965,8 +977,9 @@ RailMind-AI/
 ## Roadmap
 
 ### Done (verified working in this repo)
+
 - [x] Video upload + CV pipeline (YOLOv8 + ByteTrack + Pose)
-- [x] Bidirectional LSTM behaviour classifier with saved weights
+- [x] Temporal Transformer behaviour classifier with saved weights
 - [x] LangGraph Perception + Reasoning + Intervention agents
 - [x] SQLite storage with full schema
 - [x] React dashboard with live alerts and analytics
@@ -977,9 +990,10 @@ RailMind-AI/
 - [x] 57 passing backend tests
 
 ### Not yet built
+
 - [ ] Live RTSP camera validation (currently untested beyond file upload)
 - [ ] PostgreSQL + Redis production migration
-- [ ] LSTM retrained on real, labelled incident data
+- [ ] Temporal Transformer retrained on real, labelled incident data
 - [ ] Multi-camera person re-identification
 - [ ] Edge deployment (Jetson Orin Nano / TensorRT)
 - [ ] Automated PA system integration
@@ -1000,4 +1014,3 @@ RailMind-AI/
 Built for the FAR AWAY 2026 Hackathon by Team Accelerate.
 
 </div>
-
